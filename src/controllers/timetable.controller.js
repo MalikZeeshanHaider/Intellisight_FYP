@@ -95,3 +95,15 @@ export const getAnalytics = asyncHandler(async (req, res) => {
 
   successResponse(res, analytics, 'Analytics data retrieved successfully');
 });
+
+/**
+ * @route   GET /api/timetable/recent
+ * @desc    Get recent activity (last N entries/exits)
+ * @access  Private
+ */
+export const getRecentActivity = asyncHandler(async (req, res) => {
+  const limit = parseInt(req.query.limit) || 10;
+  const recentActivity = await timetableService.getRecentActivity(limit);
+
+  successResponse(res, recentActivity, 'Recent activity retrieved successfully');
+});

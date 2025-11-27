@@ -1,9 +1,8 @@
 import asyncHandler from 'express-async-handler';
 import { prisma } from '../config/database.js';
 import { successResponse } from '../utils/response.js';
-import { NotFoundError } from '../utils/errors.js';
+import { NotFoundError, BadRequestError } from '../utils/errors.js';
 import { HTTP_STATUS, SUCCESS_MESSAGES } from '../config/constants.js';
-import uploadService from '../services/upload.service.js';
 
 /**
  * @route   GET /api/teachers
@@ -12,29 +11,10 @@ import uploadService from '../services/upload.service.js';
  */
 export const getAllTeachers = asyncHandler(async (req, res) => {
   const teachers = await prisma.teacher.findMany({
-    include: {
-      zone: {
-        select: {
-          Zone_id: true,
-          Zone_Name: true,
-        },
-      },
-      camara: {
-        select: {
-          Camara_Id: true,
-        },
-      },
-    },
     orderBy: { Teacher_ID: 'asc' },
   });
 
-  // Return base64 strings as-is for response
-  const teachersWithImages = teachers.map((teacher) => ({
-    ...teacher,
-    Face_Pictures: teacher.Face_Pictures || null,
-  }));
-
-  successResponse(res, teachersWithImages, 'Teachers retrieved successfully');
+  successResponse(res, teachers, 'Teachers retrieved successfully');
 });
 
 /**
@@ -46,30 +26,9 @@ export const getTeacherById = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   const teacher = await prisma.teacher.findUnique({
-    where: { Teacher_ID: id },
+    where: { Teacher_ID: parseInt(id) },
     include: {
-      zone: {
-        select: {
-          Zone_id: true,
-          Zone_Name: true,
-        },
-      },
-      camara: {
-        select: {
-          Camara_Id: true,
-        },
-      },
       TimeTable: {
-        select: {
-          TimeTable_ID: true,
-          EntryTime: true,
-          ExitTime: true,
-          zone: {
-            select: {
-              Zone_Name: true,
-            },
-          },
-        },
         orderBy: { EntryTime: 'desc' },
         take: 10,
       },
@@ -80,92 +39,70 @@ export const getTeacherById = asyncHandler(async (req, res) => {
     throw new NotFoundError(`Teacher with ID ${id} not found`);
   }
 
-  // Convert Face_Pictures buffer to base64
-  const teacherWithBase64 = {
-    ...teacher,
-    Face_Pictures: teacher.Face_Pictures || null,
-  };
-
-  successResponse(res, teacherWithBase64, 'Teacher retrieved successfully');
+  successResponse(res, teacher, 'Teacher retrieved successfully');
 });
 
 /**
  * @route   POST /api/teachers
- * @desc    Create new teacher with multiple face images
+ * @desc    Create new teacher with 5 face pictures
  * @access  Private
  */
 export const createTeacher = asyncHandler(async (req, res) => {
-  const { Name, Email, Face_Pictures, Camara_Id, Zone_id } = req.body;
+  const { 
+    Name, 
+    Email,
+    Gender,
+    Faculty_Type,
+    Department,
+    Face_Picture_1,
+    Face_Picture_2,
+    Face_Picture_3,
+    Face_Picture_4,
+    Face_Picture_5
+  } = req.body;
 
-  // Handle multiple images (array of base64 strings)
-  // For now, store only the first image as base64 string in database
-  let facePictureString = null;
-  if (Face_Pictures) {
-    if (Buffer.isBuffer(Face_Pictures)) {
-      facePictureString = uploadService.bufferToBase64(Face_Pictures);
-      uploadService.validateImageSize(facePictureString);
-    } else if (Array.isArray(Face_Pictures)) {
-      if (Face_Pictures.length > 0) {
-        const first = Face_Pictures[0];
-        if (Buffer.isBuffer(first)) {
-          facePictureString = uploadService.bufferToBase64(first);
-        } else {
-          facePictureString = first;
-        }
-        uploadService.validateImageSize(facePictureString);
-      }
-    } else {
-      uploadService.validateImageSize(Face_Pictures);
-      facePictureString = Face_Pictures;
-    }
+  // Validate required fields
+  if (!Name || !Email) {
+    throw new BadRequestError('Name and Email are required');
+  }
+
+  // Validate at least one picture
+  if (!Face_Picture_1) {
+    throw new BadRequestError('At least one face picture is required');
+  }
+
+  // Validate Department is required for Permanent faculty
+  if (Faculty_Type === 'Permanent' && !Department) {
+    throw new BadRequestError('Department is required for Permanent faculty');
+  }
+
+  // Check if email already exists
+  const existingTeacher = await prisma.teacher.findUnique({
+    where: { Email },
+  });
+
+  if (existingTeacher) {
+    throw new BadRequestError(`Teacher with Email ${Email} already exists`);
   }
 
   const teacher = await prisma.teacher.create({
     data: {
       Name,
       Email,
-      Face_Pictures: facePictureString,
-      Camara_Id,
-      Zone_id,
-    },
-    include: {
-      zone: {
-        select: {
-          Zone_id: true,
-          Zone_Name: true,
-        },
-      },
-      camara: {
-        select: {
-          Camara_Id: true,
-        },
-      },
+      Gender,
+      Faculty_Type,
+      Department: Faculty_Type === 'Permanent' ? Department : null,
+      Face_Picture_1,
+      Face_Picture_2,
+      Face_Picture_3,
+      Face_Picture_4,
+      Face_Picture_5,
     },
   });
 
-  // Generate face encodings asynchronously (don't wait for it)
-  // Disabled temporarily to prevent timeout - face encodings will be generated by Python system
-  if (Face_Pictures && false) {
-    const { default: faceEncodingService } = await import('../services/faceEncoding.service.js');
-    const images = Array.isArray(Face_Pictures) ? Face_Pictures : [Face_Pictures];
-    faceEncodingService.generateEncodings('TEACHER', teacher.Teacher_ID, images)
-      .then(result => {
-        console.log(`Face encoding for teacher ${teacher.Teacher_ID}:`, result.message);
-      })
-      .catch(error => {
-        console.error(`Face encoding error for teacher ${teacher.Teacher_ID}:`, error);
-      });
-  }
-
-  // Return base64 string as-is for response
-  const teacherWithImages = {
-    ...teacher,
-    Face_Pictures: teacher.Face_Pictures || null,
-  };
-
   successResponse(
     res,
-    teacherWithImages,
+    teacher,
     SUCCESS_MESSAGES.CREATED,
     HTTP_STATUS.CREATED
   );
@@ -178,11 +115,22 @@ export const createTeacher = asyncHandler(async (req, res) => {
  */
 export const updateTeacher = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { Name, Email, Face_Pictures, Camara_Id, Zone_id } = req.body;
+  const { 
+    Name, 
+    Email,
+    Gender,
+    Faculty_Type,
+    Department,
+    Face_Picture_1,
+    Face_Picture_2,
+    Face_Picture_3,
+    Face_Picture_4,
+    Face_Picture_5
+  } = req.body;
 
   // Check if teacher exists
   const existingTeacher = await prisma.teacher.findUnique({
-    where: { Teacher_ID: id },
+    where: { Teacher_ID: parseInt(id) },
   });
 
   if (!existingTeacher) {
@@ -192,44 +140,27 @@ export const updateTeacher = asyncHandler(async (req, res) => {
   const updateData = {};
   if (Name !== undefined) updateData.Name = Name;
   if (Email !== undefined) updateData.Email = Email;
-  if (Camara_Id !== undefined) updateData.Camara_Id = Camara_Id;
-  if (Zone_id !== undefined) updateData.Zone_id = Zone_id;
-
-  // Convert base64 to buffer if provided
-  if (Face_Pictures !== undefined) {
-    if (Face_Pictures) {
-      uploadService.validateImageSize(Face_Pictures);
-      updateData.Face_Pictures = Face_Pictures;
-    } else {
-      updateData.Face_Pictures = null;
-    }
-  }
+  if (Gender !== undefined) updateData.Gender = Gender;
+  if (Faculty_Type !== undefined) updateData.Faculty_Type = Faculty_Type;
+  if (Department !== undefined) updateData.Department = Department;
+  if (Face_Picture_1 !== undefined) updateData.Face_Picture_1 = Face_Picture_1;
+  if (Face_Picture_2 !== undefined) updateData.Face_Picture_2 = Face_Picture_2;
+  if (Face_Picture_3 !== undefined) updateData.Face_Picture_3 = Face_Picture_3;
+  if (Face_Picture_4 !== undefined) updateData.Face_Picture_4 = Face_Picture_4;
+  if (Face_Picture_5 !== undefined) updateData.Face_Picture_5 = Face_Picture_5;
 
   const teacher = await prisma.teacher.update({
-    where: { Teacher_ID: id },
+    where: { Teacher_ID: parseInt(id) },
     data: updateData,
     include: {
-      zone: {
-        select: {
-          Zone_id: true,
-          Zone_Name: true,
-        },
-      },
-      camara: {
-        select: {
-          Camara_Id: true,
-        },
+      TimeTable: {
+        orderBy: { EntryTime: 'desc' },
+        take: 5,
       },
     },
   });
 
-  // Convert buffer back to base64 for response
-  const teacherWithBase64 = {
-    ...teacher,
-    Face_Pictures: teacher.Face_Pictures || null,
-  };
-
-  successResponse(res, teacherWithBase64, SUCCESS_MESSAGES.UPDATED);
+  successResponse(res, teacher, SUCCESS_MESSAGES.UPDATED);
 });
 
 /**
@@ -242,15 +173,21 @@ export const deleteTeacher = asyncHandler(async (req, res) => {
 
   // Check if teacher exists
   const existingTeacher = await prisma.teacher.findUnique({
-    where: { Teacher_ID: id },
+    where: { Teacher_ID: parseInt(id) },
   });
 
   if (!existingTeacher) {
     throw new NotFoundError(`Teacher with ID ${id} not found`);
   }
 
+  // Delete related TimeTable entries first
+  await prisma.timeTable.deleteMany({
+    where: { Teacher_ID: parseInt(id) },
+  });
+
+  // Now delete the teacher
   await prisma.teacher.delete({
-    where: { Teacher_ID: id },
+    where: { Teacher_ID: parseInt(id) },
   });
 
   successResponse(

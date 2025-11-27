@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FiX, FiUpload, FiTrash2 } from 'react-icons/fi';
-import { teacherAPI } from '../api/api';
+import { studentAPI } from '../api/api';
 
-const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
+const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
     const [formData, setFormData] = useState({
         Name: '',
+        RollNumber: '',
         Email: '',
         Gender: '',
-        Faculty_Type: '',
         Department: ''
     });
     const [facePictures, setFacePictures] = useState({
@@ -19,6 +19,26 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    // Populate form when student prop changes
+    useEffect(() => {
+        if (student) {
+            setFormData({
+                Name: student.Name || '',
+                RollNumber: student.RollNumber || '',
+                Email: student.Email || '',
+                Gender: student.Gender || '',
+                Department: student.Department || ''
+            });
+            setFacePictures({
+                Face_Picture_1: student.Face_Picture_1 || null,
+                Face_Picture_2: student.Face_Picture_2 || null,
+                Face_Picture_3: student.Face_Picture_3 || null,
+                Face_Picture_4: student.Face_Picture_4 || null,
+                Face_Picture_5: student.Face_Picture_5 || null
+            });
+        }
+    }, [student]);
 
     const handleInputChange = (e) => {
         setFormData({
@@ -57,16 +77,12 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
             setError('Name is required');
             return;
         }
+        if (!formData.RollNumber.trim()) {
+            setError('Roll Number is required');
+            return;
+        }
         if (!formData.Email.trim()) {
             setError('Email is required');
-            return;
-        }
-        if (!facePictures.Face_Picture_1) {
-            setError('At least one face picture is required');
-            return;
-        }
-        if (formData.Faculty_Type === 'Permanent' && !formData.Department.trim()) {
-            setError('Department is required for Permanent faculty');
             return;
         }
 
@@ -75,35 +91,27 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
         try {
             const payload = {
                 Name: formData.Name.trim(),
+                RollNumber: formData.RollNumber.trim(),
                 Email: formData.Email.trim(),
-                Gender: formData.Gender || undefined,
-                Faculty_Type: formData.Faculty_Type || undefined,
-                Department: formData.Faculty_Type === 'Permanent' ? formData.Department.trim() : null,
-                Face_Picture_1: facePictures.Face_Picture_1
+                Gender: formData.Gender,
+                Department: formData.Department.trim()
             };
 
-            // Add optional pictures
+            // Add pictures (only include changed ones)
+            if (facePictures.Face_Picture_1) payload.Face_Picture_1 = facePictures.Face_Picture_1;
             if (facePictures.Face_Picture_2) payload.Face_Picture_2 = facePictures.Face_Picture_2;
             if (facePictures.Face_Picture_3) payload.Face_Picture_3 = facePictures.Face_Picture_3;
             if (facePictures.Face_Picture_4) payload.Face_Picture_4 = facePictures.Face_Picture_4;
             if (facePictures.Face_Picture_5) payload.Face_Picture_5 = facePictures.Face_Picture_5;
 
-            await teacherAPI.createTeacher(payload);
+            await studentAPI.updateStudent(student.Student_ID, payload);
 
-            setFormData({ Name: '', Email: '', Gender: '', Faculty_Type: '', Department: '' });
-            setFacePictures({
-                Face_Picture_1: null,
-                Face_Picture_2: null,
-                Face_Picture_3: null,
-                Face_Picture_4: null,
-                Face_Picture_5: null
-            });
             onSuccess();
             onClose();
         } catch (err) {
-            console.error('Error creating teacher:', err);
+            console.error('Error updating student:', err);
             
-            let errorMessage = 'Failed to create teacher. Please check all fields.';
+            let errorMessage = 'Failed to update student. Please check all fields.';
             
             if (err.response?.data) {
                 const data = err.response.data;
@@ -134,7 +142,7 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
             <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h2 className="text-2xl font-bold text-gray-800">Add New Teacher</h2>
+                    <h2 className="text-2xl font-bold text-gray-800">Edit Student</h2>
                     <button
                         onClick={onClose}
                         className="text-gray-500 hover:text-gray-700 transition"
@@ -156,8 +164,24 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                             value={formData.Name}
                             onChange={handleInputChange}
                             required
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                            placeholder="Enter teacher name"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Enter student name"
+                        />
+                    </div>
+
+                    {/* Roll Number */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Roll Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            name="RollNumber"
+                            value={formData.RollNumber}
+                            onChange={handleInputChange}
+                            required
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Enter roll number"
                         />
                     </div>
 
@@ -172,8 +196,8 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                             value={formData.Email}
                             onChange={handleInputChange}
                             required
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                            placeholder="teacher@example.com"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="student@example.com"
                         />
                     </div>
 
@@ -186,7 +210,7 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                             name="Gender"
                             value={formData.Gender}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
                             <option value="">Select gender</option>
                             <option value="Male">Male</option>
@@ -195,48 +219,28 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                         </select>
                     </div>
 
-                    {/* Faculty Type */}
+                    {/* Department */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Faculty Type
+                            Department
                         </label>
-                        <select
-                            name="Faculty_Type"
-                            value={formData.Faculty_Type}
+                        <input
+                            type="text"
+                            name="Department"
+                            value={formData.Department}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                        >
-                            <option value="">Select faculty type</option>
-                            <option value="Permanent">Permanent</option>
-                            <option value="Visiting">Visiting</option>
-                        </select>
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Enter department"
+                        />
                     </div>
-
-                    {/* Department (conditional) */}
-                    {formData.Faculty_Type === 'Permanent' && (
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Department <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                name="Department"
-                                value={formData.Department}
-                                onChange={handleInputChange}
-                                required
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                placeholder="Enter department"
-                            />
-                        </div>
-                    )}
 
                     {/* Face Pictures Upload */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Face Pictures (1-5 images) <span className="text-red-500">*</span>
+                            Face Pictures (1-5 images)
                         </label>
                         <p className="text-xs text-gray-500 mb-3">
-                            {uploadedCount}/5 images uploaded. First image is required.
+                            {uploadedCount}/5 images uploaded. Leave unchanged to keep existing pictures.
                         </p>
 
                         {/* Image Upload Grid */}
@@ -249,7 +253,7 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                                     <div key={num} className="relative">
                                         <input
                                             type="file"
-                                            id={`teacherImageUpload${num}`}
+                                            id={`editImageUpload${num}`}
                                             accept="image/*"
                                             onChange={handleImageUpload(num)}
                                             className="hidden"
@@ -275,13 +279,12 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                                             </div>
                                         ) : (
                                             <label
-                                                htmlFor={`teacherImageUpload${num}`}
-                                                className="cursor-pointer flex flex-col items-center justify-center h-32 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 transition"
+                                                htmlFor={`editImageUpload${num}`}
+                                                className="cursor-pointer flex flex-col items-center justify-center h-32 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 transition"
                                             >
                                                 <FiUpload size={24} className="text-gray-400 mb-1" />
                                                 <span className="text-xs text-gray-600">
                                                     Picture {num}
-                                                    {num === 1 && <span className="text-red-500">*</span>}
                                                 </span>
                                             </label>
                                         )}
@@ -310,12 +313,12 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                         </button>
                         <button
                             type="submit"
-                            disabled={loading || !facePictures.Face_Picture_1}
-                            className={`px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition ${
-                                loading || !facePictures.Face_Picture_1 ? 'opacity-50 cursor-not-allowed' : ''
+                            disabled={loading}
+                            className={`px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition ${
+                                loading ? 'opacity-50 cursor-not-allowed' : ''
                             }`}
                         >
-                            {loading ? 'Adding...' : 'Add Teacher'}
+                            {loading ? 'Updating...' : 'Update Student'}
                         </button>
                     </div>
                 </form>
@@ -324,4 +327,4 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
     );
 };
 
-export default AddTeacherModal;
+export default EditStudentModal;

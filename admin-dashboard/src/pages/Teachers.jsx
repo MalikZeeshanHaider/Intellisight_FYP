@@ -4,10 +4,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { FiRefreshCw, FiSearch, FiAlertCircle, FiPlus } from 'react-icons/fi';
+import { FiRefreshCw, FiSearch, FiAlertCircle, FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import { GiTeacher } from 'react-icons/gi';
 import { teacherAPI } from '../api/api';
 import AddTeacherModal from '../components/AddTeacherModal';
+import EditTeacherModal from '../components/EditTeacherModal';
 
 const Teachers = () => {
   const [teachers, setTeachers] = useState([]);
@@ -16,6 +17,9 @@ const Teachers = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   // Fetch teachers
   const fetchTeachers = async () => {
@@ -50,11 +54,35 @@ const Teachers = () => {
       const filtered = teachers.filter(teacher =>
         teacher.Name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         teacher.Email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        teacher.Designation?.toLowerCase().includes(searchQuery.toLowerCase())
+        teacher.Faculty_Type?.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredTeachers(filtered);
     }
   }, [searchQuery, teachers]);
+
+  // Handle edit
+  const handleEdit = (teacher) => {
+    setSelectedTeacher(teacher);
+    setIsEditModalOpen(true);
+  };
+
+  // Handle delete
+  const handleDelete = async (teacherId) => {
+    if (deleteConfirm !== teacherId) {
+      setDeleteConfirm(teacherId);
+      setTimeout(() => setDeleteConfirm(null), 3000);
+      return;
+    }
+
+    try {
+      await teacherAPI.deleteTeacher(teacherId);
+      await fetchTeachers();
+      setDeleteConfirm(null);
+    } catch (err) {
+      console.error('Error deleting teacher:', err);
+      setError('Failed to delete teacher');
+    }
+  };
 
   if (loading && teachers.length === 0) {
     return (
@@ -131,22 +159,28 @@ const Teachers = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Teacher
+                    ID
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Designation
+                    Name
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Department
+                    Faculty Type
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contact
+                    Gender
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredTeachers.map((teacher) => (
                   <tr key={teacher.Teacher_ID} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {teacher.Teacher_ID}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
@@ -158,22 +192,40 @@ const Teachers = () => {
                           <div className="text-sm font-medium text-gray-900">
                             {teacher.Name}
                           </div>
-                          <div className="text-sm text-gray-500">
-                            {teacher.Email}
-                          </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                        {teacher.Designation || 'N/A'}
+                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        teacher.Faculty_Type === 'Permanent' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {teacher.Faculty_Type || 'N/A'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {teacher.department?.Department_Name || 'N/A'}
+                      {teacher.Gender || 'N/A'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {teacher.Phone_Number || 'N/A'}
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={() => handleEdit(teacher)}
+                        className="text-green-600 hover:text-green-900 mr-4"
+                        title="Edit teacher"
+                      >
+                        <FiEdit2 size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(teacher.Teacher_ID)}
+                        className={`${
+                          deleteConfirm === teacher.Teacher_ID
+                            ? 'text-red-700 font-bold'
+                            : 'text-red-600 hover:text-red-900'
+                        }`}
+                        title={deleteConfirm === teacher.Teacher_ID ? 'Click again to confirm' : 'Delete teacher'}
+                      >
+                        <FiTrash2 size={18} />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -188,6 +240,17 @@ const Teachers = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={fetchTeachers}
+      />
+
+      {/* Edit Teacher Modal */}
+      <EditTeacherModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedTeacher(null);
+        }}
+        onSuccess={fetchTeachers}
+        teacher={selectedTeacher}
       />
     </div>
   );

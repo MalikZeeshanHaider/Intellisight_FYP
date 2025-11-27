@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FiX, FiUpload, FiTrash2 } from 'react-icons/fi';
 import { teacherAPI } from '../api/api';
 
-const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
+const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
     const [formData, setFormData] = useState({
         Name: '',
         Email: '',
@@ -19,6 +19,26 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    // Populate form when teacher prop changes
+    useEffect(() => {
+        if (teacher) {
+            setFormData({
+                Name: teacher.Name || '',
+                Email: teacher.Email || '',
+                Gender: teacher.Gender || '',
+                Faculty_Type: teacher.Faculty_Type || '',
+                Department: teacher.Department || ''
+            });
+            setFacePictures({
+                Face_Picture_1: teacher.Face_Picture_1 || null,
+                Face_Picture_2: teacher.Face_Picture_2 || null,
+                Face_Picture_3: teacher.Face_Picture_3 || null,
+                Face_Picture_4: teacher.Face_Picture_4 || null,
+                Face_Picture_5: teacher.Face_Picture_5 || null
+            });
+        }
+    }, [teacher]);
 
     const handleInputChange = (e) => {
         setFormData({
@@ -61,10 +81,6 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
             setError('Email is required');
             return;
         }
-        if (!facePictures.Face_Picture_1) {
-            setError('At least one face picture is required');
-            return;
-        }
         if (formData.Faculty_Type === 'Permanent' && !formData.Department.trim()) {
             setError('Department is required for Permanent faculty');
             return;
@@ -78,32 +94,24 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                 Email: formData.Email.trim(),
                 Gender: formData.Gender || undefined,
                 Faculty_Type: formData.Faculty_Type || undefined,
-                Department: formData.Faculty_Type === 'Permanent' ? formData.Department.trim() : null,
-                Face_Picture_1: facePictures.Face_Picture_1
+                Department: formData.Faculty_Type === 'Permanent' ? formData.Department.trim() : null
             };
 
-            // Add optional pictures
+            // Add pictures (only include changed ones)
+            if (facePictures.Face_Picture_1) payload.Face_Picture_1 = facePictures.Face_Picture_1;
             if (facePictures.Face_Picture_2) payload.Face_Picture_2 = facePictures.Face_Picture_2;
             if (facePictures.Face_Picture_3) payload.Face_Picture_3 = facePictures.Face_Picture_3;
             if (facePictures.Face_Picture_4) payload.Face_Picture_4 = facePictures.Face_Picture_4;
             if (facePictures.Face_Picture_5) payload.Face_Picture_5 = facePictures.Face_Picture_5;
 
-            await teacherAPI.createTeacher(payload);
+            await teacherAPI.updateTeacher(teacher.Teacher_ID, payload);
 
-            setFormData({ Name: '', Email: '', Gender: '', Faculty_Type: '', Department: '' });
-            setFacePictures({
-                Face_Picture_1: null,
-                Face_Picture_2: null,
-                Face_Picture_3: null,
-                Face_Picture_4: null,
-                Face_Picture_5: null
-            });
             onSuccess();
             onClose();
         } catch (err) {
-            console.error('Error creating teacher:', err);
+            console.error('Error updating teacher:', err);
             
-            let errorMessage = 'Failed to create teacher. Please check all fields.';
+            let errorMessage = 'Failed to update teacher. Please check all fields.';
             
             if (err.response?.data) {
                 const data = err.response.data;
@@ -134,7 +142,7 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
             <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h2 className="text-2xl font-bold text-gray-800">Add New Teacher</h2>
+                    <h2 className="text-2xl font-bold text-gray-800">Edit Teacher</h2>
                     <button
                         onClick={onClose}
                         className="text-gray-500 hover:text-gray-700 transition"
@@ -233,10 +241,10 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                     {/* Face Pictures Upload */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Face Pictures (1-5 images) <span className="text-red-500">*</span>
+                            Face Pictures (1-5 images)
                         </label>
                         <p className="text-xs text-gray-500 mb-3">
-                            {uploadedCount}/5 images uploaded. First image is required.
+                            {uploadedCount}/5 images uploaded. Leave unchanged to keep existing pictures.
                         </p>
 
                         {/* Image Upload Grid */}
@@ -249,7 +257,7 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                                     <div key={num} className="relative">
                                         <input
                                             type="file"
-                                            id={`teacherImageUpload${num}`}
+                                            id={`editTeacherImageUpload${num}`}
                                             accept="image/*"
                                             onChange={handleImageUpload(num)}
                                             className="hidden"
@@ -275,13 +283,12 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                                             </div>
                                         ) : (
                                             <label
-                                                htmlFor={`teacherImageUpload${num}`}
+                                                htmlFor={`editTeacherImageUpload${num}`}
                                                 className="cursor-pointer flex flex-col items-center justify-center h-32 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 transition"
                                             >
                                                 <FiUpload size={24} className="text-gray-400 mb-1" />
                                                 <span className="text-xs text-gray-600">
                                                     Picture {num}
-                                                    {num === 1 && <span className="text-red-500">*</span>}
                                                 </span>
                                             </label>
                                         )}
@@ -310,12 +317,12 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                         </button>
                         <button
                             type="submit"
-                            disabled={loading || !facePictures.Face_Picture_1}
+                            disabled={loading}
                             className={`px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition ${
-                                loading || !facePictures.Face_Picture_1 ? 'opacity-50 cursor-not-allowed' : ''
+                                loading ? 'opacity-50 cursor-not-allowed' : ''
                             }`}
                         >
-                            {loading ? 'Adding...' : 'Add Teacher'}
+                            {loading ? 'Updating...' : 'Update Teacher'}
                         </button>
                     </div>
                 </form>
@@ -324,4 +331,4 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
     );
 };
 
-export default AddTeacherModal;
+export default EditTeacherModal;

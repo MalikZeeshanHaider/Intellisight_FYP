@@ -4,9 +4,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { FiUsers, FiRefreshCw, FiSearch, FiAlertCircle, FiPlus } from 'react-icons/fi';
+import { FiUsers, FiRefreshCw, FiSearch, FiAlertCircle, FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import { studentAPI } from '../api/api';
 import AddStudentModal from '../components/AddStudentModal';
+import EditStudentModal from '../components/EditStudentModal';
 
 const Students = () => {
   const [students, setStudents] = useState([]);
@@ -15,6 +16,9 @@ const Students = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   // Fetch students
   const fetchStudents = async () => {
@@ -49,11 +53,35 @@ const Students = () => {
       const filtered = students.filter(student =>
         student.Name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         student.Email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        student.Roll_Number?.toLowerCase().includes(searchQuery.toLowerCase())
+        student.RollNumber?.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredStudents(filtered);
     }
   }, [searchQuery, students]);
+
+  // Handle edit
+  const handleEdit = (student) => {
+    setSelectedStudent(student);
+    setIsEditModalOpen(true);
+  };
+
+  // Handle delete
+  const handleDelete = async (studentId) => {
+    if (deleteConfirm !== studentId) {
+      setDeleteConfirm(studentId);
+      setTimeout(() => setDeleteConfirm(null), 3000);
+      return;
+    }
+
+    try {
+      await studentAPI.deleteStudent(studentId);
+      await fetchStudents();
+      setDeleteConfirm(null);
+    } catch (err) {
+      console.error('Error deleting student:', err);
+      setError('Failed to delete student');
+    }
+  };
 
   if (loading && students.length === 0) {
     return (
@@ -130,22 +158,28 @@ const Students = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Student
+                    ID
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Roll Number
+                    Name
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Department
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contact
+                    Gender
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredStudents.map((student) => (
                   <tr key={student.Student_ID} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {student.Student_ID}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -157,22 +191,34 @@ const Students = () => {
                           <div className="text-sm font-medium text-gray-900">
                             {student.Name}
                           </div>
-                          <div className="text-sm text-gray-500">
-                            {student.Email}
-                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                        {student.Roll_Number}
-                      </span>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {student.Department || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {student.department?.Department_Name || 'N/A'}
+                      {student.Gender || 'N/A'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {student.Phone_Number || 'N/A'}
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={() => handleEdit(student)}
+                        className="text-blue-600 hover:text-blue-900 mr-4"
+                        title="Edit student"
+                      >
+                        <FiEdit2 size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(student.Student_ID)}
+                        className={`${
+                          deleteConfirm === student.Student_ID
+                            ? 'text-red-700 font-bold'
+                            : 'text-red-600 hover:text-red-900'
+                        }`}
+                        title={deleteConfirm === student.Student_ID ? 'Click again to confirm' : 'Delete student'}
+                      >
+                        <FiTrash2 size={18} />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -187,6 +233,17 @@ const Students = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={fetchStudents}
+      />
+
+      {/* Edit Student Modal */}
+      <EditStudentModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedStudent(null);
+        }}
+        onSuccess={fetchStudents}
+        student={selectedStudent}
       />
     </div>
   );

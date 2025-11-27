@@ -15,8 +15,7 @@ export const getAllZones = asyncHandler(async (req, res) => {
       _count: {
         select: {
           Camara: true,
-          Students: true,
-          Teacher: true,
+          TimeTable: true,
         },
       },
     },

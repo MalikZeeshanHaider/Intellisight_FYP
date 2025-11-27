@@ -1,52 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { FiX, FiUpload, FiTrash2 } from 'react-icons/fi';
-import { studentAPI, zoneAPI } from '../api/api';
-import axios from 'axios';
+import { studentAPI } from '../api/api';
 
 const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
     const [formData, setFormData] = useState({
         Name: '',
+        RollNumber: '',
         Email: '',
-        Zone_id: '',
-        Camara_Id: ''
+        Gender: '',
+        Department: ''
     });
-    const [images, setImages] = useState([]);
-    const [zones, setZones] = useState([]);
-    const [cameras, setCameras] = useState([]);
+    const [facePictures, setFacePictures] = useState({
+        Face_Picture_1: null,
+        Face_Picture_2: null,
+        Face_Picture_3: null,
+        Face_Picture_4: null,
+        Face_Picture_5: null
+    });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-
-    useEffect(() => {
-        if (isOpen) {
-            fetchZones();
-            fetchCameras();
-        }
-    }, [isOpen]);
-
-    const fetchZones = async () => {
-        try {
-            const response = await zoneAPI.getAllZones();
-            if (response.success && response.data) {
-                setZones(response.data);
-            }
-        } catch (err) {
-            console.error('Error fetching zones:', err);
-        }
-    };
-
-    const fetchCameras = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await axios.get('http://localhost:3000/api/cameras', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            if (response.data.success && response.data.data) {
-                setCameras(response.data.data);
-            }
-        } catch (err) {
-            console.error('Error fetching cameras:', err);
-        }
-    };
 
     const handleInputChange = (e) => {
         setFormData({
@@ -55,25 +27,25 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
         });
     };
 
-    const handleImageUpload = (e) => {
-        const files = Array.from(e.target.files);
+    const handleImageUpload = (pictureNumber) => (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
 
-        if (images.length + files.length > 5) {
-            setError('Maximum 5 images allowed');
-            return;
-        }
-
-        files.forEach(file => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImages(prev => [...prev, reader.result]);
-            };
-            reader.readAsDataURL(file);
-        });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setFacePictures(prev => ({
+                ...prev,
+                [`Face_Picture_${pictureNumber}`]: reader.result
+            }));
+        };
+        reader.readAsDataURL(file);
     };
 
-    const removeImage = (index) => {
-        setImages(prev => prev.filter((_, i) => i !== index));
+    const removeImage = (pictureNumber) => {
+        setFacePictures(prev => ({
+            ...prev,
+            [`Face_Picture_${pictureNumber}`]: null
+        }));
     };
 
     const handleSubmit = async (e) => {
@@ -85,12 +57,16 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
             setError('Name is required');
             return;
         }
-        if (!formData.Zone_id) {
-            setError('Zone assignment is required');
+        if (!formData.RollNumber.trim()) {
+            setError('Roll Number is required');
             return;
         }
-        if (images.length === 0) {
-            setError('At least 1 face picture is required');
+        if (!formData.Email.trim()) {
+            setError('Email is required');
+            return;
+        }
+        if (!facePictures.Face_Picture_1) {
+            setError('At least one face picture is required');
             return;
         }
 
@@ -99,34 +75,39 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
         try {
             const payload = {
                 Name: formData.Name.trim(),
-                Zone_id: parseInt(formData.Zone_id),
-                Face_Pictures: images
+                RollNumber: formData.RollNumber.trim(),
+                Email: formData.Email.trim(),
+                Gender: formData.Gender,
+                Department: formData.Department.trim(),
+                Face_Picture_1: facePictures.Face_Picture_1
             };
 
-            // Add optional fields
-            if (formData.Email && formData.Email.trim()) {
-                payload.Email = formData.Email.trim();
-            }
-            if (formData.Camara_Id) {
-                payload.Camara_Id = parseInt(formData.Camara_Id);
-            }
+            // Add optional pictures
+            if (facePictures.Face_Picture_2) payload.Face_Picture_2 = facePictures.Face_Picture_2;
+            if (facePictures.Face_Picture_3) payload.Face_Picture_3 = facePictures.Face_Picture_3;
+            if (facePictures.Face_Picture_4) payload.Face_Picture_4 = facePictures.Face_Picture_4;
+            if (facePictures.Face_Picture_5) payload.Face_Picture_5 = facePictures.Face_Picture_5;
 
             await studentAPI.createStudent(payload);
 
-            setFormData({ Name: '', Email: '', Zone_id: '', Camara_Id: '' });
-            setImages([]);
+            setFormData({ Name: '', RollNumber: '', Email: '', Gender: '', Department: '' });
+            setFacePictures({
+                Face_Picture_1: null,
+                Face_Picture_2: null,
+                Face_Picture_3: null,
+                Face_Picture_4: null,
+                Face_Picture_5: null
+            });
             onSuccess();
             onClose();
         } catch (err) {
             console.error('Error creating student:', err);
-            console.log('Full error response:', err.response);
             
             let errorMessage = 'Failed to create student. Please check all fields.';
             
             if (err.response?.data) {
                 const data = err.response.data;
                 
-                // Check for validation errors with details
                 if (data.details && Array.isArray(data.details)) {
                     errorMessage = data.details.map(d => `${d.field}: ${d.message}`).join(', ');
                 } else if (data.message) {
@@ -145,6 +126,8 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
     };
 
     if (!isOpen) return null;
+
+    const uploadedCount = Object.values(facePictures).filter(Boolean).length;
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -178,6 +161,22 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                         />
                     </div>
 
+                    {/* Roll Number */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Roll Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            name="RollNumber"
+                            value={formData.RollNumber}
+                            onChange={handleInputChange}
+                            required
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Enter roll number"
+                        />
+                    </div>
+
                     {/* Email */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -194,45 +193,37 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                         />
                     </div>
 
-                    {/* Zone */}
+                    {/* Gender */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Zone Assignment <span className="text-red-500">*</span>
+                            Gender
                         </label>
                         <select
-                            name="Zone_id"
-                            value={formData.Zone_id}
+                            name="Gender"
+                            value={formData.Gender}
                             onChange={handleInputChange}
-                            required
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
-                            <option value="">Select a zone</option>
-                            {zones.map(zone => (
-                                <option key={zone.Zone_id} value={zone.Zone_id}>
-                                    {zone.Zone_Name || `Zone ${zone.Zone_id}`}
-                                </option>
-                            ))}
+                            <option value="">Select gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
                         </select>
                     </div>
 
-                    {/* Camera (Optional) */}
+                    {/* Department */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Camera Assignment (Optional)
+                            Department
                         </label>
-                        <select
-                            name="Camara_Id"
-                            value={formData.Camara_Id}
+                        <input
+                            type="text"
+                            name="Department"
+                            value={formData.Department}
                             onChange={handleInputChange}
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            <option value="">Select a camera (optional)</option>
-                            {cameras.map(camera => (
-                                <option key={camera.Camara_Id} value={camera.Camara_Id}>
-                                    Camera {camera.Camara_Id}
-                                </option>
-                            ))}
-                        </select>
+                            placeholder="Enter department"
+                        />
                     </div>
 
                     {/* Face Pictures Upload */}
@@ -240,54 +231,60 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Face Pictures (1-5 images) <span className="text-red-500">*</span>
                         </label>
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                            <input
-                                type="file"
-                                id="imageUpload"
-                                multiple
-                                accept="image/*"
-                                onChange={handleImageUpload}
-                                className="hidden"
-                                disabled={images.length >= 5}
-                            />
-                            <label
-                                htmlFor="imageUpload"
-                                className={`cursor-pointer flex flex-col items-center ${images.length >= 5 ? 'opacity-50 cursor-not-allowed' : ''
-                                    }`}
-                            >
-                                <FiUpload size={48} className="text-gray-400 mb-2" />
-                                <span className="text-sm text-gray-600">
-                                    {images.length >= 5
-                                        ? 'Maximum images reached'
-                                        : 'Click to upload images'}
-                                </span>
-                                <span className="text-xs text-gray-500 mt-1">
-                                    {images.length}/5 images uploaded
-                                </span>
-                            </label>
-                        </div>
+                        <p className="text-xs text-gray-500 mb-3">
+                            {uploadedCount}/5 images uploaded. First image is required.
+                        </p>
 
-                        {/* Image Previews */}
-                        {images.length > 0 && (
-                            <div className="grid grid-cols-3 gap-4 mt-4">
-                                {images.map((img, index) => (
-                                    <div key={index} className="relative group">
-                                        <img
-                                            src={img}
-                                            alt={`Preview ${index + 1}`}
-                                            className="w-full h-32 object-cover rounded-lg border-2 border-gray-300"
+                        {/* Image Upload Grid */}
+                        <div className="grid grid-cols-3 gap-4">
+                            {[1, 2, 3, 4, 5].map(num => {
+                                const pictureKey = `Face_Picture_${num}`;
+                                const picture = facePictures[pictureKey];
+
+                                return (
+                                    <div key={num} className="relative">
+                                        <input
+                                            type="file"
+                                            id={`imageUpload${num}`}
+                                            accept="image/*"
+                                            onChange={handleImageUpload(num)}
+                                            className="hidden"
                                         />
-                                        <button
-                                            type="button"
-                                            onClick={() => removeImage(index)}
-                                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"
-                                        >
-                                            <FiTrash2 size={16} />
-                                        </button>
+                                        
+                                        {picture ? (
+                                            <div className="relative group">
+                                                <img
+                                                    src={picture}
+                                                    alt={`Picture ${num}`}
+                                                    className="w-full h-32 object-cover rounded-lg border-2 border-gray-300"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeImage(num)}
+                                                    className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"
+                                                >
+                                                    <FiTrash2 size={16} />
+                                                </button>
+                                                <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
+                                                    Picture {num}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <label
+                                                htmlFor={`imageUpload${num}`}
+                                                className="cursor-pointer flex flex-col items-center justify-center h-32 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 transition"
+                                            >
+                                                <FiUpload size={24} className="text-gray-400 mb-1" />
+                                                <span className="text-xs text-gray-600">
+                                                    Picture {num}
+                                                    {num === 1 && <span className="text-red-500">*</span>}
+                                                </span>
+                                            </label>
+                                        )}
                                     </div>
-                                ))}
-                            </div>
-                        )}
+                                );
+                            })}
+                        </div>
                     </div>
 
                     {/* Error Message */}
@@ -309,8 +306,8 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                         </button>
                         <button
                             type="submit"
-                            disabled={loading || images.length === 0}
-                            className={`px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition ${loading || images.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+                            disabled={loading || !facePictures.Face_Picture_1}
+                            className={`px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition ${loading || !facePictures.Face_Picture_1 ? 'opacity-50 cursor-not-allowed' : ''
                                 }`}
                         >
                             {loading ? 'Adding...' : 'Add Student'}

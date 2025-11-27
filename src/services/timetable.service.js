@@ -283,6 +283,48 @@ export class TimetableService {
   }
 
   /**
+   * Get recent activity (last N entries/exits)
+   */
+  async getRecentActivity(limit = 10) {
+    const recentEntries = await prisma.timeTable.findMany({
+      take: limit,
+      orderBy: [
+        { EntryTime: 'desc' },
+      ],
+      include: {
+        zone: {
+          select: {
+            Zone_id: true,
+            Zone_Name: true,
+          },
+        },
+        teacher: {
+          select: {
+            Teacher_ID: true,
+            Name: true,
+            Email: true,
+          },
+        },
+        student: {
+          select: {
+            Student_ID: true,
+            Name: true,
+            Email: true,
+          },
+        },
+        admin: {
+          select: {
+            Admin_ID: true,
+            Name: true,
+          },
+        },
+      },
+    });
+
+    return recentEntries;
+  }
+
+  /**
    * Verify person exists
    */
   async verifyPersonExists(personType, personId) {
