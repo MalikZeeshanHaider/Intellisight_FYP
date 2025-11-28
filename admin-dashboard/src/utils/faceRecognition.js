@@ -108,15 +108,23 @@ export const detectFaces = async (input, options = {}) => {
  */
 export const loadFaceDatabase = async (faceDatabase) => {
   try {
-    console.log('Loading face database...', faceDatabase);
+    console.log('🔄 Loading face database...', faceDatabase);
+    console.log(`  Students to process: ${faceDatabase.students?.length || 0}`);
+    console.log(`  Teachers to process: ${faceDatabase.teachers?.length || 0}`);
     
     const labeledDescriptors = [];
 
     // Process students
     for (const student of faceDatabase.students || []) {
+      console.log(`📝 Processing student: ${student.name} (ID: ${student.id})`);
+      console.log(`  Has faceImage: ${student.faceImage ? 'YES' : 'NO'}`);
+      console.log(`  Image length: ${student.faceImage?.length || 0}`);
+      
       if (student.faceImage) {
+        console.log(`  🔍 Extracting face descriptor...`);
         const descriptor = await getFaceDescriptor(student.faceImage);
         if (descriptor) {
+          console.log(`  ✅ Descriptor extracted successfully (${descriptor.length} dimensions)`);
           labeledDescriptors.push({
             id: student.id,
             name: student.name,
@@ -124,15 +132,24 @@ export const loadFaceDatabase = async (faceDatabase) => {
             email: student.email,
             descriptor: descriptor
           });
+        } else {
+          console.warn(`  ❌ Failed to extract descriptor for ${student.name}`);
         }
+      } else {
+        console.warn(`  ⚠️ No face image for ${student.name}`);
       }
     }
 
     // Process teachers
     for (const teacher of faceDatabase.teachers || []) {
+      console.log(`📝 Processing teacher: ${teacher.name} (ID: ${teacher.id})`);
+      console.log(`  Has faceImage: ${teacher.faceImage ? 'YES' : 'NO'}`);
+      
       if (teacher.faceImage) {
+        console.log(`  🔍 Extracting face descriptor...`);
         const descriptor = await getFaceDescriptor(teacher.faceImage);
         if (descriptor) {
+          console.log(`  ✅ Descriptor extracted successfully (${descriptor.length} dimensions)`);
           labeledDescriptors.push({
             id: teacher.id,
             name: teacher.name,
@@ -140,16 +157,25 @@ export const loadFaceDatabase = async (faceDatabase) => {
             email: teacher.email,
             descriptor: descriptor
           });
+        } else {
+          console.warn(`  ❌ Failed to extract descriptor for ${teacher.name}`);
         }
+      } else {
+        console.warn(`  ⚠️ No face image for ${teacher.name}`);
       }
     }
 
     faceDescriptors = labeledDescriptors;
-    console.log(`✅ Loaded ${faceDescriptors.length} face descriptors`);
+    console.log(`✅ Successfully loaded ${faceDescriptors.length} face descriptors`);
+    
+    if (faceDescriptors.length === 0) {
+      console.error('⚠️ WARNING: No face descriptors loaded! All detections will be marked as unknown.');
+    }
     
     return labeledDescriptors;
   } catch (error) {
-    console.error('Error loading face database:', error);
+    console.error('❌ Error loading face database:', error);
+    console.error('Stack:', error.stack);
     return [];
   }
 };
@@ -159,15 +185,25 @@ export const loadFaceDatabase = async (faceDatabase) => {
  */
 const getFaceDescriptor = async (base64Image) => {
   try {
+    console.log('  📸 Fetching image from base64...');
     const img = await faceapi.fetchImage(base64Image);
+    console.log(`  ✅ Image loaded: ${img.width}x${img.height}`);
+    
+    console.log('  🔍 Detecting face...');
     const detection = await faceapi
       .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
       .withFaceLandmarks()
       .withFaceDescriptor();
 
-    return detection ? detection.descriptor : null;
+    if (detection) {
+      console.log('  ✅ Face detected and descriptor extracted');
+      return detection.descriptor;
+    } else {
+      console.warn('  ⚠️ No face detected in image');
+      return null;
+    }
   } catch (error) {
-    console.error('Error getting face descriptor:', error);
+    console.error('  ❌ Error getting face descriptor:', error.message);
     return null;
   }
 };
@@ -198,6 +234,17 @@ export const matchFace = (faceDescriptor, threshold = 0.6) => {
   }
 
   return bestMatch;
+};
+
+/**
+ * Calculate Euclidean distance between two face descriptors
+ * Used for checking duplicate unknown persons
+ */
+export const calculateDistance = (descriptor1, descriptor2) => {
+  if (!descriptor1 || !descriptor2) {
+    return Infinity;
+  }
+  return faceapi.euclideanDistance(descriptor1, descriptor2);
 };
 
 /**

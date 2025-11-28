@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import app from './app.js';
 import { testConnection, disconnect } from './config/database.js';
 import logger from './utils/logger.js';
+import imagePreprocessingService from './services/imagePreprocessing.service.js';
 
 // Load environment variables
 dotenv.config();
@@ -10,6 +11,15 @@ const PORT = process.env.PORT || 3000;
 
 // Test database connection before starting server
 await testConnection();
+
+// Preprocess all images on startup
+logger.info('🔄 Starting image preprocessing...');
+try {
+  const result = await imagePreprocessingService.preprocessAllImages();
+  logger.info(`✅ Image preprocessing complete! Processed ${result.processed} people`);
+} catch (error) {
+  logger.warn('⚠️ Image preprocessing failed, system will use original images:', error.message);
+}
 
 // Start server
 const server = app.listen(PORT, () => {

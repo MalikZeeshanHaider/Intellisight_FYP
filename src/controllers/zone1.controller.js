@@ -4,15 +4,17 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import imagePreprocessingService from '../services/imagePreprocessing.service.js';
+
 const prisma = new PrismaClient();
 
 /**
- * Log recognized person entry to Zone 1
+ * Log recognized person entry to Zone 1 (via Entry camera)
  * POST /api/zones/1/recognize
  */
 export const logRecognizedPerson = async (req, res) => {
   try {
-    const { personId, personType, confidence } = req.body;
+    const { personId, personType, confidence, cameraType } = req.body;
 
     if (!personId || !personType) {
       return res.status(400).json({
@@ -21,12 +23,17 @@ export const logRecognizedPerson = async (req, res) => {
       });
     }
 
-    // Check if person is already in zone (no exit time)
-    const existingEntry = await prisma.timeTable.findFirst({
+    console.log(`📹 ${cameraType || 'Unknown'} camera detected: ${personType} ${personId}`);
+
+    // Normalize personType (Student/Teacher)
+    const normalizedType = personType === 'STUDENT' || personType === 'Student' ? 'Student' : 'Teacher';
+
+    // Check if person is already in active presence
+    const existingEntry = await prisma.activePresence.findFirst({
       where: {
         Zone_id: 1,
-        ExitTime: null,
-        ...(personType === 'TEACHER' 
+        PersonType: normalizedType,
+        ...(normalizedType === 'Teacher' 
           ? { Teacher_ID: parseInt(personId) }
           : { Student_ID: parseInt(personId) }
         )
@@ -41,29 +48,140 @@ export const logRecognizedPerson = async (req, res) => {
       });
     }
 
-    // Create new entry
-    const entry = await prisma.timeTable.create({
-      data: {
-        Zone_id: 1,
-        PersonType: personType,
-        EntryTime: new Date(),
-        ...(personType === 'TEACHER' 
-          ? { Teacher_ID: parseInt(personId) }
-          : { Student_ID: parseInt(personId) }
-        )
-      },
-      include: {
-        teacher: true,
-        student: true,
-        zone: true
-      }
-    });
+    // Add to active presence (only on Entry camera)
+    if (cameraType === 'Entry') {
+      const entryTime = new Date();
+      
+      // Create ActivePresence record
+      const entry = await prisma.activePresence.create({
+        data: {
+          Zone_id: 1,
+          PersonType: normalizedType,
+          EntryTime: entryTime,
+          ...(normalizedType === 'Teacher' 
+            ? { Teacher_ID: parseInt(personId) }
+            : { Student_ID: parseInt(personId) }
+          )
+        },
+        include: {
+          teacher: {
+            select: {
+              Teacher_ID: true,
+              Name: true,
+              Email: true,
+              Department: true
+            }
+          },
+          student: {
+            select: {
+              Student_ID: true,
+              Name: true,
+              Email: true,
+              Department: true,
+              RollNumber: true
+            }
+          },
+          zone: {
+            select: {
+              Zone_id: true,
+              Zone_Name: true
+            }
+          }
+        }
+      });
 
-    res.status(201).json({
-      success: true,
-      message: 'Person entry logged successfully',
-      data: entry
-    });
+      // Also create TimeTable entry for tracking
+      await prisma.timeTable.create({
+        data: {
+          Zone_id: 1,
+          PersonType: normalizedType,
+          EntryTime: entryTime,
+          ...(normalizedType === 'Teacher' 
+            ? { Teacher_ID: parseInt(personId) }
+            : { Student_ID: parseInt(personId) }
+          )
+        }
+      });
+
+      console.log(`✅ Entry logged for ${normalizedType} ${personId}`);
+
+      res.status(201).json({
+        success: true,
+        message: 'Person entry logged successfully',
+        data: entry
+      });
+    } else if (cameraType === 'Exit' && existingEntry) {
+      // Exit camera - trigger exit logic
+      const exitTime = new Date();
+      const durationMs = exitTime - new Date(existingEntry.EntryTime);
+      const durationMinutes = Math.round(durationMs / 1000 / 60);
+
+      // Create attendance log
+      await prisma.attendanceLog.create({
+        data: {
+          Zone_id: 1,
+          PersonType: normalizedType,
+          EntryTime: existingEntry.EntryTime,
+          ExitTime: exitTime,
+          Duration: durationMinutes,
+          ...(normalizedType === 'Teacher' 
+            ? { Teacher_ID: parseInt(personId) }
+            : { Student_ID: parseInt(personId) }
+          )
+        }
+      });
+
+      // Update TimeTable with exit time
+      const timetableEntry = await prisma.timeTable.findFirst({
+        where: {
+          Zone_id: 1,
+          PersonType: normalizedType,
+          ExitTime: null,
+          ...(normalizedType === 'Teacher' 
+            ? { Teacher_ID: parseInt(personId) }
+            : { Student_ID: parseInt(personId) }
+          )
+        },
+        orderBy: {
+          EntryTime: 'desc'
+        }
+      });
+
+      if (timetableEntry) {
+        await prisma.timeTable.update({
+          where: {
+            TimeTable_ID: timetableEntry.TimeTable_ID
+          },
+          data: {
+            ExitTime: exitTime
+          }
+        });
+      }
+
+      // Remove from active presence
+      await prisma.activePresence.delete({
+        where: {
+          Presence_ID: existingEntry.Presence_ID
+        }
+      });
+
+      console.log(`🚪 Exit logged for ${normalizedType} ${personId} (${durationMinutes} min)`);
+
+      res.status(200).json({
+        success: true,
+        message: 'Person exit logged successfully',
+        data: {
+          duration: durationMinutes,
+          exitTime: exitTime
+        }
+      });
+    } else {
+      res.status(200).json({
+        success: true,
+        message: `${cameraType} detection acknowledged`,
+        data: null
+      });
+    }
 
   } catch (error) {
     console.error('Error logging recognized person:', error);
@@ -125,20 +243,43 @@ export const logUnknownPerson = async (req, res) => {
 };
 
 /**
- * Get all persons currently in Zone 1
+ * Get all persons currently in Zone 1 (from ActivePresence)
  * GET /api/zones/1/current
  */
 export const getCurrentPersons = async (req, res) => {
   try {
-    const currentPersons = await prisma.timeTable.findMany({
+    const currentPersons = await prisma.activePresence.findMany({
       where: {
-        Zone_id: 1,
-        ExitTime: null
+        Zone_id: 1
       },
       include: {
-        teacher: true,
-        student: true,
-        zone: true
+        teacher: {
+          select: {
+            Teacher_ID: true,
+            Name: true,
+            Email: true,
+            Department: true,
+            Gender: true,
+            Face_Picture_1: true
+          }
+        },
+        student: {
+          select: {
+            Student_ID: true,
+            Name: true,
+            Email: true,
+            Department: true,
+            Gender: true,
+            RollNumber: true,
+            Face_Picture_1: true
+          }
+        },
+        zone: {
+          select: {
+            Zone_id: true,
+            Zone_Name: true
+          }
+        }
       },
       orderBy: {
         EntryTime: 'desc'
@@ -146,16 +287,26 @@ export const getCurrentPersons = async (req, res) => {
     });
 
     // Format response
-    const formatted = currentPersons.map(entry => ({
-      TimeTable_ID: entry.TimeTable_ID,
-      PersonType: entry.PersonType,
-      PersonID: entry.PersonType === 'TEACHER' ? entry.Teacher_ID : entry.Student_ID,
-      Name: entry.PersonType === 'TEACHER' ? entry.teacher?.Name : entry.student?.Name,
-      Email: entry.PersonType === 'TEACHER' ? entry.teacher?.Email : entry.student?.Email,
-      Face_Pictures: entry.PersonType === 'TEACHER' ? entry.teacher?.Face_Pictures : entry.student?.Face_Pictures,
-      EntryTime: entry.EntryTime,
-      Zone: entry.zone?.Zone_Name
-    }));
+    const formatted = currentPersons.map(entry => {
+      const person = entry.student || entry.teacher;
+      const duration = Math.floor((new Date() - new Date(entry.EntryTime)) / 60000); // minutes
+      
+      return {
+        Presence_ID: entry.Presence_ID,
+        PersonType: entry.PersonType,
+        PersonID: entry.PersonType === 'Student' ? entry.Student_ID : entry.Teacher_ID,
+        Name: person?.Name,
+        Email: person?.Email,
+        Department: person?.Department,
+        Gender: person?.Gender,
+        RollNumber: person?.RollNumber || null,
+        Face_Picture: person?.Face_Picture_1,
+        EntryTime: entry.EntryTime,
+        Duration: duration + ' mins',
+        Zone: entry.zone?.Zone_Name,
+        Status: 'Inside'
+      };
+    });
 
     res.status(200).json({
       success: true,
@@ -174,21 +325,45 @@ export const getCurrentPersons = async (req, res) => {
 };
 
 /**
- * Get all Zone 1 activity logs
+ * Get all Zone 1 activity logs (from AttendanceLog)
  * GET /api/zones/1/logs
  */
 export const getZoneLogs = async (req, res) => {
   try {
     const { limit = 50, offset = 0 } = req.query;
 
-    const logs = await prisma.timeTable.findMany({
+    const logs = await prisma.attendanceLog.findMany({
       where: {
         Zone_id: 1
       },
       include: {
-        teacher: true,
-        student: true,
-        zone: true
+        teacher: {
+          select: {
+            Teacher_ID: true,
+            Name: true,
+            Email: true,
+            Department: true,
+            Gender: true,
+            Face_Picture_1: true
+          }
+        },
+        student: {
+          select: {
+            Student_ID: true,
+            Name: true,
+            Email: true,
+            Department: true,
+            Gender: true,
+            RollNumber: true,
+            Face_Picture_1: true
+          }
+        },
+        zone: {
+          select: {
+            Zone_id: true,
+            Zone_Name: true
+          }
+        }
       },
       orderBy: {
         EntryTime: 'desc'
@@ -197,25 +372,31 @@ export const getZoneLogs = async (req, res) => {
       skip: parseInt(offset)
     });
 
-    const total = await prisma.timeTable.count({
+    const total = await prisma.attendanceLog.count({
       where: { Zone_id: 1 }
     });
 
     // Format response
-    const formatted = logs.map(entry => ({
-      TimeTable_ID: entry.TimeTable_ID,
-      PersonType: entry.PersonType,
-      PersonID: entry.PersonType === 'TEACHER' ? entry.Teacher_ID : entry.Student_ID,
-      Name: entry.PersonType === 'TEACHER' ? entry.teacher?.Name : entry.student?.Name,
-      Email: entry.PersonType === 'TEACHER' ? entry.teacher?.Email : entry.student?.Email,
-      Face_Pictures: entry.PersonType === 'TEACHER' ? entry.teacher?.Face_Pictures : entry.student?.Face_Pictures,
-      EntryTime: entry.EntryTime,
-      ExitTime: entry.ExitTime,
-      Zone: entry.zone?.Zone_Name,
-      Duration: entry.ExitTime 
-        ? Math.round((new Date(entry.ExitTime) - new Date(entry.EntryTime)) / 1000 / 60) + ' mins'
-        : 'Ongoing'
-    }));
+    const formatted = logs.map(entry => {
+      const person = entry.student || entry.teacher;
+      
+      return {
+        Log_ID: entry.Log_ID,
+        PersonType: entry.PersonType,
+        PersonID: entry.PersonType === 'Student' ? entry.Student_ID : entry.Teacher_ID,
+        Name: person?.Name,
+        Email: person?.Email,
+        Department: person?.Department,
+        Gender: person?.Gender,
+        RollNumber: person?.RollNumber || null,
+        Face_Picture: person?.Face_Picture_1,
+        EntryTime: entry.EntryTime,
+        ExitTime: entry.ExitTime,
+        Duration: entry.Duration ? entry.Duration + ' mins' : 'Ongoing',
+        Zone: entry.zone?.Zone_Name,
+        CreatedAt: entry.CreatedAt
+      };
+    });
 
     res.status(200).json({
       success: true,
@@ -235,59 +416,107 @@ export const getZoneLogs = async (req, res) => {
 };
 
 /**
- * Get all students and teachers with face data for matching
+ * Get all students and teachers with face embeddings for matching
  * GET /api/zones/1/face-database
  */
 export const getFaceDatabase = async (req, res) => {
   try {
-    const [students, teachers] = await Promise.all([
-      prisma.students.findMany({
+    console.log('📚 Fetching face database from preprocessed images...');
+
+    // Try to get preprocessed images first
+    let faceData;
+    try {
+      faceData = await imagePreprocessingService.getPreprocessedImages();
+      console.log(`✅ Using preprocessed images: ${faceData.students.length} students, ${faceData.teachers.length} teachers`);
+    } catch (preprocessError) {
+      console.warn('⚠️ Preprocessed images not available, falling back to original images');
+      
+      // Fallback to original method
+      const students = await prisma.students.findMany({
         where: {
-          Face_Pictures: { not: null }
+          Face_Embeddings: { not: null }
         },
         select: {
           Student_ID: true,
           Name: true,
           Email: true,
-          Face_Pictures: true
+          Department: true,
+          RollNumber: true,
+          Face_Embeddings: true,
+          Face_Picture_1: true
         }
-      }),
-      prisma.teacher.findMany({
+      });
+
+      const teachers = await prisma.teacher.findMany({
         where: {
-          Face_Pictures: { not: null }
+          Face_Embeddings: { not: null }
         },
         select: {
           Teacher_ID: true,
           Name: true,
           Email: true,
-          Face_Pictures: true
+          Department: true,
+          Face_Embeddings: true,
+          Face_Picture_1: true
         }
-      })
-    ]);
+      });
 
-    // Convert face pictures to base64
-    const studentsData = students.map(s => ({
-      id: s.Student_ID,
-      name: s.Name,
-      email: s.Email,
-      type: 'STUDENT',
-      faceImage: s.Face_Pictures ? `data:image/jpeg;base64,${s.Face_Pictures.toString('base64')}` : null
-    }));
+      faceData = {
+        students: students.map(s => ({
+          id: s.Student_ID,
+          name: s.Name,
+          email: s.Email,
+          department: s.Department,
+          rollNumber: s.RollNumber,
+          type: 'Student',
+          enrolled: true,
+          faceImage: s.Face_Picture_1,
+          hasEmbeddings: s.Face_Embeddings !== null
+        })),
+        teachers: teachers.map(t => ({
+          id: t.Teacher_ID,
+          name: t.Name,
+          email: t.Email,
+          department: t.Department,
+          type: 'Teacher',
+          enrolled: true,
+          faceImage: t.Face_Picture_1,
+          hasEmbeddings: t.Face_Embeddings !== null
+        }))
+      };
+    }
 
-    const teachersData = teachers.map(t => ({
-      id: t.Teacher_ID,
-      name: t.Name,
-      email: t.Email,
-      type: 'TEACHER',
-      faceImage: t.Face_Pictures ? `data:image/jpeg;base64,${t.Face_Pictures.toString('base64')}` : null
-    }));
+    // Debug logging
+    if (faceData.students.length > 0) {
+      console.log('✅ Students found:');
+      faceData.students.forEach(s => {
+        console.log(`  - ${s.name} (ID: ${s.id})`);
+        console.log(`    Has faceImage: ${s.faceImage ? 'YES' : 'NO'}`);
+        console.log(`    Has Embeddings: ${s.hasEmbeddings ? 'YES' : 'NO'}`);
+      });
+    } else {
+      console.log('⚠️ No students found with Face_Embeddings');
+    }
+
+    if (faceData.teachers.length > 0) {
+      console.log('✅ Teachers found:');
+      faceData.teachers.forEach(t => {
+        console.log(`  - ${t.name} (ID: ${t.id})`);
+        console.log(`    Has faceImage: ${t.faceImage ? 'YES' : 'NO'}`);
+        console.log(`    Has Embeddings: ${t.hasEmbeddings ? 'YES' : 'NO'}`);
+      });
+    } else {
+      console.log('⚠️ No teachers found with Face_Embeddings');
+    }
 
     res.status(200).json({
       success: true,
       data: {
-        students: studentsData,
-        teachers: teachersData,
-        total: studentsData.length + teachersData.length
+        students: faceData.students,
+        teachers: faceData.teachers,
+        total: faceData.students.length + faceData.teachers.length,
+        enrolled: faceData.students.length + faceData.teachers.length,
+        usingPreprocessed: true
       }
     });
 
@@ -302,30 +531,74 @@ export const getFaceDatabase = async (req, res) => {
 };
 
 /**
- * Mark person exit from Zone 1
- * PUT /api/zones/1/exit/:timetableId
+ * Mark person exit from Zone 1 (via Exit camera)
+ * PUT /api/zones/1/exit/:presenceId
  */
 export const markExit = async (req, res) => {
   try {
-    const { timetableId } = req.params;
+    const { presenceId } = req.params;
 
-    const updated = await prisma.timeTable.update({
+    // Get active presence record
+    const presence = await prisma.activePresence.findUnique({
       where: {
-        TimeTable_ID: parseInt(timetableId)
-      },
-      data: {
-        ExitTime: new Date()
+        Presence_ID: parseInt(presenceId)
       },
       include: {
-        teacher: true,
-        student: true
+        student: {
+          select: {
+            Student_ID: true,
+            Name: true,
+            Email: true
+          }
+        },
+        teacher: {
+          select: {
+            Teacher_ID: true,
+            Name: true,
+            Email: true
+          }
+        }
+      }
+    });
+
+    if (!presence) {
+      return res.status(404).json({
+        success: false,
+        message: 'Active presence record not found'
+      });
+    }
+
+    const exitTime = new Date();
+    const duration = Math.floor((exitTime - new Date(presence.EntryTime)) / 60000); // minutes
+
+    // Create attendance log
+    const attendanceLog = await prisma.attendanceLog.create({
+      data: {
+        Zone_id: presence.Zone_id,
+        PersonType: presence.PersonType,
+        Student_ID: presence.Student_ID,
+        Teacher_ID: presence.Teacher_ID,
+        EntryTime: presence.EntryTime,
+        ExitTime: exitTime,
+        Duration: duration
+      }
+    });
+
+    // Remove from active presence
+    await prisma.activePresence.delete({
+      where: {
+        Presence_ID: parseInt(presenceId)
       }
     });
 
     res.status(200).json({
       success: true,
-      message: 'Exit time recorded',
-      data: updated
+      message: 'Exit recorded and moved to attendance log',
+      data: {
+        attendanceLog,
+        person: presence.student || presence.teacher,
+        duration: duration + ' mins'
+      }
     });
 
   } catch (error) {
@@ -469,6 +742,201 @@ export const deleteUnknownFace = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to delete unknown face entry',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get TimeTable logs with Entry/Exit data
+ * GET /api/zones/1/timetable-logs
+ */
+export const getTimeTableLogs = async (req, res) => {
+  try {
+    const { limit = 50, offset = 0, personType, zoneId } = req.query;
+
+    const where = {
+      ...(zoneId && { Zone_id: parseInt(zoneId) }),
+      ...(personType && { PersonType: personType })
+    };
+
+    const logs = await prisma.timeTable.findMany({
+      where,
+      include: {
+        teacher: {
+          select: {
+            Teacher_ID: true,
+            Name: true,
+            Email: true,
+            Department: true,
+            Gender: true,
+            Face_Picture_1: true
+          }
+        },
+        student: {
+          select: {
+            Student_ID: true,
+            Name: true,
+            Email: true,
+            Department: true,
+            Gender: true,
+            RollNumber: true,
+            Face_Picture_1: true
+          }
+        },
+        zone: {
+          select: {
+            Zone_id: true,
+            Zone_Name: true
+          }
+        }
+      },
+      orderBy: {
+        EntryTime: 'desc'
+      },
+      take: parseInt(limit),
+      skip: parseInt(offset)
+    });
+
+    const total = await prisma.timeTable.count({ where });
+
+    // Format response with calculated duration
+    const formatted = logs.map(entry => {
+      const person = entry.student || entry.teacher;
+      let duration = null;
+      let status = 'Inside';
+
+      if (entry.ExitTime && entry.EntryTime) {
+        const durationMs = new Date(entry.ExitTime) - new Date(entry.EntryTime);
+        duration = Math.round(durationMs / 1000 / 60); // minutes
+        status = 'Completed';
+      } else if (entry.EntryTime) {
+        const durationMs = new Date() - new Date(entry.EntryTime);
+        duration = Math.round(durationMs / 1000 / 60); // minutes
+        status = 'Inside';
+      }
+      
+      return {
+        TimeTable_ID: entry.TimeTable_ID,
+        PersonType: entry.PersonType,
+        PersonID: entry.PersonType === 'Student' ? entry.Student_ID : entry.Teacher_ID,
+        Name: person?.Name,
+        Email: person?.Email,
+        Department: person?.Department,
+        Gender: person?.Gender,
+        RollNumber: person?.RollNumber || null,
+        Face_Picture: person?.Face_Picture_1,
+        EntryTime: entry.EntryTime,
+        ExitTime: entry.ExitTime,
+        Duration: duration,
+        Status: status,
+        Zone: entry.zone?.Zone_Name || 'Unknown'
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      count: formatted.length,
+      total: total,
+      data: formatted,
+      pagination: {
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        hasMore: parseInt(offset) + formatted.length < total
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching TimeTable logs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch TimeTable logs',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Debug endpoint - Get ALL students/teachers (for troubleshooting)
+ * GET /api/zones/1/debug-database
+ */
+export const getDebugDatabase = async (req, res) => {
+  try {
+    // Get ALL students (not filtered by Face_Embeddings)
+    const allStudents = await prisma.students.findMany({
+      select: {
+        Student_ID: true,
+        Name: true,
+        Email: true,
+        RollNumber: true,
+        Face_Embeddings: true,
+        Face_Picture_1: true,
+        Face_Picture_2: true,
+        Face_Picture_3: true,
+        Face_Picture_4: true,
+        Face_Picture_5: true
+      }
+    });
+
+    // Get ALL teachers
+    const allTeachers = await prisma.teacher.findMany({
+      select: {
+        Teacher_ID: true,
+        Name: true,
+        Email: true,
+        Face_Embeddings: true,
+        Face_Picture_1: true,
+        Face_Picture_2: true,
+        Face_Picture_3: true,
+        Face_Picture_4: true,
+        Face_Picture_5: true
+      }
+    });
+
+    const studentsDebug = allStudents.map(s => ({
+      id: s.Student_ID,
+      name: s.Name,
+      email: s.Email,
+      rollNumber: s.RollNumber,
+      hasEmbeddings: s.Face_Embeddings !== null,
+      hasPicture1: s.Face_Picture_1 !== null,
+      hasPicture2: s.Face_Picture_2 !== null,
+      hasPicture3: s.Face_Picture_3 !== null,
+      hasPicture4: s.Face_Picture_4 !== null,
+      hasPicture5: s.Face_Picture_5 !== null,
+      picture1Length: s.Face_Picture_1?.length || 0
+    }));
+
+    const teachersDebug = allTeachers.map(t => ({
+      id: t.Teacher_ID,
+      name: t.Name,
+      email: t.Email,
+      hasEmbeddings: t.Face_Embeddings !== null,
+      hasPicture1: t.Face_Picture_1 !== null,
+      hasPicture2: t.Face_Picture_2 !== null,
+      hasPicture3: t.Face_Picture_3 !== null,
+      hasPicture4: t.Face_Picture_4 !== null,
+      hasPicture5: t.Face_Picture_5 !== null,
+      picture1Length: t.Face_Picture_1?.length || 0
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: {
+        students: studentsDebug,
+        teachers: teachersDebug,
+        totalStudents: allStudents.length,
+        totalTeachers: allTeachers.length,
+        studentsWithEmbeddings: studentsDebug.filter(s => s.hasEmbeddings).length,
+        teachersWithEmbeddings: teachersDebug.filter(t => t.hasEmbeddings).length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching debug database:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch debug database',
       error: error.message
     });
   }

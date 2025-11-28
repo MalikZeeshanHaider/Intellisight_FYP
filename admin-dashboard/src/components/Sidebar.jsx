@@ -14,7 +14,9 @@ import {
   FiSettings,
   FiLogOut,
   FiVideo,
-  FiAlertCircle
+  FiAlertCircle,
+  FiActivity,
+  FiClock
 } from 'react-icons/fi';
 import { GiTeacher } from 'react-icons/gi';
 
@@ -33,6 +35,21 @@ const Sidebar = () => {
       icon: FiHome,
       label: 'Dashboard',
       exact: true
+    },
+    {
+      path: '/zone1-live',
+      icon: FiVideo,
+      label: 'Zone 1 Live'
+    },
+    {
+      path: '/active-presence',
+      icon: FiActivity,
+      label: 'Active Presence'
+    },
+    {
+      path: '/attendance-logs',
+      icon: FiClock,
+      label: 'Attendance Logs'
     },
     {
       path: '/unknown-faces',

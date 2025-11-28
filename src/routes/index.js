@@ -7,6 +7,8 @@ import teacherRoutes from './teacher.routes.js';
 import studentRoutes from './student.routes.js';
 import timetableRoutes from './timetable.routes.js';
 import healthRoutes from './health.routes.js';
+import faceRecognitionRoutes from './faceRecognition.routes.js';
+import liveRecognitionRoutes from './liveRecognition.routes.js';
 
 const router = express.Router();
 
@@ -21,5 +23,7 @@ router.use('/cameras', cameraRoutes);
 router.use('/teachers', teacherRoutes);
 router.use('/students', studentRoutes);
 router.use('/timetable', timetableRoutes);
+router.use('/face-recognition', faceRecognitionRoutes);
+router.use('/live-recognition', liveRecognitionRoutes); // Auto live recognition
 
 export default router;

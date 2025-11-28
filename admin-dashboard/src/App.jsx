@@ -22,6 +22,8 @@ import Zone1 from './pages/Zone1';
 import UnknownFaces from './pages/UnknownFaces';
 import Logs from './pages/Logs';
 import Settings from './pages/Settings';
+import ActivePresence from './pages/ActivePresence';
+import AttendanceLogs from './pages/AttendanceLogs';
 
 console.log('%c📱 App.jsx - Component Loading', 'color: blue; font-size: 14px');
 
@@ -149,6 +151,32 @@ function App() {
                   <Layout>
                     <ErrorBoundary>
                       <Settings />
+                    </ErrorBoundary>
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/active-presence"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ErrorBoundary>
+                      <ActivePresence />
+                    </ErrorBoundary>
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/attendance-logs"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ErrorBoundary>
+                      <AttendanceLogs />
                     </ErrorBoundary>
                   </Layout>
                 </ProtectedRoute>

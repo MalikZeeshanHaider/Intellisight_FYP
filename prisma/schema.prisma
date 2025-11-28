@@ -19,57 +19,69 @@ model Admin {
 }
 
 model Zone {
-  Zone_id   Int         @id @default(autoincrement())
-  Zone_Name String?
-  Camara    Camara[]
-  TimeTable TimeTable[]
+  Zone_id        Int              @id @default(autoincrement())
+  Zone_Name      String?
+  Camara         Camara[]
+  TimeTable      TimeTable[]
+  ActivePresence ActivePresence[]
+  AttendanceLog  AttendanceLog[]
 
   @@map("Zone")
 }
 
 model Camara {
-  Camara_Id Int     @id @default(autoincrement())
-  Password  String?
-  Zone_id   Int?
-  zone      Zone?   @relation(fields: [Zone_id], references: [Zone_id])
+  Camara_Id   Int     @id @default(autoincrement())
+  Password    String?
+  Zone_id     Int?
+  Camera_Type String? @default("Entry") // "Entry" or "Exit"
+  Camera_URL  String? // RTSP URL or device index
+  zone        Zone?   @relation(fields: [Zone_id], references: [Zone_id])
 
   @@map("Camara")
 }
 
 model Teacher {
-  Teacher_ID     Int         @id @default(autoincrement())
-  Name           String?
-  Email          String?     @unique
-  CreatedAt      DateTime    @default(now())
-  Department     String?
-  Face_Picture_1 String?
-  Face_Picture_2 String?
-  Face_Picture_3 String?
-  Face_Picture_4 String?
-  Face_Picture_5 String?
-  Faculty_Type   String?
-  Gender         String?
-  UpdatedAt      DateTime    @updatedAt
-  TimeTable      TimeTable[]
+  Teacher_ID      Int              @id @default(autoincrement())
+  Name            String?
+  Email           String?          @unique
+  CreatedAt       DateTime         @default(now())
+  Department      String?
+  Face_Picture_1  String?
+  Face_Picture_2  String?
+  Face_Picture_3  String?
+  Face_Picture_4  String?
+  Face_Picture_5  String?
+  Face_Embeddings Bytes? // Serialized face encodings
+  Faculty_Type    String?
+  Gender          String?
+  UpdatedAt       DateTime         @updatedAt
+  TimeTable       TimeTable[]
+  ActivePresence  ActivePresence[]
+  AttendanceLog   AttendanceLog[]
+  ProcessedImages ProcessedFaceImages[]
 
   @@map("Teacher")
 }
-s
+
 model Students {
-  Student_ID     Int         @id @default(autoincrement())
-  Name           String?
-  RollNumber     String?     @unique
-  Email          String?     @unique
-  Face_Picture_1 String?
-  Face_Picture_2 String?
-  Face_Picture_3 String?
-  Face_Picture_4 String?
-  Face_Picture_5 String?
-  CreatedAt      DateTime    @default(now())
-  UpdatedAt      DateTime    @updatedAt
-  Department     String?
-  Gender         String?
-  TimeTable      TimeTable[]
+  Student_ID      Int              @id @default(autoincrement())
+  Name            String?
+  RollNumber      String?          @unique
+  Email           String?          @unique
+  Face_Picture_1  String?
+  Face_Picture_2  String?
+  Face_Picture_3  String?
+  Face_Picture_4  String?
+  Face_Picture_5  String?
+  Face_Embeddings Bytes? // Serialized face encodings
+  CreatedAt       DateTime         @default(now())
+  UpdatedAt       DateTime         @updatedAt
+  Department      String?
+  Gender          String?
+  TimeTable       TimeTable[]
+  ActivePresence  ActivePresence[]
+  AttendanceLog   AttendanceLog[]
+  ProcessedImages ProcessedFaceImages[]
 
   @@map("Students")
 }
@@ -102,4 +114,52 @@ model UnknownFaces {
   CreatedAt      DateTime @default(now())
 
   @@map("UnknownFaces")
+}
+
+model ActivePresence {
+  Presence_ID Int       @id @default(autoincrement())
+  PersonType  String // "Student" or "Teacher"
+  Student_ID  Int?
+  Teacher_ID  Int?
+  Zone_id     Int
+  EntryTime   DateTime  @default(now())
+  student     Students? @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
+  teacher     Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
+  zone        Zone      @relation(fields: [Zone_id], references: [Zone_id], onDelete: Cascade)
+
+  @@map("ActivePresence")
+}
+
+model AttendanceLog {
+  Log_ID     Int       @id @default(autoincrement())
+  PersonType String // "Student" or "Teacher"
+  Student_ID Int?
+  Teacher_ID Int?
+  Zone_id    Int
+  EntryTime  DateTime
+  ExitTime   DateTime?
+  Duration   Int? // Minutes spent in zone
+  CreatedAt  DateTime  @default(now())
+  student    Students? @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
+  teacher    Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
+  zone       Zone      @relation(fields: [Zone_id], references: [Zone_id], onDelete: Cascade)
+
+  @@map("AttendanceLog")
+}
+
+model ProcessedFaceImages {
+  Processed_ID Int      @id @default(autoincrement())
+  PersonType   String // "Student" or "Teacher"
+  Student_ID   Int?
+  Teacher_ID   Int?
+  Image1       Bytes?
+  Image2       Bytes?
+  Image3       Bytes?
+  Image4       Bytes?
+  Image5       Bytes?
+  CreatedAt    DateTime @default(now())
+  student      Students? @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
+  teacher      Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
+
+  @@map("ProcessedFaceImages")
 }

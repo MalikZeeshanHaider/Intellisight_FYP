@@ -60,6 +60,14 @@ export const zone1API = {
     return response.data;
   },
 
+  // Get TimeTable logs (Entry/Exit tracking)
+  getTimeTableLogs: async (limit = 50, offset = 0, personType = null, zoneId = null) => {
+    const response = await api.get('/timetable-logs', {
+      params: { limit, offset, personType, zoneId }
+    });
+    return response.data;
+  },
+
   // Get face database for recognition
   getFaceDatabase: async () => {
     const response = await api.get('/face-database');

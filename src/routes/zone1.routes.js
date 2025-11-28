@@ -25,11 +25,14 @@ router.get('/current', zone1Controller.getCurrentPersons);
 // Get Zone 1 activity logs
 router.get('/logs', zone1Controller.getZoneLogs);
 
+// Get TimeTable logs (Entry/Exit tracking)
+router.get('/timetable-logs', zone1Controller.getTimeTableLogs);
+
 // Get face database for matching
 router.get('/face-database', zone1Controller.getFaceDatabase);
 
 // Mark person exit
-router.put('/exit/:timetableId', zone1Controller.markExit);
+router.put('/exit/:presenceId', zone1Controller.markExit);
 
 // Get unknown faces log
 router.get('/unknown-list', zone1Controller.getUnknownFaces);
@@ -39,5 +42,8 @@ router.put('/unknown/:unknownId', zone1Controller.updateUnknownFaceStatus);
 
 // Delete unknown face entry
 router.delete('/unknown/:unknownId', zone1Controller.deleteUnknownFace);
+
+// Debug endpoint - check all students/teachers
+router.get('/debug-database', zone1Controller.getDebugDatabase);
 
 export default router;

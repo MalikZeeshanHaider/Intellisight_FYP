@@ -4,9 +4,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { FiRefreshCw, FiSearch, FiAlertCircle, FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
+import { FiRefreshCw, FiSearch, FiAlertCircle, FiPlus, FiEdit2, FiTrash2, FiUserCheck } from 'react-icons/fi';
 import { GiTeacher } from 'react-icons/gi';
 import { teacherAPI } from '../api/api';
+import { enrollPerson } from '../api/faceRecognition';
 import AddTeacherModal from '../components/AddTeacherModal';
 import EditTeacherModal from '../components/EditTeacherModal';
 
@@ -20,6 +21,7 @@ const Teachers = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [enrollingIds, setEnrollingIds] = useState(new Set());
 
   // Fetch teachers
   const fetchTeachers = async () => {
@@ -80,7 +82,30 @@ const Teachers = () => {
       setDeleteConfirm(null);
     } catch (err) {
       console.error('Error deleting teacher:', err);
-      setError('Failed to delete teacher');
+      alert('Failed to delete teacher');
+      setDeleteConfirm(null);
+    }
+  };
+
+  // Handle enroll
+  const handleEnroll = async (teacherId) => {
+    try {
+      setEnrollingIds(prev => new Set(prev).add(teacherId));
+      const response = await enrollPerson('Teacher', teacherId);
+      
+      if (response.success) {
+        alert(`Face enrollment successful for ${response.data.name}`);
+        await fetchTeachers();
+      }
+    } catch (err) {
+      console.error('Error enrolling teacher:', err);
+      alert(err.response?.data?.message || 'Failed to enroll face embeddings');
+    } finally {
+      setEnrollingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(teacherId);
+        return newSet;
+      });
     }
   };
 
@@ -208,6 +233,18 @@ const Teachers = () => {
                       {teacher.Gender || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={() => handleEnroll(teacher.Teacher_ID)}
+                        disabled={enrollingIds.has(teacher.Teacher_ID)}
+                        className="text-purple-600 hover:text-purple-900 mr-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Enroll face embeddings"
+                      >
+                        {enrollingIds.has(teacher.Teacher_ID) ? (
+                          <div className="animate-spin h-5 w-5 border-2 border-purple-600 border-t-transparent rounded-full" />
+                        ) : (
+                          <FiUserCheck size={18} />
+                        )}
+                      </button>
                       <button
                         onClick={() => handleEdit(teacher)}
                         className="text-green-600 hover:text-green-900 mr-4"

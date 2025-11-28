@@ -9,6 +9,8 @@ import { FiCamera, FiAlertCircle } from 'react-icons/fi';
 
 const LiveCameraFeed = ({ 
   webcamRef,
+  cameraLabel = "Zone 1 - Live Camera Feed",
+  cameraType = "Entry",
   onFaceDetection, 
   isProcessing, 
   detections = [],
@@ -20,13 +22,26 @@ const LiveCameraFeed = ({
   const [cameraReady, setCameraReady] = useState(false);
   
   // Use provided ref or local ref
-  const activeWebcamRef = webcamRef || localWebcamRef;
+  const activeWebcamRef = localWebcamRef;
+
+  // If webcamRef is a function, call it when webcam is ready
+  useEffect(() => {
+    if (typeof webcamRef === 'function' && localWebcamRef.current) {
+      webcamRef(localWebcamRef.current);
+    }
+  }, [webcamRef, cameraReady]);
 
   // Video constraints
   const videoConstraints = {
     width: 640,
     height: 480,
     facingMode: "user"
+  };
+
+  // Camera type colors
+  const cameraColors = {
+    'Entry': '#10B981', // Green
+    'Exit': '#F97316'   // Orange
   };
 
   useEffect(() => {
@@ -170,7 +185,14 @@ const LiveCameraFeed = ({
       {/* Camera info */}
       <div className="bg-gray-800 px-4 py-2 text-sm text-gray-300">
         <div className="flex items-center justify-between">
-          <span>Zone 1 - Live Camera Feed</span>
+          <div className="flex items-center space-x-2">
+            <div 
+              className="w-2 h-2 rounded-full" 
+              style={{ backgroundColor: cameraColors[cameraType] || '#10B981' }}
+            ></div>
+            <span className="font-medium">{cameraLabel}</span>
+            <span className="text-xs text-gray-400">({cameraType})</span>
+          </div>
           <span className="text-xs">640 x 480 @ 30fps</span>
         </div>
       </div>

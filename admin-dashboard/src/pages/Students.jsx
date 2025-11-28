@@ -4,8 +4,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { FiUsers, FiRefreshCw, FiSearch, FiAlertCircle, FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
+import { FiUsers, FiRefreshCw, FiSearch, FiAlertCircle, FiPlus, FiEdit2, FiTrash2, FiUserCheck } from 'react-icons/fi';
 import { studentAPI } from '../api/api';
+import { enrollPerson } from '../api/faceRecognition';
 import AddStudentModal from '../components/AddStudentModal';
 import EditStudentModal from '../components/EditStudentModal';
 
@@ -19,6 +20,7 @@ const Students = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [enrollingIds, setEnrollingIds] = useState(new Set());
 
   // Fetch students
   const fetchStudents = async () => {
@@ -64,7 +66,6 @@ const Students = () => {
     setSelectedStudent(student);
     setIsEditModalOpen(true);
   };
-
   // Handle delete
   const handleDelete = async (studentId) => {
     if (deleteConfirm !== studentId) {
@@ -79,7 +80,30 @@ const Students = () => {
       setDeleteConfirm(null);
     } catch (err) {
       console.error('Error deleting student:', err);
-      setError('Failed to delete student');
+      alert('Failed to delete student');
+      setDeleteConfirm(null);
+    }
+  };
+
+  // Handle enroll
+  const handleEnroll = async (studentId) => {
+    try {
+      setEnrollingIds(prev => new Set(prev).add(studentId));
+      const response = await enrollPerson('Student', studentId);
+      
+      if (response.success) {
+        alert(`Face enrollment successful for ${response.data.name}`);
+        await fetchStudents();
+      }
+    } catch (err) {
+      console.error('Error enrolling student:', err);
+      alert(err.response?.data?.message || 'Failed to enroll face embeddings');
+    } finally {
+      setEnrollingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(studentId);
+        return newSet;
+      });
     }
   };
 
@@ -201,6 +225,18 @@ const Students = () => {
                       {student.Gender || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={() => handleEnroll(student.Student_ID)}
+                        disabled={enrollingIds.has(student.Student_ID)}
+                        className="text-green-600 hover:text-green-900 mr-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Enroll face embeddings"
+                      >
+                        {enrollingIds.has(student.Student_ID) ? (
+                          <div className="animate-spin h-5 w-5 border-2 border-green-600 border-t-transparent rounded-full" />
+                        ) : (
+                          <FiUserCheck size={18} />
+                        )}
+                      </button>
                       <button
                         onClick={() => handleEdit(student)}
                         className="text-blue-600 hover:text-blue-900 mr-4"
