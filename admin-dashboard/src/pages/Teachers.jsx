@@ -125,21 +125,149 @@ const Teachers = () => {
   return (
     <div className="space-y-6 relative">
       {/* Animated Background */}
-      <div className="fixed inset-0 pointer-events-none z-0">
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-radial from-green-500/5 via-transparent to-transparent dark:from-green-500/10"></div>
         <div className="absolute inset-0 bg-gradient-radial from-purple-500/5 via-transparent to-transparent dark:from-purple-500/10" style={{ transform: 'translate(50%, 50%)' }}></div>
+        
+        {/* Network Lines Effect */}
+        <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="line-gradient-1" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="rgb(34, 197, 94)" stopOpacity="0" />
+              <stop offset="50%" stopColor="rgb(34, 197, 94)" stopOpacity="0.15" />
+              <stop offset="100%" stopColor="rgb(34, 197, 94)" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="line-gradient-2" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="rgb(16, 185, 129)" stopOpacity="0" />
+              <stop offset="50%" stopColor="rgb(16, 185, 129)" stopOpacity="0.15" />
+              <stop offset="100%" stopColor="rgb(16, 185, 129)" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="line-gradient-3" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="rgb(168, 85, 247)" stopOpacity="0" />
+              <stop offset="50%" stopColor="rgb(168, 85, 247)" stopOpacity="0.15" />
+              <stop offset="100%" stopColor="rgb(168, 85, 247)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          
+          {/* Horizontal network lines */}
+          <motion.line 
+            x1="-20%" y1="15%" x2="120%" y2="18%" 
+            stroke="url(#line-gradient-1)" 
+            strokeWidth="2"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ 
+              pathLength: [0, 1, 0],
+              opacity: [0, 0.6, 0],
+              x1: ["-20%", "0%", "20%"],
+              x2: ["120%", "140%", "160%"]
+            }}
+            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          />
+          
+          <motion.line 
+            x1="-20%" y1="45%" x2="120%" y2="42%" 
+            stroke="url(#line-gradient-2)" 
+            strokeWidth="2"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ 
+              pathLength: [0, 1, 0],
+              opacity: [0, 0.6, 0],
+              x1: ["-20%", "0%", "20%"],
+              x2: ["120%", "140%", "160%"]
+            }}
+            transition={{ duration: 25, repeat: Infinity, ease: "linear", delay: 4 }}
+          />
+          
+          <motion.line 
+            x1="-20%" y1="75%" x2="120%" y2="78%" 
+            stroke="url(#line-gradient-1)" 
+            strokeWidth="2"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ 
+              pathLength: [0, 1, 0],
+              opacity: [0, 0.6, 0],
+              x1: ["-20%", "0%", "20%"],
+              x2: ["120%", "140%", "160%"]
+            }}
+            transition={{ duration: 22, repeat: Infinity, ease: "linear", delay: 8 }}
+          />
+          
+          {/* Vertical network lines */}
+          <motion.line 
+            x1="25%" y1="-20%" x2="28%" y2="120%" 
+            stroke="url(#line-gradient-3)" 
+            strokeWidth="2"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ 
+              pathLength: [0, 1, 0],
+              opacity: [0, 0.6, 0],
+              y1: ["-20%", "0%", "20%"],
+              y2: ["120%", "140%", "160%"]
+            }}
+            transition={{ duration: 26, repeat: Infinity, ease: "linear", delay: 2 }}
+          />
+          
+          <motion.line 
+            x1="65%" y1="-20%" x2="62%" y2="120%" 
+            stroke="url(#line-gradient-2)" 
+            strokeWidth="2"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ 
+              pathLength: [0, 1, 0],
+              opacity: [0, 0.6, 0],
+              y1: ["-20%", "0%", "20%"],
+              y2: ["120%", "140%", "160%"]
+            }}
+            transition={{ duration: 21, repeat: Infinity, ease: "linear", delay: 6 }}
+          />
+          
+          {/* Connection nodes */}
+          <motion.circle 
+            cx="25%" cy="15%" r="3" 
+            fill="rgb(34, 197, 94)" 
+            opacity="0"
+            animate={{ 
+              opacity: [0, 0.4, 0],
+              r: [3, 5, 3]
+            }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.circle 
+            cx="65%" cy="45%" r="3" 
+            fill="rgb(16, 185, 129)" 
+            opacity="0"
+            animate={{ 
+              opacity: [0, 0.4, 0],
+              r: [3, 5, 3]
+            }}
+            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
+          />
+          <motion.circle 
+            cx="28%" cy="75%" r="3" 
+            fill="rgb(168, 85, 247)" 
+            opacity="0"
+            animate={{ 
+              opacity: [0, 0.4, 0],
+              r: [3, 5, 3]
+            }}
+            transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 3 }}
+          />
+        </svg>
       </div>
 
       {/* Header */}
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative bg-white/80 dark:bg-surface/80 backdrop-blur-xl rounded-xl shadow-2xl p-6 border border-green-500/20"
+        className="relative p-6 rounded-3xl overflow-hidden dark:bg-gradient-to-br dark:from-green-500/5 dark:to-emerald-500/5 bg-gradient-to-br from-white/80 to-green-50/80 backdrop-blur-xl dark:border-green-500/20 border-green-200"
+        style={{
+          boxShadow: document.documentElement.classList.contains('dark') 
+            ? '0 8px 32px rgba(34, 197, 94, 0.1)' 
+            : '0 10px 40px rgba(34, 197, 94, 0.15), 0 4px 12px rgba(16, 185, 129, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+        }}
       >
-        {/* Scan Line Effect */}
-        <div className="absolute inset-0 overflow-hidden rounded-xl pointer-events-none">
-          <div className="absolute inset-0 bg-gradient-to-b from-green-500/10 via-transparent to-transparent animate-scan"></div>
-        </div>
+        {/* Glass shimmer effect */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
 
       <div className="flex items-center justify-between relative z-10">
         <div>
@@ -162,12 +290,17 @@ const Teachers = () => {
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.95 }}
+            whileTap={{ scale: 0.95, rotate: 180 }}
             onClick={fetchTeachers}
-            className="flex items-center space-x-2 px-4 py-2 bg-white/50 dark:bg-surface/50 backdrop-blur-sm text-gray-700 dark:text-gray-300 rounded-lg border border-gray-300/50 dark:border-gray-600/50 hover:border-green-500/50 transition-colors"
+            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-500/10 to-emerald-500/10 dark:from-green-500/20 dark:to-emerald-500/20 backdrop-blur-sm text-green-700 dark:text-green-300 rounded-lg border border-green-500/30 hover:border-green-500/60 hover:shadow-lg hover:shadow-green-500/20 transition-all"
           >
-            <FiRefreshCw size={16} className={loading ? 'animate-spin text-green-500' : ''} />
-            <span>Refresh</span>
+            <motion.div
+              animate={loading ? { rotate: 360 } : {}}
+              transition={{ duration: 1, repeat: loading ? Infinity : 0, ease: "linear" }}
+            >
+              <FiRefreshCw size={16} className="text-green-500 dark:text-green-400" />
+            </motion.div>
+            <span className="font-semibold">Refresh</span>
           </motion.button>
         </div>
       </div>
@@ -189,10 +322,15 @@ const Teachers = () => {
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="relative bg-white/80 dark:bg-surface/80 backdrop-blur-xl rounded-xl shadow-lg p-4 border border-green-500/20 overflow-hidden"
+        className="relative p-4 rounded-3xl overflow-hidden dark:bg-gradient-to-br dark:from-green-500/5 dark:to-emerald-500/5 bg-gradient-to-br from-white/80 to-green-50/80 backdrop-blur-xl dark:border-green-500/20 border-green-200"
+        style={{
+          boxShadow: document.documentElement.classList.contains('dark') 
+            ? '0 8px 32px rgba(34, 197, 94, 0.1)' 
+            : '0 10px 40px rgba(34, 197, 94, 0.15), 0 4px 12px rgba(16, 185, 129, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+        }}
       >
-        {/* Scan Line */}
-        <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 via-transparent to-transparent pointer-events-none"></div>
+        {/* Glass shimmer effect */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
         
         <div className="relative">
           <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-500 dark:text-green-400" size={20} />
@@ -201,7 +339,7 @@ const Teachers = () => {
             placeholder="Search by name, email, or designation..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white/50 dark:bg-surface/50 backdrop-blur-sm border border-green-500/30 dark:border-green-500/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400 focus:border-transparent text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400"
+            className="w-full pl-10 pr-4 py-2.5 bg-transparent border-none rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/50 dark:focus:ring-green-400/50 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 font-medium"
           />
         </div>
       </motion.div>
@@ -210,10 +348,15 @@ const Teachers = () => {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative bg-white/80 dark:bg-surface/80 backdrop-blur-xl rounded-xl shadow-lg overflow-hidden border border-green-500/20"
+        className="relative p-6 rounded-3xl overflow-hidden dark:bg-gradient-to-br dark:from-green-500/5 dark:to-emerald-500/5 bg-gradient-to-br from-white/80 to-green-50/80 backdrop-blur-xl dark:border-green-500/20 border-green-200"
+        style={{
+          boxShadow: document.documentElement.classList.contains('dark') 
+            ? '0 8px 32px rgba(34, 197, 94, 0.1)' 
+            : '0 10px 40px rgba(34, 197, 94, 0.15), 0 4px 12px rgba(16, 185, 129, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+        }}
       >
-        {/* Scan Line */}
-        <div className="absolute inset-0 bg-gradient-to-b from-green-500/5 via-transparent to-transparent pointer-events-none"></div>
+        {/* Glass shimmer effect */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
         
         {filteredTeachers.length === 0 ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400 relative z-10">

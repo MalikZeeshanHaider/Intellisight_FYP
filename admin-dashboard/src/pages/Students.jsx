@@ -126,18 +126,36 @@ const Students = () => {
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute inset-0 bg-gradient-radial from-cyan-500/5 via-transparent to-transparent dark:from-cyan-500/10"></div>
         <div className="absolute inset-0 bg-gradient-radial from-blue-500/5 via-transparent to-transparent dark:from-blue-500/10" style={{ transform: 'translate(50%, 50%)' }}></div>
+        
+        {/* Asymmetrical Lines Effect */}
+        <svg className="absolute inset-0 w-full h-full opacity-[0.03] dark:opacity-[0.05]" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="asymmetric-lines" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
+              <line x1="0" y1="20" x2="100" y2="25" stroke="currentColor" strokeWidth="0.5" className="text-cyan-500" />
+              <line x1="0" y1="45" x2="100" y2="40" stroke="currentColor" strokeWidth="0.5" className="text-blue-500" />
+              <line x1="0" y1="70" x2="100" y2="75" stroke="currentColor" strokeWidth="0.5" className="text-purple-500" />
+              <line x1="20" y1="0" x2="25" y2="100" stroke="currentColor" strokeWidth="0.5" className="text-cyan-400" />
+              <line x1="60" y1="0" x2="55" y2="100" stroke="currentColor" strokeWidth="0.5" className="text-blue-400" />
+              <line x1="85" y1="0" x2="90" y2="100" stroke="currentColor" strokeWidth="0.5" className="text-indigo-400" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#asymmetric-lines)" />
+        </svg>
       </div>
 
       {/* Header */}
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative bg-white/80 dark:bg-surface/80 backdrop-blur-xl rounded-xl shadow-2xl p-6 border border-cyan-500/20"
+        className="relative p-6 rounded-3xl overflow-hidden dark:bg-gradient-to-br dark:from-cyan-500/5 dark:to-blue-500/5 bg-gradient-to-br from-white/80 to-indigo-50/80 backdrop-blur-xl dark:border-cyan-500/20 border-indigo-200"
+        style={{
+          boxShadow: document.documentElement.classList.contains('dark') 
+            ? '0 8px 32px rgba(0, 255, 255, 0.1)' 
+            : '0 10px 40px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(79, 70, 229, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+        }}
       >
-        {/* Scan Line Effect */}
-        <div className="absolute inset-0 overflow-hidden rounded-xl pointer-events-none">
-          <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/10 via-transparent to-transparent animate-scan"></div>
-        </div>
+        {/* Glass shimmer effect */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
 
       <div className="flex items-center justify-between relative z-10">
         <div>
@@ -160,12 +178,17 @@ const Students = () => {
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.95 }}
+            whileTap={{ scale: 0.95, rotate: 180 }}
             onClick={fetchStudents}
-            className="flex items-center space-x-2 px-4 py-2 bg-white/50 dark:bg-surface/50 backdrop-blur-sm text-gray-700 dark:text-gray-300 rounded-lg border border-gray-300/50 dark:border-gray-600/50 hover:border-cyan-500/50 transition-colors"
+            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/20 dark:to-blue-500/20 backdrop-blur-sm text-cyan-700 dark:text-cyan-300 rounded-lg border border-cyan-500/30 hover:border-cyan-500/60 hover:shadow-lg hover:shadow-cyan-500/20 transition-all"
           >
-            <FiRefreshCw size={16} className={loading ? 'animate-spin text-cyan-500' : ''} />
-            <span>Refresh</span>
+            <motion.div
+              animate={loading ? { rotate: 360 } : {}}
+              transition={{ duration: 1, repeat: loading ? Infinity : 0, ease: "linear" }}
+            >
+              <FiRefreshCw size={16} className="text-cyan-500 dark:text-cyan-400" />
+            </motion.div>
+            <span className="font-semibold">Refresh</span>
           </motion.button>
         </div>
       </div>
@@ -187,10 +210,15 @@ const Students = () => {
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="relative bg-white/80 dark:bg-surface/80 backdrop-blur-xl rounded-xl shadow-lg p-4 border border-cyan-500/20 overflow-hidden"
+        className="relative p-4 rounded-3xl overflow-hidden dark:bg-gradient-to-br dark:from-cyan-500/5 dark:to-blue-500/5 bg-gradient-to-br from-white/80 to-indigo-50/80 backdrop-blur-xl dark:border-cyan-500/20 border-indigo-200"
+        style={{
+          boxShadow: document.documentElement.classList.contains('dark') 
+            ? '0 8px 32px rgba(0, 255, 255, 0.1)' 
+            : '0 10px 40px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(79, 70, 229, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+        }}
       >
-        {/* Scan Line */}
-        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 via-transparent to-transparent pointer-events-none"></div>
+        {/* Glass shimmer effect */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
         
         <div className="relative">
           <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-cyan-500 dark:text-cyan-400" size={20} />
@@ -199,7 +227,7 @@ const Students = () => {
             placeholder="Search by name, email, or roll number..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white/50 dark:bg-surface/50 backdrop-blur-sm border border-cyan-500/30 dark:border-cyan-500/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 focus:border-transparent text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400"
+            className="w-full pl-10 pr-4 py-2.5 bg-transparent border-none rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500/50 dark:focus:ring-cyan-400/50 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 font-medium"
           />
         </div>
       </motion.div>
@@ -208,10 +236,15 @@ const Students = () => {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative bg-white/80 dark:bg-surface/80 backdrop-blur-xl rounded-xl shadow-lg overflow-hidden border border-cyan-500/20"
+        className="relative p-6 rounded-3xl overflow-hidden dark:bg-gradient-to-br dark:from-cyan-500/5 dark:to-blue-500/5 bg-gradient-to-br from-white/80 to-indigo-50/80 backdrop-blur-xl dark:border-cyan-500/20 border-indigo-200"
+        style={{
+          boxShadow: document.documentElement.classList.contains('dark') 
+            ? '0 8px 32px rgba(0, 255, 255, 0.1)' 
+            : '0 10px 40px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(79, 70, 229, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+        }}
       >
-        {/* Scan Line */}
-        <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/5 via-transparent to-transparent pointer-events-none"></div>
+        {/* Glass shimmer effect */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
         
         {filteredStudents.length === 0 ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400 relative z-10">
