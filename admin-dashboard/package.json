@@ -5,9 +5,12 @@
   "description": "IntelliSight Admin Dashboard - Real-time Zone Tracking for Students & Teachers",
   "private": true,
   "dependencies": {
+    "@headlessui/react": "^2.2.9",
+    "@heroicons/react": "^2.2.0",
     "axios": "^1.6.2",
     "date-fns": "^3.0.0",
     "face-api.js": "^0.22.2",
+    "framer-motion": "^12.23.25",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-icons": "^4.12.0",

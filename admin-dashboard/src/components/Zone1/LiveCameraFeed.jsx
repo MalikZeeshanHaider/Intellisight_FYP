@@ -6,6 +6,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
 import { FiCamera, FiAlertCircle } from 'react-icons/fi';
+import { motion } from 'framer-motion';
 
 const LiveCameraFeed = ({ 
   webcamRef,
@@ -110,7 +111,21 @@ const LiveCameraFeed = ({
   };
 
   return (
-    <div className="relative bg-gray-900 rounded-lg overflow-hidden shadow-lg">
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="relative bg-gradient-to-br from-gray-900 via-black to-gray-900 rounded-xl overflow-hidden shadow-2xl border-2 border-cyan-500/30 dark:border-cyan-400/40"
+    >
+      {/* Animated Border Glow */}
+      <div className="absolute inset-0 rounded-xl pointer-events-none">
+        <div className="absolute inset-0 rounded-xl border-2 border-cyan-500/50 dark:border-cyan-400/60 animate-pulse"></div>
+      </div>
+
+      {/* Scan Line Effect */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-10 rounded-xl">
+        <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/10 via-transparent to-transparent animate-scan"></div>
+      </div>
+
       {/* Camera Feed */}
       <div className="relative" style={{ width: '640px', height: '480px' }}>
         <Webcam
@@ -134,69 +149,82 @@ const LiveCameraFeed = ({
 
         {/* Loading overlay */}
         {!cameraReady && !cameraError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-900 via-black to-gray-900 backdrop-blur-sm z-20">
             <div className="text-center text-white">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
-              <p className="text-lg">Initializing camera...</p>
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 shadow-lg shadow-cyan-500/50 mb-4"></div>
+              <p className="text-lg font-semibold bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent">Initializing camera...</p>
             </div>
           </div>
         )}
 
         {/* Error overlay */}
         {cameraError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-900 via-black to-gray-900 backdrop-blur-sm z-20">
             <div className="text-center text-white max-w-md mx-4">
-              <FiAlertCircle size={48} className="mx-auto mb-4 text-red-500" />
-              <p className="text-lg mb-2">Camera Access Error</p>
+              <FiAlertCircle size={48} className="mx-auto mb-4 text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
+              <p className="text-lg mb-2 font-semibold">Camera Access Error</p>
               <p className="text-sm text-gray-400">{cameraError}</p>
-              <button
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => window.location.reload()}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="mt-4 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-shadow"
               >
                 Retry
-              </button>
+              </motion.button>
             </div>
           </div>
         )}
 
         {/* Processing indicator */}
         {isProcessing && (
-          <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-1 rounded-full text-sm flex items-center space-x-2">
-            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute top-4 left-4 bg-cyan-500/20 backdrop-blur-md border border-cyan-500/40 text-cyan-100 px-3 py-1 rounded-full text-sm flex items-center space-x-2 shadow-lg shadow-cyan-500/30 z-20"
+          >
+            <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse shadow-lg shadow-cyan-400/50"></div>
             <span>Processing...</span>
-          </div>
+          </motion.div>
         )}
 
         {/* Detection count */}
-        <div className="absolute top-4 right-4 bg-black bg-opacity-70 text-white px-3 py-1 rounded-full text-sm">
-          <FiCamera className="inline mr-1" />
-          {detections.length} face{detections.length !== 1 ? 's' : ''} detected
+        <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md border border-purple-500/40 text-white px-3 py-1 rounded-full text-sm shadow-lg shadow-purple-500/20 z-20">
+          <FiCamera className="inline mr-1 text-purple-400" />
+          <span className="text-purple-100">{detections.length} face{detections.length !== 1 ? 's' : ''} detected</span>
         </div>
 
         {/* Status indicator */}
-        <div className="absolute bottom-4 left-4 flex items-center space-x-2">
-          <div className={`w-3 h-3 rounded-full ${cameraReady ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}></div>
-          <span className="text-white text-sm font-medium">
+        <div className="absolute bottom-4 left-4 flex items-center space-x-2 bg-black/60 backdrop-blur-md border border-green-500/40 px-3 py-1 rounded-full shadow-lg shadow-green-500/20 z-20">
+          <div className={`w-3 h-3 rounded-full ${cameraReady ? 'bg-green-500 shadow-lg shadow-green-500/50' : 'bg-red-500 shadow-lg shadow-red-500/50'} animate-pulse`}></div>
+          <span className={`text-sm font-bold ${cameraReady ? 'text-green-400' : 'text-red-400'}`}>
             {cameraReady ? 'LIVE' : 'OFFLINE'}
           </span>
         </div>
       </div>
 
       {/* Camera info */}
-      <div className="bg-gray-800 px-4 py-2 text-sm text-gray-300">
+      <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 backdrop-blur-xl px-4 py-2 text-sm border-t border-cyan-500/20 relative z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div 
-              className="w-2 h-2 rounded-full" 
-              style={{ backgroundColor: cameraColors[cameraType] || '#10B981' }}
+              className="w-2 h-2 rounded-full shadow-lg" 
+              style={{ 
+                backgroundColor: cameraColors[cameraType] || '#10B981',
+                boxShadow: `0 0 10px ${cameraColors[cameraType] || '#10B981'}50`
+              }}
             ></div>
-            <span className="font-medium">{cameraLabel}</span>
-            <span className="text-xs text-gray-400">({cameraType})</span>
+            <span className="font-medium text-gray-200">{cameraLabel}</span>
+            <span className="text-xs px-2 py-0.5 rounded-full border" style={{
+              color: cameraColors[cameraType] || '#10B981',
+              borderColor: `${cameraColors[cameraType] || '#10B981'}40`,
+              backgroundColor: `${cameraColors[cameraType] || '#10B981'}10`
+            }}>({cameraType})</span>
           </div>
-          <span className="text-xs">640 x 480 @ 30fps</span>
+          <span className="text-xs text-cyan-400">640 x 480 @ 30fps</span>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
