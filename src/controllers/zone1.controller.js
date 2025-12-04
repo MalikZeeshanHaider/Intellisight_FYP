@@ -41,10 +41,33 @@ export const logRecognizedPerson = async (req, res) => {
     });
 
     if (existingEntry) {
+      console.log(`⏭️ ${normalizedType} ${personId} already in zone - skipping duplicate entry`);
       return res.status(200).json({
         success: true,
         message: 'Person already in zone',
         data: existingEntry
+      });
+    }
+
+    // Also check if there's an open attendance log (no exit time)
+    const openAttendanceLog = await prisma.attendanceLog.findFirst({
+      where: {
+        Zone_id: 1,
+        PersonType: normalizedType,
+        ExitTime: null,
+        ...(normalizedType === 'Teacher' 
+          ? { Teacher_ID: parseInt(personId) }
+          : { Student_ID: parseInt(personId) }
+        )
+      }
+    });
+
+    if (openAttendanceLog) {
+      console.log(`⏭️ ${normalizedType} ${personId} has open attendance log - skipping duplicate`);
+      return res.status(200).json({
+        success: true,
+        message: 'Person already has active attendance session',
+        data: openAttendanceLog
       });
     }
 
@@ -90,12 +113,14 @@ export const logRecognizedPerson = async (req, res) => {
         }
       });
 
-      // Also create TimeTable entry for tracking
-      await prisma.timeTable.create({
+      // Also create AttendanceLog entry for tracking (with null ExitTime initially)
+      await prisma.attendanceLog.create({
         data: {
           Zone_id: 1,
           PersonType: normalizedType,
           EntryTime: entryTime,
+          ExitTime: null,
+          Duration: null,
           ...(normalizedType === 'Teacher' 
             ? { Teacher_ID: parseInt(personId) }
             : { Student_ID: parseInt(personId) }
@@ -116,23 +141,8 @@ export const logRecognizedPerson = async (req, res) => {
       const durationMs = exitTime - new Date(existingEntry.EntryTime);
       const durationMinutes = Math.round(durationMs / 1000 / 60);
 
-      // Create attendance log
-      await prisma.attendanceLog.create({
-        data: {
-          Zone_id: 1,
-          PersonType: normalizedType,
-          EntryTime: existingEntry.EntryTime,
-          ExitTime: exitTime,
-          Duration: durationMinutes,
-          ...(normalizedType === 'Teacher' 
-            ? { Teacher_ID: parseInt(personId) }
-            : { Student_ID: parseInt(personId) }
-          )
-        }
-      });
-
-      // Update TimeTable with exit time
-      const timetableEntry = await prisma.timeTable.findFirst({
+      // Update AttendanceLog with exit time and duration
+      const attendanceEntry = await prisma.attendanceLog.findFirst({
         where: {
           Zone_id: 1,
           PersonType: normalizedType,
@@ -147,13 +157,14 @@ export const logRecognizedPerson = async (req, res) => {
         }
       });
 
-      if (timetableEntry) {
-        await prisma.timeTable.update({
+      if (attendanceEntry) {
+        await prisma.attendanceLog.update({
           where: {
-            TimeTable_ID: timetableEntry.TimeTable_ID
+            Log_ID: attendanceEntry.Log_ID
           },
           data: {
-            ExitTime: exitTime
+            ExitTime: exitTime,
+            Duration: durationMinutes
           }
         });
       }
@@ -612,6 +623,45 @@ export const markExit = async (req, res) => {
 };
 
 /**
+ * Get count of active unknown faces in Zone 1
+ * GET /api/zones/1/unknown-count
+ */
+export const getUnknownFacesCount = async (req, res) => {
+  try {
+    // Count unknown faces with PENDING status or detected in last 24 hours
+    const twentyFourHoursAgo = new Date();
+    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+
+    const count = await prisma.unknownFaces.count({
+      where: {
+        Zone_id: 1,
+        OR: [
+          { Status: 'PENDING' },
+          { 
+            DetectedTime: {
+              gte: twentyFourHoursAgo
+            }
+          }
+        ]
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      count: count
+    });
+
+  } catch (error) {
+    console.error('Error counting unknown faces:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to count unknown faces',
+      error: error.message
+    });
+  }
+};
+
+/**
  * Get unknown faces log
  * GET /api/zones/1/unknown-list
  */
@@ -748,7 +798,7 @@ export const deleteUnknownFace = async (req, res) => {
 };
 
 /**
- * Get TimeTable logs with Entry/Exit data
+ * Get AttendanceLog logs with Entry/Exit data
  * GET /api/zones/1/timetable-logs
  */
 export const getTimeTableLogs = async (req, res) => {
@@ -760,7 +810,7 @@ export const getTimeTableLogs = async (req, res) => {
       ...(personType && { PersonType: personType })
     };
 
-    const logs = await prisma.timeTable.findMany({
+    const logs = await prisma.attendanceLog.findMany({
       where,
       include: {
         teacher: {
@@ -798,26 +848,20 @@ export const getTimeTableLogs = async (req, res) => {
       skip: parseInt(offset)
     });
 
-    const total = await prisma.timeTable.count({ where });
+    const total = await prisma.attendanceLog.count({ where });
 
     // Format response with calculated duration
     const formatted = logs.map(entry => {
       const person = entry.student || entry.teacher;
-      let duration = null;
+      let duration = entry.Duration; // Use stored duration
       let status = 'Inside';
 
-      if (entry.ExitTime && entry.EntryTime) {
-        const durationMs = new Date(entry.ExitTime) - new Date(entry.EntryTime);
-        duration = Math.round(durationMs / 1000 / 60); // minutes
+      if (entry.ExitTime) {
         status = 'Completed';
-      } else if (entry.EntryTime) {
-        const durationMs = new Date() - new Date(entry.EntryTime);
-        duration = Math.round(durationMs / 1000 / 60); // minutes
-        status = 'Inside';
       }
       
       return {
-        TimeTable_ID: entry.TimeTable_ID,
+        Log_ID: entry.Log_ID,
         PersonType: entry.PersonType,
         PersonID: entry.PersonType === 'Student' ? entry.Student_ID : entry.Teacher_ID,
         Name: person?.Name,
@@ -847,10 +891,10 @@ export const getTimeTableLogs = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching TimeTable logs:', error);
+    console.error('Error fetching attendance logs:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch TimeTable logs',
+      message: 'Failed to fetch attendance logs',
       error: error.message
     });
   }
@@ -937,6 +981,67 @@ export const getDebugDatabase = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch debug database',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Re-enroll all faces (trigger Python training script)
+ * POST /api/zones/1/re-enroll
+ */
+export const reEnrollFaces = async (req, res) => {
+  try {
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+    const path = await import('path');
+    
+    console.log('🔄 Re-enrollment requested...');
+    
+    // Path to Python training script
+    const scriptPath = path.join(process.cwd(), 'face-recognition', 'train_from_database.py');
+    const pythonCommand = `python "${scriptPath}"`;
+    
+    console.log(`📝 Running: ${pythonCommand}`);
+    
+    // Execute Python training script
+    const { stdout, stderr } = await execAsync(pythonCommand, {
+      cwd: path.join(process.cwd(), 'face-recognition'),
+      timeout: 120000 // 2 minutes timeout
+    });
+    
+    console.log('📊 Training output:', stdout);
+    
+    if (stderr && !stderr.includes('[CONFIG]')) {
+      console.error('⚠️ Training stderr:', stderr);
+    }
+    
+    // Parse training results from output
+    const studentsMatch = stdout.match(/Students trained: (\d+)/);
+    const teachersMatch = stdout.match(/Teachers trained: (\d+)/);
+    const totalEncodingsMatch = stdout.match(/Total encodings: (\d+)/);
+    
+    const results = {
+      studentsEnrolled: studentsMatch ? parseInt(studentsMatch[1]) : 0,
+      teachersEnrolled: teachersMatch ? parseInt(teachersMatch[1]) : 0,
+      totalEncodings: totalEncodingsMatch ? parseInt(totalEncodingsMatch[1]) : 0,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('✅ Re-enrollment complete:', results);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Face re-enrollment completed successfully',
+      data: results
+    });
+    
+  } catch (error) {
+    console.error('❌ Re-enrollment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to re-enroll faces',
       error: error.message
     });
   }

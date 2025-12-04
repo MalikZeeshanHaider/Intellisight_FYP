@@ -86,14 +86,14 @@ const Register = () => {
                         <h2 className="text-4xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple mb-2">
                             Create Account
                         </h2>
-                        <div className="flex items-center justify-center gap-2 text-steel-600">
+                        <div className="flex items-center justify-center gap-2 text-gray-300">
                             <HiSparkles className="text-accent-cyan" />
                             <p className="text-sm font-medium">Register New Admin</p>
                         </div>
                     </motion.div>
                     <motion.form variants={itemVariants} onSubmit={handleSubmit} className="space-y-5">
                         <motion.div variants={itemVariants}>
-                            <label className="block text-sm font-semibold text-navy-primary mb-2">Full Name</label>
+                            <label className="block text-sm font-semibold text-white mb-2">Full Name</label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                     <FaUser className="text-steel-500" />
@@ -112,7 +112,7 @@ const Register = () => {
                         </motion.div>
 
                         <motion.div variants={itemVariants}>
-                            <label className="block text-sm font-semibold text-navy-primary mb-2">Email Address</label>
+                            <label className="block text-sm font-semibold text-white mb-2">Email Address</label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                     <FaEnvelope className="text-steel-500" />
@@ -132,7 +132,7 @@ const Register = () => {
                         </motion.div>
 
                         <motion.div variants={itemVariants}>
-                            <label className="block text-sm font-semibold text-navy-primary mb-2">Role</label>
+                            <label className="block text-sm font-semibold text-white mb-2">Role</label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                     <FaShieldAlt className="text-steel-500" />
@@ -152,7 +152,7 @@ const Register = () => {
                         </motion.div>
 
                         <motion.div variants={itemVariants}>
-                            <label className="block text-sm font-semibold text-navy-primary mb-2">Password</label>
+                            <label className="block text-sm font-semibold text-white mb-2">Password</label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                     <FaLock className="text-steel-500" />
@@ -219,7 +219,7 @@ const Register = () => {
                         </motion.div>
 
                         <motion.div variants={itemVariants} className="text-center pt-4">
-                            <p className="text-sm text-steel-600">
+                            <p className="text-sm text-gray-300">
                                 Already have an account?{' '}
                                 <Link to="/login" className="font-semibold text-transparent bg-clip-text bg-gradient-to-r from-accent-blue to-accent-cyan hover:from-accent-cyan hover:to-accent-blue transition-all">
                                     Sign In

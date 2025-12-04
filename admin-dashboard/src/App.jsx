@@ -93,12 +93,12 @@ function App() {
             />
 
             <Route
-              path="/zones/:id"
+              path="/zones/zone1-live"
               element={
                 <ProtectedRoute>
                   <Layout>
                     <ErrorBoundary>
-                      <ZoneDetail />
+                      <Zone1 />
                     </ErrorBoundary>
                   </Layout>
                 </ProtectedRoute>
@@ -106,12 +106,12 @@ function App() {
             />
 
             <Route
-              path="/zone1-live"
+              path="/zones/:id"
               element={
                 <ProtectedRoute>
                   <Layout>
                     <ErrorBoundary>
-                      <Zone1 />
+                      <ZoneDetail />
                     </ErrorBoundary>
                   </Layout>
                 </ProtectedRoute>

@@ -15,20 +15,41 @@ let faceDescriptors = [];
  * Load face-api.js models
  */
 export const loadModels = async () => {
-  if (modelsLoaded) return true;
+  if (modelsLoaded) {
+    console.log('✅ Models already loaded');
+    return true;
+  }
 
   try {
-    console.log('Loading face-api.js models from:', MODEL_URL);
+    console.log('🔄 Loading face-api.js models from:', MODEL_URL);
     
-    // Load only the models we need (and have downloaded)
-    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-    console.log('✅ TinyFaceDetector loaded');
+    // Load models one by one with detailed error handling
+    try {
+      console.log('  Loading TinyFaceDetector...');
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+      console.log('  ✅ TinyFaceDetector loaded');
+    } catch (err) {
+      console.error('  ❌ Failed to load TinyFaceDetector:', err.message);
+      throw new Error(`TinyFaceDetector failed: ${err.message}`);
+    }
     
-    await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-    console.log('✅ FaceLandmark68Net loaded');
+    try {
+      console.log('  Loading FaceLandmark68Net...');
+      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+      console.log('  ✅ FaceLandmark68Net loaded');
+    } catch (err) {
+      console.error('  ❌ Failed to load FaceLandmark68Net:', err.message);
+      throw new Error(`FaceLandmark68Net failed: ${err.message}`);
+    }
     
-    await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-    console.log('✅ FaceRecognitionNet loaded');
+    try {
+      console.log('  Loading FaceRecognitionNet...');
+      await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+      console.log('  ✅ FaceRecognitionNet loaded');
+    } catch (err) {
+      console.error('  ❌ Failed to load FaceRecognitionNet:', err.message);
+      throw new Error(`FaceRecognitionNet failed: ${err.message}`);
+    }
 
     modelsLoaded = true;
     console.log('✅ All face-api.js models loaded successfully');
@@ -36,6 +57,11 @@ export const loadModels = async () => {
   } catch (error) {
     console.error('❌ Error loading face-api.js models:', error);
     console.error('Error details:', error.message);
+    console.error('Make sure model files exist in /public/models/ directory');
+    console.error('Expected files:');
+    console.error('  - tiny_face_detector_model-weights_manifest.json & shard1');
+    console.error('  - face_landmark_68_model-weights_manifest.json & shard1');
+    console.error('  - face_recognition_model-weights_manifest.json & shard1, shard2');
     return false;
   }
 };

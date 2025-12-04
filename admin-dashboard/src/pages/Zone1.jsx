@@ -37,6 +37,7 @@ const Zone1 = () => {
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [isReEnrolling, setIsReEnrolling] = useState(false);
   const [stats, setStats] = useState({
     totalRecognized: 0,
     totalUnknown: 0,
@@ -55,6 +56,21 @@ const Zone1 = () => {
   // Load face-api.js models and face database on mount
   useEffect(() => {
     initializeFaceRecognition();
+  }, []);
+
+  // Periodic refresh of current persons in zone (every 5 seconds)
+  useEffect(() => {
+    // Initial fetch
+    fetchCurrentPersons();
+    fetchUnknownCount();
+    
+    // Set up interval for periodic updates
+    const refreshInterval = setInterval(() => {
+      fetchCurrentPersons();
+      fetchUnknownCount();
+    }, 5000); // Refresh every 5 seconds
+    
+    return () => clearInterval(refreshInterval);
   }, []);
 
   const initializeFaceRecognition = async () => {
@@ -112,9 +128,23 @@ const Zone1 = () => {
       console.error('❌ Initialization error:', err);
       const errorMessage = err.message || 'Failed to initialize face recognition';
       
-      // Check for specific error types
-      if (err.message?.includes('models')) {
-        setError('Model loading failed. Please ensure face-api.js models are in /public/models/');
+      // Check for specific error types with detailed messages
+      if (err.message?.includes('TinyFaceDetector') || 
+          err.message?.includes('FaceLandmark') || 
+          err.message?.includes('FaceRecognition') ||
+          err.message?.includes('models')) {
+        setError(`Model loading failed: ${err.message}. 
+
+Please ensure the following files exist in /public/models/:
+- tiny_face_detector_model-weights_manifest.json
+- tiny_face_detector_model-shard1
+- face_landmark_68_model-weights_manifest.json  
+- face_landmark_68_model-shard1
+- face_recognition_model-weights_manifest.json
+- face_recognition_model-shard1
+- face_recognition_model-shard2
+
+If models are missing, run: npm run download-models`);
       } else if (err.message?.includes('camera') || err.message?.includes('webcam')) {
         setError('Camera access denied. Please allow camera permissions and refresh.');
       } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
@@ -319,8 +349,9 @@ const Zone1 = () => {
           totalUnknown: prev.totalUnknown + 1
         }));
         
-        // Refresh logs to show new entry
+        // Refresh logs and unknown count
         await fetchLogs();
+        await fetchUnknownCount();
         
         setSuccess('Unknown person captured and logged!');
         setTimeout(() => setSuccess(null), 3000);
@@ -343,9 +374,67 @@ const Zone1 = () => {
       const response = await zone1API.getCurrentPersons();
       if (response.success) {
         setCurrentPersons(response.data);
+        
+        // Update knownInZone stat based on ActivePresence count
+        setStats(prev => ({
+          ...prev,
+          knownInZone: response.data.length
+        }));
       }
     } catch (err) {
       console.error('Error fetching current persons:', err);
+    }
+  };
+
+  // Fetch unknown faces count
+  const fetchUnknownCount = async () => {
+    try {
+      const response = await zone1API.getUnknownFacesCount();
+      if (response.success) {
+        setStats(prev => ({
+          ...prev,
+          unknownInZone: response.count
+        }));
+      }
+    } catch (err) {
+      console.error('Error fetching unknown count:', err);
+    }
+  };
+
+  // Re-enroll faces function
+  const handleReEnroll = async () => {
+    try {
+      setIsReEnrolling(true);
+      setError(null);
+      setSuccess(null);
+      
+      console.log('🔄 Starting re-enrollment...');
+      
+      // Call backend to trigger Python training
+      const response = await zone1API.reEnrollFaces();
+      
+      if (response?.success) {
+        const { studentsEnrolled, teachersEnrolled, totalEncodings } = response.data;
+        
+        setSuccess(`✅ Re-enrollment complete! Students: ${studentsEnrolled}, Teachers: ${teachersEnrolled}, Total encodings: ${totalEncodings}`);
+        
+        // Reload face database
+        console.log('🔄 Reloading face database...');
+        await initializeFaceRecognition();
+        
+        console.log('✅ System restarted with new enrollments');
+      } else {
+        throw new Error(response?.message || 'Re-enrollment failed');
+      }
+      
+    } catch (err) {
+      console.error('❌ Re-enrollment error:', err);
+      setError(`Re-enrollment failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsReEnrolling(false);
+      
+      // Auto-hide success message after 5 seconds
+      setTimeout(() => setSuccess(null), 5000);
     }
   };
 
@@ -526,11 +615,12 @@ const Zone1 = () => {
           <motion.button
             whileHover={{ scale: 1.05, y: -2 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => window.location.reload()}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 dark:from-cyan-600 dark:to-blue-700 text-white rounded-lg shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-shadow"
+            onClick={handleReEnroll}
+            disabled={isReEnrolling}
+            className={`flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 dark:from-cyan-600 dark:to-blue-700 text-white rounded-lg shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-shadow ${isReEnrolling ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            <FiRefreshCw size={16} />
-            <span>Restart System</span>
+            <FiRefreshCw size={16} className={isReEnrolling ? 'animate-spin' : ''} />
+            <span>{isReEnrolling ? 'Re-enrolling...' : 'Restart & Re-enroll'}</span>
           </motion.button>
         </div>
         </div>
@@ -633,7 +723,7 @@ const Zone1 = () => {
           <div className="flex items-center justify-between relative z-10">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Total Recognized</p>
-              <p className="text-3xl font-bold text-[#0369a1] dark:text-[#00ffff]">{stats.totalRecognized}</p>
+              <p className="text-3xl font-bold text-[#0369a1] dark:text-[#00ffff]">{stats.knownInZone + stats.unknownInZone}</p>
             </div>
             <motion.div 
               whileHover={{ scale: 1.1, rotate: 360 }}

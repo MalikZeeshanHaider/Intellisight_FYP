@@ -15,7 +15,8 @@ export const getAllZones = asyncHandler(async (req, res) => {
       _count: {
         select: {
           Camara: true,
-          TimeTable: true,
+          AttendanceLog: true,
+          ActivePresence: true,
         },
       },
     },
@@ -37,23 +38,10 @@ export const getZoneById = asyncHandler(async (req, res) => {
     where: { Zone_id: id },
     include: {
       Camara: true,
-      Students: {
-        select: {
-          Student_ID: true,
-          Name: true,
-          Email: true,
-        },
-      },
-      Teacher: {
-        select: {
-          Teacher_ID: true,
-          Name: true,
-          Email: true,
-        },
-      },
       _count: {
         select: {
-          TimeTable: true,
+          AttendanceLog: true,
+          ActivePresence: true,
         },
       },
     },

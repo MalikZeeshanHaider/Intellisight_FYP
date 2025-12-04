@@ -141,7 +141,7 @@ const Login = () => {
             <h2 className="text-4xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple mb-2">
               IntelliSight
             </h2>
-            <div className="flex items-center justify-center gap-2 text-steel-600">
+            <div className="flex items-center justify-center gap-2 text-gray-300">
               <HiSparkles className="text-accent-cyan" />
               <p className="text-sm font-medium">Smart Movement Monitoring System</p>
             </div>
@@ -155,7 +155,7 @@ const Login = () => {
           >
             {/* Email Input */}
             <motion.div variants={itemVariants}>
-              <label className="block text-sm font-semibold text-navy-primary mb-2">
+              <label className="block text-sm font-semibold text-white mb-2">
                 Email Address
               </label>
               <div className="relative">
@@ -178,7 +178,7 @@ const Login = () => {
 
             {/* Password Input */}
             <motion.div variants={itemVariants}>
-              <label className="block text-sm font-semibold text-navy-primary mb-2">
+              <label className="block text-sm font-semibold text-white mb-2">
                 Password
               </label>
               <div className="relative">
@@ -252,7 +252,7 @@ const Login = () => {
 
             {/* Register Link */}
             <motion.div variants={itemVariants} className="text-center pt-4">
-              <p className="text-sm text-steel-600">
+              <p className="text-sm text-gray-300">
                 Don't have an account?{' '}
                 <Link
                   to="/register"
@@ -265,25 +265,25 @@ const Login = () => {
           </motion.form>
 
           {/* Features */}
-          <motion.div variants={itemVariants} className="mt-8 pt-6 border-t border-steel-200">
+          <motion.div variants={itemVariants} className="mt-8 pt-6 border-t border-gray-600">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div className="group cursor-pointer">
                 <div className="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-accent-blue/10 to-accent-cyan/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                   <FaBrain className="text-accent-blue text-xl" />
                 </div>
-                <p className="text-xs text-steel-600 font-medium">AI Powered</p>
+                <p className="text-xs text-gray-300 font-medium">AI Powered</p>
               </div>
               <div className="group cursor-pointer">
                 <div className="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-accent-cyan/10 to-accent-blue/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                   <FaShieldAlt className="text-accent-cyan text-xl" />
                 </div>
-                <p className="text-xs text-steel-600 font-medium">Secure</p>
+                <p className="text-xs text-gray-300 font-medium">Secure</p>
               </div>
               <div className="group cursor-pointer">
                 <div className="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-accent-purple/10 to-accent-pink/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                   <HiSparkles className="text-accent-purple text-xl" />
                 </div>
-                <p className="text-xs text-steel-600 font-medium">Real-time</p>
+                <p className="text-xs text-gray-300 font-medium">Real-time</p>
               </div>
             </div>
           </motion.div>

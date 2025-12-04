@@ -42,11 +42,6 @@ const Sidebar = () => {
       exact: true
     },
     {
-      path: '/zone1-live',
-      icon: FiVideo,
-      label: 'Zone 1 Live'
-    },
-    {
       path: '/active-presence',
       icon: FiActivity,
       label: 'Active Presence'

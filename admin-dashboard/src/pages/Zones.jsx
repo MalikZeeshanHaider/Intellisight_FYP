@@ -6,15 +6,19 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiMapPin, FiRefreshCw, FiPlus, FiAlertCircle, FiVideo, FiZap } from 'react-icons/fi';
+import { FiMapPin, FiRefreshCw, FiPlus, FiAlertCircle, FiVideo, FiZap, FiX } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi';
 import { zoneAPI } from '../api/api';
+import { zone1API } from '../api/zone1';
 
 const Zones = () => {
   const [zones, setZones] = useState([]);
   const [zoneCounts, setZoneCounts] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newZone, setNewZone] = useState({ Zone_Name: '', Description: '' });
+  const [isCreating, setIsCreating] = useState(false);
   const navigate = useNavigate();
 
   // Fetch zones and person counts
@@ -32,10 +36,23 @@ const Zones = () => {
         const counts = {};
         for (const zone of response.data) {
           try {
-            const personsData = await zoneAPI.getPersonsInZone(zone.Zone_ID);
-            counts[zone.Zone_ID] = personsData.data?.length || 0;
+            if (zone.Zone_id === 1) {
+              // For Zone 1, use Zone 1 Live API to get accurate count
+              const [currentPersonsResponse, unknownCountResponse] = await Promise.all([
+                zone1API.getCurrentPersons(),
+                zone1API.getUnknownFacesCount()
+              ]);
+              
+              const knownCount = currentPersonsResponse.success ? currentPersonsResponse.data.length : 0;
+              const unknownCount = unknownCountResponse.success ? unknownCountResponse.count : 0;
+              counts[zone.Zone_id] = knownCount + unknownCount;
+            } else {
+              // For other zones, use the existing API
+              const personsData = await zoneAPI.getPersonsInZone(zone.Zone_id);
+              counts[zone.Zone_id] = personsData.data?.length || 0;
+            }
           } catch (err) {
-            counts[zone.Zone_ID] = 0;
+            counts[zone.Zone_id] = 0;
           }
         }
         setZoneCounts(counts);
@@ -58,6 +75,32 @@ const Zones = () => {
     const interval = setInterval(fetchZones, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // Create new zone
+  const handleCreateZone = async () => {
+    if (!newZone.Zone_Name.trim()) {
+      setError('Zone name is required');
+      return;
+    }
+
+    try {
+      setIsCreating(true);
+      setError(null);
+
+      const response = await zoneAPI.createZone(newZone);
+      
+      if (response.success) {
+        setShowAddModal(false);
+        setNewZone({ Zone_Name: '', Description: '' });
+        await fetchZones();
+      }
+    } catch (err) {
+      console.error('Error creating zone:', err);
+      setError('Failed to create zone');
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   if (loading && zones.length === 0) {
     return (
@@ -142,28 +185,48 @@ const Zones = () => {
           </motion.p>
         </div>
 
-        <motion.button
-          whileHover={{ scale: 1.05, boxShadow: '0 0 30px rgba(99, 102, 241, 0.6)' }}
-          whileTap={{ scale: 0.95 }}
-          onClick={fetchZones}
-          className="flex items-center gap-3 px-6 py-3 rounded-2xl font-bold relative overflow-hidden group dark:bg-gradient-to-br dark:from-indigo-500 dark:to-purple-500 bg-gradient-to-br from-indigo-600 to-indigo-700 border-2 dark:border-white/20 border-indigo-800/30"
-          style={{
-            boxShadow: document.documentElement.classList.contains('dark') ? '0 4px 20px rgba(99, 102, 241, 0.4)' : '0 4px 20px rgba(99, 102, 241, 0.3)'
-          }}
-        >
-          <motion.div
-            animate={loading ? { rotate: 360 } : {}}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        <div className="flex gap-3">
+          <motion.button
+            whileHover={{ scale: 1.05, boxShadow: '0 0 30px rgba(16, 185, 129, 0.6)' }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-3 px-6 py-3 rounded-2xl font-bold relative overflow-hidden group dark:bg-gradient-to-br dark:from-green-500 dark:to-emerald-500 bg-gradient-to-br from-green-600 to-green-700 border-2 dark:border-white/20 border-green-800/30"
+            style={{
+              boxShadow: document.documentElement.classList.contains('dark') ? '0 4px 20px rgba(16, 185, 129, 0.4)' : '0 4px 20px rgba(5, 150, 105, 0.3)'
+            }}
           >
-            <FiRefreshCw size={18} className="text-white" />
-          </motion.div>
-          <span className="text-white relative z-10">Refresh</span>
-          <motion.div
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
-            animate={{ x: ['-100%', '200%'] }}
-            transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
-          />
-        </motion.button>
+            <FiPlus size={18} className="text-white" />
+            <span className="text-white relative z-10">Add Zone</span>
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+              animate={{ x: ['-100%', '200%'] }}
+              transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+            />
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.05, boxShadow: '0 0 30px rgba(99, 102, 241, 0.6)' }}
+            whileTap={{ scale: 0.95 }}
+            onClick={fetchZones}
+            className="flex items-center gap-3 px-6 py-3 rounded-2xl font-bold relative overflow-hidden group dark:bg-gradient-to-br dark:from-indigo-500 dark:to-purple-500 bg-gradient-to-br from-indigo-600 to-indigo-700 border-2 dark:border-white/20 border-indigo-800/30"
+            style={{
+              boxShadow: document.documentElement.classList.contains('dark') ? '0 4px 20px rgba(99, 102, 241, 0.4)' : '0 4px 20px rgba(99, 102, 241, 0.3)'
+            }}
+          >
+            <motion.div
+              animate={loading ? { rotate: 360 } : {}}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            >
+              <FiRefreshCw size={18} className="text-white" />
+            </motion.div>
+            <span className="text-white relative z-10">Refresh</span>
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+              animate={{ x: ['-100%', '200%'] }}
+              transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+            />
+          </motion.button>
+        </div>
       </motion.div>
 
       {/* Error Alert */}
@@ -196,7 +259,7 @@ const Zones = () => {
       >
         {zones.map((zone, index) => (
           <motion.div
-            key={zone.Zone_ID}
+            key={zone.Zone_id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
@@ -240,7 +303,7 @@ const Zones = () => {
               </motion.div>
               <div className="text-right">
                 <motion.p
-                  key={zoneCounts[zone.Zone_ID]}
+                  key={zoneCounts[zone.Zone_id]}
                   initial={{ scale: 1.5, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   className="text-4xl font-black dark:text-[#6366f1] text-[#4338ca]"
@@ -248,7 +311,7 @@ const Zones = () => {
                     textShadow: document.documentElement.classList.contains('dark') ? '0 0 20px rgba(99, 102, 241, 0.8)' : '0 0 10px rgba(67, 56, 202, 0.3)'
                   }}
                 >
-                  {zoneCounts[zone.Zone_ID] || 0}
+                  {zoneCounts[zone.Zone_id] || 0}
                 </motion.p>
                 <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>persons</p>
               </div>
@@ -264,15 +327,15 @@ const Zones = () => {
 
             <div className="pt-4 border-t relative z-10 space-y-2" style={{ borderColor: 'var(--border-color)' }}>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>Zone ID: {zone.Zone_ID}</span>
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>Zone ID: {zone.Zone_id}</span>
               </div>
 
               {/* Live View Button for Zone 1 */}
-              {zone.Zone_ID === 1 && (
+              {zone.Zone_id === 1 && (
                 <motion.button
                   whileHover={{ scale: 1.02, boxShadow: '0 0 25px rgba(16, 185, 129, 0.6)' }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => navigate('/zone1-live')}
+                  onClick={() => navigate('/zones/zone1-live')}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold relative overflow-hidden group dark:bg-gradient-to-br dark:from-green-500 dark:to-emerald-500 bg-gradient-to-br from-green-600 to-green-700 border-2 dark:border-white/20 border-green-800/30"
                   style={{
                     boxShadow: document.documentElement.classList.contains('dark') ? '0 4px 20px rgba(16, 185, 129, 0.4)' : '0 4px 20px rgba(5, 150, 105, 0.3)'
@@ -288,12 +351,21 @@ const Zones = () => {
                 </motion.button>
               )}
 
-              <Link
-                to={`/zones/${zone.Zone_ID}`}
-                className="block w-full text-center px-4 py-2.5 rounded-xl font-bold transition-all duration-300 dark:border-indigo-500/50 border-indigo-300 dark:text-indigo-400 text-indigo-600 hover:dark:bg-indigo-500/20 hover:bg-indigo-100 border-2"
-              >
-                View Details →
-              </Link>
+              {zone.Zone_id === 1 ? (
+                <Link
+                  to="/logs"
+                  className="block w-full text-center px-4 py-2.5 rounded-xl font-bold transition-all duration-300 dark:border-indigo-500/50 border-indigo-300 dark:text-indigo-400 text-indigo-600 hover:dark:bg-indigo-500/20 hover:bg-indigo-100 border-2"
+                >
+                  View Details →
+                </Link>
+              ) : (
+                <Link
+                  to={`/zones/${zone.Zone_id}`}
+                  className="block w-full text-center px-4 py-2.5 rounded-xl font-bold transition-all duration-300 dark:border-indigo-500/50 border-indigo-300 dark:text-indigo-400 text-indigo-600 hover:dark:bg-indigo-500/20 hover:bg-indigo-100 border-2"
+                >
+                  View Details →
+                </Link>
+              )}
             </div>
           </motion.div>
         ))}
@@ -324,6 +396,100 @@ const Zones = () => {
           </div>
         </motion.div>
       )}
+
+      {/* Add Zone Modal */}
+      <AnimatePresence>
+        {showAddModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => !isCreating && setShowAddModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="dark:bg-gradient-to-br dark:from-gray-800 dark:to-gray-900 bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border-2 dark:border-indigo-500/30 border-indigo-200"
+              style={{
+                boxShadow: '0 20px 60px rgba(99, 102, 241, 0.3)'
+              }}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold" style={{ color: 'var(--text-main)' }}>
+                  Create New Zone
+                </h2>
+                <button
+                  onClick={() => !isCreating && setShowAddModal(false)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                  disabled={isCreating}
+                >
+                  <FiX size={20} style={{ color: 'var(--text-soft)' }} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-main)' }}>
+                    Zone Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={newZone.Zone_Name}
+                    onChange={(e) => setNewZone({ ...newZone, Zone_Name: e.target.value })}
+                    placeholder="e.g., Zone 2"
+                    className="w-full px-4 py-3 rounded-xl border-2 dark:border-indigo-500/30 border-indigo-200 dark:bg-gray-800 bg-white focus:outline-none focus:border-indigo-500 transition"
+                    style={{ color: 'var(--text-main)' }}
+                    disabled={isCreating}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-main)' }}>
+                    Description
+                  </label>
+                  <textarea
+                    value={newZone.Description}
+                    onChange={(e) => setNewZone({ ...newZone, Description: e.target.value })}
+                    placeholder="Optional description"
+                    rows={3}
+                    className="w-full px-4 py-3 rounded-xl border-2 dark:border-indigo-500/30 border-indigo-200 dark:bg-gray-800 bg-white focus:outline-none focus:border-indigo-500 transition resize-none"
+                    style={{ color: 'var(--text-main)' }}
+                    disabled={isCreating}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowAddModal(false)}
+                  disabled={isCreating}
+                  className="flex-1 px-4 py-3 rounded-xl font-bold border-2 dark:border-gray-600 border-gray-300 dark:hover:bg-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+                  style={{ color: 'var(--text-main)' }}
+                >
+                  Cancel
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleCreateZone}
+                  disabled={isCreating || !newZone.Zone_Name.trim()}
+                  className="flex-1 px-4 py-3 rounded-xl font-bold bg-gradient-to-br from-indigo-600 to-indigo-700 dark:from-indigo-500 dark:to-purple-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    boxShadow: '0 4px 20px rgba(99, 102, 241, 0.4)'
+                  }}
+                >
+                  {isCreating ? 'Creating...' : 'Create Zone'}
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

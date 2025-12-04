@@ -52,8 +52,15 @@ export class TimetableService {
       data.Student_ID = personId;
     }
 
-    const entry = await prisma.timeTable.create({
-      data,
+    // Create attendance log entry
+    const attendanceEntry = await prisma.attendanceLog.create({
+      data: {
+        EntryTime: entryTime,
+        PersonType: personType,
+        Zone_id: zoneId,
+        Teacher_ID: personType === PERSON_TYPES.TEACHER ? personId : null,
+        Student_ID: personType === PERSON_TYPES.STUDENT ? personId : null,
+      },
       include: {
         zone: true,
         teacher: personType === PERSON_TYPES.TEACHER ? { select: { Name: true, Email: true } } : false,
@@ -61,7 +68,18 @@ export class TimetableService {
       },
     });
 
-    return entry;
+    // Also create active presence entry
+    await prisma.activePresence.create({
+      data: {
+        PersonType: personType,
+        Zone_id: zoneId,
+        Teacher_ID: personType === PERSON_TYPES.TEACHER ? personId : null,
+        Student_ID: personType === PERSON_TYPES.STUDENT ? personId : null,
+        EntryTime: entryTime,
+      },
+    });
+
+    return attendanceEntry;
   }
 
   /**
@@ -72,42 +90,59 @@ export class TimetableService {
   async recordExit({ personType, personId, zoneId, timestamp, adminId }) {
     const exitTime = timestamp ? new Date(timestamp) : new Date();
 
-    // Find most recent open entry
+    // Find most recent open entry in ActivePresence
     const openEntry = await this.findOpenEntry(personType, personId, zoneId);
 
     if (openEntry) {
-      // Update existing entry with exit time
-      const updated = await prisma.timeTable.update({
-        where: { TimeTable_ID: openEntry.TimeTable_ID },
-        data: { ExitTime: exitTime },
-        include: {
-          zone: true,
-          teacher: personType === PERSON_TYPES.TEACHER ? { select: { Name: true, Email: true } } : false,
-          student: personType === PERSON_TYPES.STUDENT ? { select: { Name: true, Email: true } } : false,
-        },
+      // Remove from ActivePresence
+      await prisma.activePresence.delete({
+        where: { Presence_ID: openEntry.Presence_ID },
       });
 
-      return updated;
+      // Update corresponding AttendanceLog entry
+      const attendanceLog = await prisma.attendanceLog.findFirst({
+        where: {
+          PersonType: personType,
+          Zone_id: zoneId,
+          Teacher_ID: personType === PERSON_TYPES.TEACHER ? personId : null,
+          Student_ID: personType === PERSON_TYPES.STUDENT ? personId : null,
+          EntryTime: openEntry.EntryTime,
+          ExitTime: null,
+        },
+        orderBy: { EntryTime: 'desc' },
+      });
+
+      if (attendanceLog) {
+        const duration = Math.floor((exitTime - new Date(attendanceLog.EntryTime)) / 1000 / 60); // minutes
+        
+        const updated = await prisma.attendanceLog.update({
+          where: { Log_ID: attendanceLog.Log_ID },
+          data: { 
+            ExitTime: exitTime,
+            Duration: duration,
+          },
+          include: {
+            zone: true,
+            teacher: personType === PERSON_TYPES.TEACHER ? { select: { Name: true, Email: true } } : false,
+            student: personType === PERSON_TYPES.STUDENT ? { select: { Name: true, Email: true } } : false,
+          },
+        });
+
+        return updated;
+      }
     }
 
     // No open entry found - create exit-only record (anomaly)
-    // This could happen if entry wasn't recorded or system was offline
-    const data = {
-      EntryTime: null, // No entry recorded
-      ExitTime: exitTime,
-      PersonType: personType,
-      Zone_id: zoneId,
-      Admin_ID: adminId,
-    };
-
-    if (personType === PERSON_TYPES.TEACHER) {
-      data.Teacher_ID = personId;
-    } else {
-      data.Student_ID = personId;
-    }
-
-    const exitRecord = await prisma.timeTable.create({
-      data,
+    const exitRecord = await prisma.attendanceLog.create({
+      data: {
+        EntryTime: exitTime, // Use exit time as entry since we don't have entry
+        ExitTime: exitTime,
+        PersonType: personType,
+        Zone_id: zoneId,
+        Teacher_ID: personType === PERSON_TYPES.TEACHER ? personId : null,
+        Student_ID: personType === PERSON_TYPES.STUDENT ? personId : null,
+        Duration: 0,
+      },
       include: {
         zone: true,
         teacher: personType === PERSON_TYPES.TEACHER ? { select: { Name: true, Email: true } } : false,
@@ -124,7 +159,6 @@ export class TimetableService {
   async findOpenEntry(personType, personId, zoneId = null) {
     const where = {
       PersonType: personType,
-      ExitTime: null,
     };
 
     if (personType === PERSON_TYPES.TEACHER) {
@@ -137,7 +171,7 @@ export class TimetableService {
       where.Zone_id = zoneId;
     }
 
-    const openEntry = await prisma.timeTable.findFirst({
+    const openEntry = await prisma.activePresence.findFirst({
       where,
       orderBy: { EntryTime: 'desc' },
     });
@@ -149,13 +183,11 @@ export class TimetableService {
    * Get all currently active persons (those with open entries)
    */
   async getActivePersons() {
-    const activeEntries = await prisma.timeTable.findMany({
-      where: { ExitTime: null },
+    const activeEntries = await prisma.activePresence.findMany({
       include: {
-        zone: { select: { Zone_Name: true } },
-        teacher: { select: { Name: true, Email: true } },
-        student: { select: { Name: true, Email: true } },
-        admin: { select: { Name: true } },
+        zone: { select: { Zone_Name: true, Zone_id: true } },
+        teacher: { select: { Teacher_ID: true, Name: true, Email: true } },
+        student: { select: { Student_ID: true, Name: true, Email: true } },
       },
       orderBy: { EntryTime: 'desc' },
     });
@@ -201,19 +233,18 @@ export class TimetableService {
     const skip = (page - 1) * limit;
 
     const [entries, total] = await Promise.all([
-      prisma.timeTable.findMany({
+      prisma.attendanceLog.findMany({
         where,
         include: {
           zone: { select: { Zone_Name: true } },
           teacher: { select: { Name: true, Email: true } },
           student: { select: { Name: true, Email: true } },
-          admin: { select: { Name: true } },
         },
         orderBy: { EntryTime: 'desc' },
         skip,
         take: limit,
       }),
-      prisma.timeTable.count({ where }),
+      prisma.attendanceLog.count({ where }),
     ]);
 
     return {
@@ -238,7 +269,7 @@ export class TimetableService {
       entriesByPersonType,
     ] = await Promise.all([
       // Total entries today
-      prisma.timeTable.count({
+      prisma.attendanceLog.count({
         where: {
           EntryTime: {
             gte: new Date(new Date().setHours(0, 0, 0, 0)),
@@ -247,12 +278,10 @@ export class TimetableService {
       }),
 
       // Currently active
-      prisma.timeTable.count({
-        where: { ExitTime: null },
-      }),
+      prisma.activePresence.count(),
 
       // Entries by zone (today)
-      prisma.timeTable.groupBy({
+      prisma.attendanceLog.groupBy({
         by: ['Zone_id'],
         where: {
           EntryTime: {
@@ -263,7 +292,7 @@ export class TimetableService {
       }),
 
       // Entries by person type (today)
-      prisma.timeTable.groupBy({
+      prisma.attendanceLog.groupBy({
         by: ['PersonType'],
         where: {
           EntryTime: {
@@ -286,7 +315,7 @@ export class TimetableService {
    * Get recent activity (last N entries/exits)
    */
   async getRecentActivity(limit = 10) {
-    const recentEntries = await prisma.timeTable.findMany({
+    const recentEntries = await prisma.attendanceLog.findMany({
       take: limit,
       orderBy: [
         { EntryTime: 'desc' },
@@ -310,12 +339,6 @@ export class TimetableService {
             Student_ID: true,
             Name: true,
             Email: true,
-          },
-        },
-        admin: {
-          select: {
-            Admin_ID: true,
-            Name: true,
           },
         },
       },

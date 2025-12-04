@@ -27,11 +27,12 @@ api.interceptors.request.use((config) => {
 
 export const zone1API = {
   // Log recognized person entry
-  logRecognizedPerson: async (personId, personType, confidence = 0.95) => {
+  logRecognizedPerson: async (personId, personType, confidence = 0.95, cameraType = 'Entry') => {
     const response = await api.post('/recognize', {
       personId,
       personType,
-      confidence
+      confidence,
+      cameraType
     });
     return response.data;
   },
@@ -74,6 +75,12 @@ export const zone1API = {
     return response.data;
   },
 
+  // Re-enroll all faces (trigger training)
+  reEnrollFaces: async () => {
+    const response = await api.post('/re-enroll');
+    return response.data;
+  },
+
   // Mark person exit
   markExit: async (timetableId) => {
     const response = await api.put(`/exit/${timetableId}`);
@@ -85,6 +92,12 @@ export const zone1API = {
     const response = await api.get('/unknown-list', {
       params: { limit, status }
     });
+    return response.data;
+  },
+
+  // Get count of active unknown faces in zone
+  getUnknownFacesCount: async () => {
+    const response = await api.get('/unknown-count');
     return response.data;
   }
 };

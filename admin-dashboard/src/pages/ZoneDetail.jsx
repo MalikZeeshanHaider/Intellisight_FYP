@@ -4,17 +4,25 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { FiMapPin, FiRefreshCw, FiArrowLeft, FiClock, FiAlertCircle } from 'react-icons/fi';
 import { zoneAPI } from '../api/api';
 import { format } from 'date-fns';
 
 const ZoneDetail = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [zone, setZone] = useState(null);
   const [persons, setPersons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Redirect Zone 1 to live page
+  useEffect(() => {
+    if (id === '1' || id === 'zone1-live') {
+      navigate('/zones/zone1-live', { replace: true });
+    }
+  }, [id, navigate]);
 
   // Fetch zone details and persons
   const fetchZoneData = async () => {

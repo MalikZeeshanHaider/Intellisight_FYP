@@ -37,6 +37,9 @@ router.put('/exit/:presenceId', zone1Controller.markExit);
 // Get unknown faces log
 router.get('/unknown-list', zone1Controller.getUnknownFaces);
 
+// Get count of active unknown faces
+router.get('/unknown-count', zone1Controller.getUnknownFacesCount);
+
 // Update unknown face status
 router.put('/unknown/:unknownId', zone1Controller.updateUnknownFaceStatus);
 
@@ -45,5 +48,8 @@ router.delete('/unknown/:unknownId', zone1Controller.deleteUnknownFace);
 
 // Debug endpoint - check all students/teachers
 router.get('/debug-database', zone1Controller.getDebugDatabase);
+
+// Re-enroll faces (trigger Python training)
+router.post('/re-enroll', zone1Controller.reEnrollFaces);
 
 export default router;

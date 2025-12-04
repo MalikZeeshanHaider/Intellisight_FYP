@@ -8,12 +8,12 @@ datasource db {
 }
 
 model Admin {
-  Admin_ID  Int         @id @default(autoincrement())
-  Name      String?
-  Email     String?     @unique
-  Password  String?
-  Role      String?
-  TimeTable TimeTable[]
+  Admin_ID Int     @id @default(autoincrement())
+  Name     String?
+  Email    String? @unique
+  Password String?
+  Role     String?
+  Logs     Logs[]
 
   @@map("Admin")
 }
@@ -21,10 +21,10 @@ model Admin {
 model Zone {
   Zone_id        Int              @id @default(autoincrement())
   Zone_Name      String?
-  Camara         Camara[]
-  TimeTable      TimeTable[]
   ActivePresence ActivePresence[]
   AttendanceLog  AttendanceLog[]
+  Camara         Camara[]
+  Logs           Logs[]
 
   @@map("Zone")
 }
@@ -33,74 +33,57 @@ model Camara {
   Camara_Id   Int     @id @default(autoincrement())
   Password    String?
   Zone_id     Int?
-  Camera_Type String? @default("Entry") // "Entry" or "Exit"
-  Camera_URL  String? // RTSP URL or device index
+  Camera_Type String? @default("Entry")
+  Camera_URL  String?
   zone        Zone?   @relation(fields: [Zone_id], references: [Zone_id])
 
   @@map("Camara")
 }
 
 model Teacher {
-  Teacher_ID      Int              @id @default(autoincrement())
+  Teacher_ID      Int                   @id @default(autoincrement())
   Name            String?
-  Email           String?          @unique
-  CreatedAt       DateTime         @default(now())
+  Email           String?               @unique
+  CreatedAt       DateTime              @default(now())
   Department      String?
   Face_Picture_1  String?
   Face_Picture_2  String?
   Face_Picture_3  String?
   Face_Picture_4  String?
   Face_Picture_5  String?
-  Face_Embeddings Bytes? // Serialized face encodings
+  Face_Embeddings Bytes?
   Faculty_Type    String?
   Gender          String?
-  UpdatedAt       DateTime         @updatedAt
-  TimeTable       TimeTable[]
+  UpdatedAt       DateTime              @updatedAt
   ActivePresence  ActivePresence[]
   AttendanceLog   AttendanceLog[]
+  Logs            Logs[]
   ProcessedImages ProcessedFaceImages[]
 
   @@map("Teacher")
 }
 
 model Students {
-  Student_ID      Int              @id @default(autoincrement())
+  Student_ID      Int                   @id @default(autoincrement())
   Name            String?
-  RollNumber      String?          @unique
-  Email           String?          @unique
+  RollNumber      String?               @unique
+  Email           String?               @unique
   Face_Picture_1  String?
   Face_Picture_2  String?
   Face_Picture_3  String?
   Face_Picture_4  String?
   Face_Picture_5  String?
-  Face_Embeddings Bytes? // Serialized face encodings
-  CreatedAt       DateTime         @default(now())
-  UpdatedAt       DateTime         @updatedAt
+  Face_Embeddings Bytes?
+  CreatedAt       DateTime              @default(now())
+  UpdatedAt       DateTime              @updatedAt
   Department      String?
   Gender          String?
-  TimeTable       TimeTable[]
   ActivePresence  ActivePresence[]
   AttendanceLog   AttendanceLog[]
+  Logs            Logs[]
   ProcessedImages ProcessedFaceImages[]
 
   @@map("Students")
-}
-
-model TimeTable {
-  TimeTable_ID Int       @id @default(autoincrement())
-  EntryTime    DateTime?
-  ExitTime     DateTime?
-  PersonType   String?
-  Admin_ID     Int?
-  Teacher_ID   Int?
-  Student_ID   Int?
-  Zone_id      Int?
-  admin        Admin?    @relation(fields: [Admin_ID], references: [Admin_ID])
-  student      Students? @relation(fields: [Student_ID], references: [Student_ID])
-  teacher      Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID])
-  zone         Zone?     @relation(fields: [Zone_id], references: [Zone_id])
-
-  @@map("TimeTable")
 }
 
 model UnknownFaces {
@@ -118,7 +101,7 @@ model UnknownFaces {
 
 model ActivePresence {
   Presence_ID Int       @id @default(autoincrement())
-  PersonType  String // "Student" or "Teacher"
+  PersonType  String
   Student_ID  Int?
   Teacher_ID  Int?
   Zone_id     Int
@@ -132,13 +115,13 @@ model ActivePresence {
 
 model AttendanceLog {
   Log_ID     Int       @id @default(autoincrement())
-  PersonType String // "Student" or "Teacher"
+  PersonType String
   Student_ID Int?
   Teacher_ID Int?
   Zone_id    Int
   EntryTime  DateTime
   ExitTime   DateTime?
-  Duration   Int? // Minutes spent in zone
+  Duration   Int?
   CreatedAt  DateTime  @default(now())
   student    Students? @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
   teacher    Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
@@ -148,8 +131,8 @@ model AttendanceLog {
 }
 
 model ProcessedFaceImages {
-  Processed_ID Int      @id @default(autoincrement())
-  PersonType   String // "Student" or "Teacher"
+  Processed_ID Int       @id @default(autoincrement())
+  PersonType   String
   Student_ID   Int?
   Teacher_ID   Int?
   Image1       Bytes?
@@ -157,9 +140,24 @@ model ProcessedFaceImages {
   Image3       Bytes?
   Image4       Bytes?
   Image5       Bytes?
-  CreatedAt    DateTime @default(now())
+  CreatedAt    DateTime  @default(now())
   student      Students? @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
   teacher      Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
 
   @@map("ProcessedFaceImages")
+}
+
+model Logs {
+  Logs_ID    Int       @id @default(autoincrement())
+  EntryTime  DateTime?
+  ExitTime   DateTime?
+  PersonType String?
+  Admin_ID   Int?
+  Teacher_ID Int?
+  Student_ID Int?
+  Zone_id    Int?
+  Admin      Admin?    @relation(fields: [Admin_ID], references: [Admin_ID])
+  Students   Students? @relation(fields: [Student_ID], references: [Student_ID])
+  Teacher    Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID])
+  Zone       Zone?     @relation(fields: [Zone_id], references: [Zone_id])
 }
