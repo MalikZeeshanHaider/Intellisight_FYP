@@ -17,8 +17,8 @@ router.use('/health', healthRoutes);
 
 // Mount all routes
 router.use('/admin', authRoutes);
+router.use('/zones/1', zone1Routes); // Zone 1 live tracking - must be before generic /zones
 router.use('/zones', zoneRoutes);
-router.use('/zones/1', zone1Routes); // Zone 1 live tracking
 router.use('/cameras', cameraRoutes);
 router.use('/teachers', teacherRoutes);
 router.use('/students', studentRoutes);

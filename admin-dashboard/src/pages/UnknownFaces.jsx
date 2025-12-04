@@ -51,10 +51,6 @@ const UnknownFaces = () => {
   };
 
   const handleDelete = async (unknownId) => {
-    if (!window.confirm('Are you sure you want to delete this entry?')) {
-      return;
-    }
-
     try {
       await unknownFacesAPI.deleteUnknownFace(unknownId);
       setSuccess('Entry deleted successfully');
@@ -331,9 +327,9 @@ const UnknownFaces = () => {
                     </select>
 
                     <button
-                      onClick={() => handleDelete(face.Unknown_ID)}
+                      onDoubleClick={() => handleDelete(face.Unknown_ID)}
                       className="p-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
-                      title="Delete"
+                      title="Double-click to delete"
                     >
                       <FiTrash2 size={14} />
                     </button>

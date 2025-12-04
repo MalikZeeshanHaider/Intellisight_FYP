@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiMapPin, FiRefreshCw, FiPlus, FiAlertCircle, FiVideo, FiZap, FiX } from 'react-icons/fi';
+import { FiMapPin, FiRefreshCw, FiPlus, FiAlertCircle, FiVideo, FiZap, FiX, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi';
 import { zoneAPI } from '../api/api';
 import { zone1API } from '../api/zone1';
@@ -19,6 +19,12 @@ const Zones = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newZone, setNewZone] = useState({ Zone_Name: '', Description: '' });
   const [isCreating, setIsCreating] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingZone, setEditingZone] = useState(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingZone, setDeletingZone] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
 
   // Fetch zones and person counts
@@ -99,6 +105,68 @@ const Zones = () => {
       setError('Failed to create zone');
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  // Open edit modal
+  const handleOpenEdit = (zone) => {
+    setEditingZone({ ...zone });
+    setShowEditModal(true);
+  };
+
+  // Update zone
+  const handleUpdateZone = async () => {
+    if (!editingZone.Zone_Name.trim()) {
+      setError('Zone name is required');
+      return;
+    }
+
+    try {
+      setIsUpdating(true);
+      setError(null);
+
+      const response = await zoneAPI.updateZone(editingZone.Zone_id, {
+        Zone_Name: editingZone.Zone_Name,
+        Description: editingZone.Description
+      });
+      
+      if (response.success) {
+        setShowEditModal(false);
+        setEditingZone(null);
+        await fetchZones();
+      }
+    } catch (err) {
+      console.error('Error updating zone:', err);
+      setError('Failed to update zone');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Open delete modal
+  const handleOpenDelete = (zone) => {
+    setDeletingZone(zone);
+    setShowDeleteModal(true);
+  };
+
+  // Delete zone
+  const handleDeleteZone = async () => {
+    try {
+      setIsDeleting(true);
+      setError(null);
+
+      const response = await zoneAPI.deleteZone(deletingZone.Zone_id);
+      
+      if (response.success) {
+        setShowDeleteModal(false);
+        setDeletingZone(null);
+        await fetchZones();
+      }
+    } catch (err) {
+      console.error('Error deleting zone:', err);
+      setError('Failed to delete zone');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -330,26 +398,24 @@ const Zones = () => {
                 <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>Zone ID: {zone.Zone_id}</span>
               </div>
 
-              {/* Live View Button for Zone 1 */}
-              {zone.Zone_id === 1 && (
-                <motion.button
-                  whileHover={{ scale: 1.02, boxShadow: '0 0 25px rgba(16, 185, 129, 0.6)' }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => navigate('/zones/zone1-live')}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold relative overflow-hidden group dark:bg-gradient-to-br dark:from-green-500 dark:to-emerald-500 bg-gradient-to-br from-green-600 to-green-700 border-2 dark:border-white/20 border-green-800/30"
-                  style={{
-                    boxShadow: document.documentElement.classList.contains('dark') ? '0 4px 20px rgba(16, 185, 129, 0.4)' : '0 4px 20px rgba(5, 150, 105, 0.3)'
-                  }}
-                >
-                  <FiVideo size={16} className="text-white" />
-                  <span className="text-white relative z-10">🔴 Live View</span>
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
-                    animate={{ x: ['-100%', '200%'] }}
-                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
-                  />
-                </motion.button>
-              )}
+              {/* Live View Button for all zones */}
+              <motion.button
+                whileHover={{ scale: 1.02, boxShadow: '0 0 25px rgba(16, 185, 129, 0.6)' }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => navigate(zone.Zone_id === 1 ? '/zones/zone1-live' : `/zones/${zone.Zone_id}/live`)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold relative overflow-hidden group dark:bg-gradient-to-br dark:from-green-500 dark:to-emerald-500 bg-gradient-to-br from-green-600 to-green-700 border-2 dark:border-white/20 border-green-800/30"
+                style={{
+                  boxShadow: document.documentElement.classList.contains('dark') ? '0 4px 20px rgba(16, 185, 129, 0.4)' : '0 4px 20px rgba(5, 150, 105, 0.3)'
+                }}
+              >
+                <FiVideo size={16} className="text-white" />
+                <span className="text-white relative z-10">🔴 Live View</span>
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                  animate={{ x: ['-100%', '200%'] }}
+                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                />
+              </motion.button>
 
               {zone.Zone_id === 1 ? (
                 <Link
@@ -366,6 +432,29 @@ const Zones = () => {
                   View Details →
                 </Link>
               )}
+
+              {/* Edit and Delete Buttons */}
+              <div className="flex gap-2 mt-2">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleOpenEdit(zone)}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all duration-300 dark:bg-gradient-to-br dark:from-blue-500/20 dark:to-blue-600/20 bg-blue-100 dark:border-blue-500/50 border-blue-300 dark:text-blue-400 text-blue-600 hover:dark:bg-blue-500/30 hover:bg-blue-200 border-2"
+                >
+                  <FiEdit2 size={16} />
+                  <span>Edit</span>
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleOpenDelete(zone)}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all duration-300 dark:bg-gradient-to-br dark:from-red-500/20 dark:to-red-600/20 bg-red-100 dark:border-red-500/50 border-red-300 dark:text-red-400 text-red-600 hover:dark:bg-red-500/30 hover:bg-red-200 border-2"
+                >
+                  <FiTrash2 size={16} />
+                  <span>Delete</span>
+                </motion.button>
+              </div>
             </div>
           </motion.div>
         ))}
@@ -484,6 +573,173 @@ const Zones = () => {
                   }}
                 >
                   {isCreating ? 'Creating...' : 'Create Zone'}
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Zone Modal */}
+      <AnimatePresence>
+        {showEditModal && editingZone && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => !isUpdating && setShowEditModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="dark:bg-gradient-to-br dark:from-gray-800 dark:to-gray-900 bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border-2 dark:border-blue-500/30 border-blue-200"
+              style={{
+                boxShadow: '0 20px 60px rgba(59, 130, 246, 0.3)'
+              }}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold" style={{ color: 'var(--text-main)' }}>
+                  Edit Zone
+                </h2>
+                <button
+                  onClick={() => !isUpdating && setShowEditModal(false)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                  disabled={isUpdating}
+                >
+                  <FiX size={20} style={{ color: 'var(--text-soft)' }} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-main)' }}>
+                    Zone Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={editingZone.Zone_Name}
+                    onChange={(e) => setEditingZone({ ...editingZone, Zone_Name: e.target.value })}
+                    placeholder="e.g., Zone 2"
+                    className="w-full px-4 py-3 rounded-xl border-2 dark:border-blue-500/30 border-blue-200 dark:bg-gray-800 bg-white focus:outline-none focus:border-blue-500 transition"
+                    style={{ color: 'var(--text-main)' }}
+                    disabled={isUpdating}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-main)' }}>
+                    Description
+                  </label>
+                  <textarea
+                    value={editingZone.Description || ''}
+                    onChange={(e) => setEditingZone({ ...editingZone, Description: e.target.value })}
+                    placeholder="Optional description"
+                    rows={3}
+                    className="w-full px-4 py-3 rounded-xl border-2 dark:border-blue-500/30 border-blue-200 dark:bg-gray-800 bg-white focus:outline-none focus:border-blue-500 transition resize-none"
+                    style={{ color: 'var(--text-main)' }}
+                    disabled={isUpdating}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowEditModal(false)}
+                  disabled={isUpdating}
+                  className="flex-1 px-4 py-3 rounded-xl font-bold border-2 dark:border-gray-600 border-gray-300 dark:hover:bg-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+                  style={{ color: 'var(--text-main)' }}
+                >
+                  Cancel
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleUpdateZone}
+                  disabled={isUpdating}
+                  className="flex-1 px-4 py-3 rounded-xl font-bold relative overflow-hidden dark:bg-gradient-to-br dark:from-blue-500 dark:to-blue-600 bg-gradient-to-br from-blue-600 to-blue-700 text-white disabled:opacity-50"
+                  style={{
+                    boxShadow: '0 4px 20px rgba(59, 130, 246, 0.4)'
+                  }}
+                >
+                  {isUpdating ? 'Updating...' : 'Update Zone'}
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Zone Modal */}
+      <AnimatePresence>
+        {showDeleteModal && deletingZone && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => !isDeleting && setShowDeleteModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="dark:bg-gradient-to-br dark:from-gray-800 dark:to-gray-900 bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border-2 dark:border-red-500/30 border-red-200"
+              style={{
+                boxShadow: '0 20px 60px rgba(239, 68, 68, 0.3)'
+              }}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  Delete Zone
+                </h2>
+                <button
+                  onClick={() => !isDeleting && setShowDeleteModal(false)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                  disabled={isDeleting}
+                >
+                  <FiX size={20} style={{ color: 'var(--text-soft)' }} />
+                </button>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-lg mb-4" style={{ color: 'var(--text-main)' }}>
+                  Are you sure you want to delete <strong>{deletingZone.Zone_Name}</strong>?
+                </p>
+                <div className="dark:bg-red-500/10 bg-red-50 border-l-4 border-red-500 rounded-lg p-4">
+                  <p className="text-sm text-red-600 dark:text-red-400">
+                    ⚠️ This action cannot be undone. All cameras, logs, and data associated with this zone will be permanently deleted.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-3 rounded-xl font-bold border-2 dark:border-gray-600 border-gray-300 dark:hover:bg-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+                  style={{ color: 'var(--text-main)' }}
+                >
+                  Cancel
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleDeleteZone}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-3 rounded-xl font-bold relative overflow-hidden dark:bg-gradient-to-br dark:from-red-500 dark:to-red-600 bg-gradient-to-br from-red-600 to-red-700 text-white disabled:opacity-50"
+                  style={{
+                    boxShadow: '0 4px 20px rgba(239, 68, 68, 0.4)'
+                  }}
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete Zone'}
                 </motion.button>
               </div>
             </motion.div>

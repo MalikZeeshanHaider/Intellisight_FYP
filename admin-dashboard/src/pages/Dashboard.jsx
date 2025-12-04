@@ -20,6 +20,7 @@ import {
 import { GiTeacher } from 'react-icons/gi';
 import { HiSparkles, HiLightningBolt } from 'react-icons/hi';
 import { statsAPI, timetableAPI, zoneAPI } from '../api/api';
+import { zone1API } from '../api/zone1';
 import { format } from 'date-fns';
 
 const Dashboard = () => {
@@ -71,13 +72,30 @@ const Dashboard = () => {
       if (zonesData?.success && Array.isArray(zonesData.data)) {
         const zonePromises = zonesData.data.map(async (zone) => {
           try {
-            const personsData = await zoneAPI.getPersonsInZone(zone.Zone_ID);
+            let personCount = 0;
+            
+            if (zone.Zone_id === 1) {
+              // For Zone 1, use Zone 1 Live API to get accurate count
+              const [currentPersonsResponse, unknownCountResponse] = await Promise.all([
+                zone1API.getCurrentPersons(),
+                zone1API.getUnknownFacesCount()
+              ]);
+              
+              const knownCount = currentPersonsResponse.success ? currentPersonsResponse.data.length : 0;
+              const unknownCount = unknownCountResponse.success ? unknownCountResponse.count : 0;
+              personCount = knownCount + unknownCount;
+            } else {
+              // For other zones, use the generic API
+              const personsData = await zoneAPI.getPersonsInZone(zone.Zone_id);
+              personCount = personsData.data?.length || 0;
+            }
+            
             return {
               ...zone,
-              personCount: Array.isArray(personsData.data) ? personsData.data.length : 0,
+              personCount,
             };
           } catch (err) {
-            console.error(`Error fetching persons for zone ${zone.Zone_ID}:`, err);
+            console.error(`Error fetching persons for zone ${zone.Zone_id}:`, err);
             return {
               ...zone,
               personCount: 0,
@@ -769,14 +787,14 @@ const Dashboard = () => {
             <div className="space-y-3 relative z-10">
               {zoneOverview.map((zone, index) => (
                 <motion.div
-                  key={zone.Zone_ID}
+                  key={zone.Zone_id}
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
                   whileHover={{ scale: 1.03, x: 5 }}
                 >
                   <Link
-                    to={`/zones/${zone.Zone_ID}`}
+                    to={zone.Zone_id === 1 ? '/zones/zone1-live' : `/zones/${zone.Zone_id}/live`}
                     className="block p-4 rounded-2xl transition-all duration-300 relative overflow-hidden group"
                     style={{
                       background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(79, 70, 229, 0.1))',
@@ -803,7 +821,7 @@ const Dashboard = () => {
                         </div>
                         <div>
                           <p className="font-bold" style={{ color: 'var(--text-main)' }}>{zone.Zone_Name}</p>
-                          <p className="text-xs font-medium" style={{ color: 'var(--text-soft)' }}>Zone {zone.Zone_ID}</p>
+                          <p className="text-xs font-medium" style={{ color: 'var(--text-soft)' }}>Zone {zone.Zone_id}</p>
                         </div>
                       </div>
                       <div className="text-right">

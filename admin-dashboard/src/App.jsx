@@ -19,6 +19,7 @@ import Teachers from './pages/Teachers';
 import Zones from './pages/Zones';
 import ZoneDetail from './pages/ZoneDetail';
 import Zone1 from './pages/Zone1';
+import ZoneLive from './pages/ZoneLive';
 import UnknownFaces from './pages/UnknownFaces';
 import Logs from './pages/Logs';
 import Settings from './pages/Settings';
@@ -99,6 +100,19 @@ function App() {
                   <Layout>
                     <ErrorBoundary>
                       <Zone1 />
+                    </ErrorBoundary>
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/zones/:zoneId/live"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ErrorBoundary>
+                      <ZoneLive />
                     </ErrorBoundary>
                   </Layout>
                 </ProtectedRoute>

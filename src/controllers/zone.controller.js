@@ -128,3 +128,62 @@ export const deleteZone = asyncHandler(async (req, res) => {
     HTTP_STATUS.OK
   );
 });
+
+/**
+ * @route   GET /api/zones/:id/current
+ * @desc    Get all persons currently in a specific zone
+ * @access  Private
+ */
+export const getCurrentPersonsInZone = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const zoneId = parseInt(id);
+
+  // Check if zone exists
+  const zone = await prisma.zone.findUnique({
+    where: { Zone_id: zoneId },
+  });
+
+  if (!zone) {
+    throw new NotFoundError(`Zone with ID ${zoneId} not found`);
+  }
+
+  const currentPersons = await prisma.activePresence.findMany({
+    where: {
+      Zone_id: zoneId
+    },
+    include: {
+      teacher: {
+        select: {
+          Teacher_ID: true,
+          Name: true,
+          Email: true,
+          Department: true,
+          Gender: true,
+          Face_Picture_1: true
+        }
+      },
+      student: {
+        select: {
+          Student_ID: true,
+          Name: true,
+          Email: true,
+          Department: true,
+          Gender: true,
+          RollNumber: true,
+          Face_Picture_1: true
+        }
+      },
+      zone: {
+        select: {
+          Zone_id: true,
+          Zone_Name: true
+        }
+      }
+    },
+    orderBy: {
+      Entry_Time: 'desc'
+    }
+  });
+
+  successResponse(res, currentPersons, `Active persons in ${zone.Zone_Name} retrieved successfully`);
+});

@@ -78,7 +78,7 @@ export const zoneAPI = {
 
   // Get persons in a specific zone
   getPersonsInZone: async (zoneId) => {
-    const response = await api.get(`/timetable/zone/${zoneId}/persons`);
+    const response = await api.get(`/zones/${zoneId}/current`);
     return response.data;
   },
 
