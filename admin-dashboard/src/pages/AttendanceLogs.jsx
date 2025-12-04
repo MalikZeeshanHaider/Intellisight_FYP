@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FiDownload, FiFilter, FiClock, FiMapPin, FiUsers, FiChevronRight } from 'react-icons/fi';
+import { HiSparkles } from 'react-icons/hi';
 import { getAttendanceLogs } from '../api/faceRecognition';
 import { zoneAPI } from '../api/api';
 
@@ -95,37 +98,113 @@ export default function AttendanceLogs() {
   };
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="space-y-8 p-6"
+    >
+      {/* Breadcrumb */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-2 text-sm"
+        style={{ color: 'var(--text-soft)' }}
+      >
+        <span className="hover:opacity-80 cursor-pointer transition-opacity">Dashboard</span>
+        <FiChevronRight size={14} />
+        <span style={{ color: 'var(--primary)' }} className="font-semibold">Attendance Logs</span>
+      </motion.div>
+
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="flex justify-between items-start"
+      >
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Attendance Logs</h1>
-          <p className="text-gray-600 mt-1">
+          <h1
+            className="text-4xl font-display font-bold mb-2"
+            style={{
+              background: `linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}
+          >
+            Attendance Logs
+          </h1>
+          <p className="flex items-center gap-2" style={{ color: 'var(--text-soft)' }}>
+            <HiSparkles style={{ color: 'var(--primary-light)' }} />
             View entry and exit history for all zones
           </p>
         </div>
         
-        <button
+        <motion.button
+          whileHover={{ scale: 1.05, boxShadow: `0 0 20px var(--glow)` }}
+          whileTap={{ scale: 0.95 }}
           onClick={exportToCSV}
           disabled={logs.length === 0}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+          className="px-6 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            background: `linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)`,
+            color: '#fff',
+            border: `1px solid var(--border-color)`,
+            boxShadow: `0 4px 16px var(--shadow)`
+          }}
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
+          <FiDownload size={18} />
           <span>Export CSV</span>
-        </button>
-      </div>
+        </motion.button>
+      </motion.div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-6">
+      {/* Filters Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="rounded-3xl p-6 backdrop-blur-xl"
+        style={{
+          background: 'var(--surface-alt)',
+          border: `1px solid var(--border-color)`,
+          boxShadow: `0 8px 32px var(--shadow)`
+        }}
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{
+              background: `linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)`,
+              boxShadow: `0 0 20px var(--glow)`
+            }}
+          >
+            <FiFilter className="text-white" size={18} />
+          </div>
+          <h3 className="text-lg font-display font-semibold" style={{ color: 'var(--text-main)' }}>
+            Filter Logs
+          </h3>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Zone</label>
+            <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-soft)' }}>
+              <div className="flex items-center gap-2">
+                <FiMapPin size={14} />
+                Zone
+              </div>
+            </label>
             <select
               value={filters.zoneId}
               onChange={(e) => handleFilterChange('zoneId', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 rounded-xl transition-all duration-300 focus:outline-none"
+              style={{
+                background: 'var(--surface)',
+                border: `2px solid var(--border-color)`,
+                color: 'var(--text-main)',
+                boxShadow: `0 2px 8px var(--shadow)`
+              }}
+              onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
+              onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
             >
               <option value="">All Zones</option>
               {zones.map(zone => (
@@ -135,11 +214,24 @@ export default function AttendanceLogs() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Person Type</label>
+            <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-soft)' }}>
+              <div className="flex items-center gap-2">
+                <FiUsers size={14} />
+                Person Type
+              </div>
+            </label>
             <select
               value={filters.personType}
               onChange={(e) => handleFilterChange('personType', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 rounded-xl transition-all duration-300 focus:outline-none"
+              style={{
+                background: 'var(--surface)',
+                border: `2px solid var(--border-color)`,
+                color: 'var(--text-main)',
+                boxShadow: `0 2px 8px var(--shadow)`
+              }}
+              onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
+              onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
             >
               <option value="">All Types</option>
               <option value="Student">Students</option>
@@ -148,107 +240,222 @@ export default function AttendanceLogs() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+            <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-soft)' }}>
+              <div className="flex items-center gap-2">
+                <FiClock size={14} />
+                Start Date
+              </div>
+            </label>
             <input
               type="date"
               value={filters.startDate}
               onChange={(e) => handleFilterChange('startDate', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 rounded-xl transition-all duration-300 focus:outline-none"
+              style={{
+                background: 'var(--surface)',
+                border: `2px solid var(--border-color)`,
+                color: 'var(--text-main)',
+                boxShadow: `0 2px 8px var(--shadow)`
+              }}
+              onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
+              onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+            <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-soft)' }}>
+              <div className="flex items-center gap-2">
+                <FiClock size={14} />
+                End Date
+              </div>
+            </label>
             <input
               type="date"
               value={filters.endDate}
               onChange={(e) => handleFilterChange('endDate', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 rounded-xl transition-all duration-300 focus:outline-none"
+              style={{
+                background: 'var(--surface)',
+                border: `2px solid var(--border-color)`,
+                color: 'var(--text-main)',
+                boxShadow: `0 2px 8px var(--shadow)`
+              }}
+              onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
+              onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
             />
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
-        </div>
-      )}
+      {/* Error Alert */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="rounded-2xl p-4 backdrop-blur-xl"
+            style={{
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '2px solid rgba(239, 68, 68, 0.3)',
+              color: '#ef4444'
+            }}
+          >
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Logs Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="rounded-3xl overflow-hidden backdrop-blur-xl"
+        style={{
+          background: 'var(--surface-alt)',
+          border: `1px solid var(--border-color)`,
+          boxShadow: `0 8px 32px var(--shadow)`
+        }}
+      >
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Zone</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entry Time</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exit Time</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+          <table className="min-w-full">
+            <thead>
+              <tr style={{ background: 'var(--highlight)' }}>
+                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>Zone</th>
+                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>Name</th>
+                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>Type</th>
+                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>Department</th>
+                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>Entry Time</th>
+                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>Exit Time</th>
+                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>Duration</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center">
-                    <div className="flex justify-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                  <td colSpan="7" className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-12 h-12 rounded-full"
+                        style={{
+                          border: `3px solid var(--border-color)`,
+                          borderTopColor: 'var(--primary)',
+                          boxShadow: `0 0 20px var(--glow)`
+                        }}
+                      />
+                      <span className="text-sm font-medium" style={{ color: 'var(--text-soft)' }}>
+                        Loading attendance logs...
+                      </span>
                     </div>
                   </td>
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
-                    No attendance logs found
+                  <td colSpan="7" className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div
+                        className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                        style={{
+                          background: 'var(--highlight)',
+                          border: `2px solid var(--border-color)`
+                        }}
+                      >
+                        <FiClock size={32} style={{ color: 'var(--text-soft)', opacity: 0.5 }} />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-lg mb-1" style={{ color: 'var(--text-main)' }}>
+                          No attendance logs found
+                        </p>
+                        <p className="text-sm" style={{ color: 'var(--text-soft)' }}>
+                          Try adjusting your filters or check back later
+                        </p>
+                      </div>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                logs.map((log) => {
-                  const person = log.person;
-                  const isStudent = log.personType === 'Student';
-                  
-                  return (
-                    <tr key={log.logId} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {log.zone?.Zone_Name || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold ${
-                            isStudent ? 'bg-blue-500' : 'bg-green-500'
-                          }`}>
-                            {person?.Name?.charAt(0) || '?'}
+                <AnimatePresence>
+                  {logs.map((log, index) => {
+                    const person = log.person;
+                    const isStudent = log.personType === 'Student';
+                    
+                    return (
+                      <motion.tr
+                        key={log.logId}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="transition-all duration-300"
+                        style={{ borderBottom: `1px solid var(--border-color)` }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--highlight)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-8 h-8 rounded-lg flex items-center justify-center"
+                              style={{
+                                background: `linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)`,
+                                boxShadow: `0 0 12px var(--glow)`
+                              }}
+                            >
+                              <FiMapPin className="text-white" size={14} />
+                            </div>
+                            <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                              {log.zone?.Zone_Name || '-'}
+                            </span>
                           </div>
-                          <span className="ml-3 text-sm font-medium text-gray-900">
-                            {person?.Name || 'Unknown'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div
+                              className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-lg"
+                              style={{
+                                background: isStudent 
+                                  ? `linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)`
+                                  : `linear-gradient(135deg, #10b981 0%, #34d399 100%)`,
+                                boxShadow: `0 0 16px ${isStudent ? 'var(--glow)' : 'rgba(16, 185, 129, 0.4)'}`
+                              }}
+                            >
+                              {person?.Name?.charAt(0) || '?'}
+                            </div>
+                            <span className="ml-3 text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                              {person?.Name || 'Unknown'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className="px-3 py-1 rounded-full text-xs font-bold"
+                            style={{
+                              background: isStudent ? 'var(--highlight)' : 'rgba(16, 185, 129, 0.15)',
+                              color: isStudent ? 'var(--primary)' : '#10b981',
+                              border: `1px solid ${isStudent ? 'var(--border-color)' : 'rgba(16, 185, 129, 0.3)'}`
+                            }}
+                          >
+                            {log.personType}
                           </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          isStudent ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                        }`}>
-                          {log.personType}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {person?.Department || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDateTime(log.entryTime)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDateTime(log.exitTime)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDuration(log.duration)}
-                      </td>
-                    </tr>
-                  );
-                })
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: 'var(--text-soft)' }}>
+                          {person?.Department || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: 'var(--text-main)' }}>
+                          {formatDateTime(log.entryTime)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: 'var(--text-main)' }}>
+                          {formatDateTime(log.exitTime)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold" style={{ color: 'var(--primary)' }}>
+                          {formatDuration(log.duration)}
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </AnimatePresence>
               )}
             </tbody>
           </table>
@@ -256,29 +463,51 @@ export default function AttendanceLogs() {
 
         {/* Pagination */}
         {pagination.total > pagination.limit && (
-          <div className="bg-gray-50 px-6 py-3 flex items-center justify-between border-t border-gray-200">
-            <div className="text-sm text-gray-700">
+          <div
+            className="px-6 py-4 flex items-center justify-between"
+            style={{
+              background: 'var(--highlight)',
+              borderTop: `1px solid var(--border-color)`
+            }}
+          >
+            <div className="text-sm font-medium" style={{ color: 'var(--text-soft)' }}>
               Showing {pagination.offset + 1} to {Math.min(pagination.offset + pagination.limit, pagination.total)} of {pagination.total} results
             </div>
-            <div className="flex space-x-2">
-              <button
+            <div className="flex gap-2">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => setPagination(prev => ({ ...prev, offset: Math.max(0, prev.offset - prev.limit) }))}
                 disabled={pagination.offset === 0}
-                className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                className="px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: 'var(--surface)',
+                  border: `1px solid var(--border-color)`,
+                  color: 'var(--text-main)',
+                  boxShadow: `0 2px 8px var(--shadow)`
+                }}
               >
                 Previous
-              </button>
-              <button
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => setPagination(prev => ({ ...prev, offset: prev.offset + prev.limit }))}
                 disabled={pagination.offset + pagination.limit >= pagination.total}
-                className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                className="px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: `linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)`,
+                  color: '#fff',
+                  border: `1px solid var(--border-color)`,
+                  boxShadow: `0 4px 12px var(--glow)`
+                }}
               >
                 Next
-              </button>
+              </motion.button>
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
