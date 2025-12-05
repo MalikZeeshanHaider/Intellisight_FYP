@@ -181,7 +181,7 @@ export const getCurrentPersonsInZone = asyncHandler(async (req, res) => {
       }
     },
     orderBy: {
-      Entry_Time: 'desc'
+      EntryTime: 'desc'
     }
   });
 

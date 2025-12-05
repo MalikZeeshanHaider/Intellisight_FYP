@@ -4,63 +4,46 @@
 
 @layer base {
   :root {
-    /* Light Theme (Default) - Enhanced Contrast */
-    --primary: #3730a3;
-    --primary-light: #4f46e5;
-    --surface: #e0e7ff;
-    --surface-alt: #c7d2fe;
-    --text-main: #0f172a;
-    --text-soft: #334155;
-    --border-color: rgba(67, 56, 202, 0.3);
-    --glow: rgba(79, 70, 229, 0.5);
-    --highlight: rgba(79, 70, 229, 0.2);
-    --shadow: rgba(0, 0, 0, 0.15);
+    /* Clean Modern Theme - Light Mode (Inspired by Smart Home UI) */
+    --primary: #4A9FD4;
+    --primary-light: #6BB5E0;
+    --primary-dark: #3182CE;
+    --accent: #38BDF8;
+    --accent-light: #7DD3FC;
+    --surface: #F0F4F8;
+    --surface-alt: #E8EDF2;
+    --card-bg: rgba(255, 255, 255, 0.85);
+    --card-bg-solid: #FFFFFF;
+    --text-main: #1A202C;
+    --text-soft: #4A5568;
+    --text-muted: #718096;
+    --border-color: rgba(74, 159, 212, 0.15);
+    --glow: rgba(74, 159, 212, 0.3);
+    --highlight: rgba(74, 159, 212, 0.08);
+    --shadow: rgba(0, 0, 0, 0.08);
   }
 
-  @media (prefers-color-scheme: dark) {
-    :root {
-      /* Dark Theme */
-      --primary: #6BA6C1;
-      --primary-light: #89BDD3;
-      --surface: #0D1B24;
-      --surface-alt: #152731;
-      --text-main: #E6EEF4;
-      --text-soft: #A4B2BD;
-      --border-color: rgba(107, 166, 193, 0.22);
-      --glow: rgba(137, 189, 211, 0.45);
-      --highlight: rgba(107, 166, 193, 0.15);
-      --shadow: rgba(0, 0, 0, 0.45);
-    }
-  }
-
-  [data-theme="light"] {
-    --primary: #3730a3;
-    --primary-light: #4f46e5;
-    --surface: #e0e7ff;
-    --surface-alt: #c7d2fe;
-    --text-main: #0f172a;
-    --text-soft: #334155;
-    --border-color: rgba(67, 56, 202, 0.3);
-    --glow: rgba(79, 70, 229, 0.5);
-    --highlight: rgba(79, 70, 229, 0.2);
-    --shadow: rgba(0, 0, 0, 0.15);
-  }
-
-  [data-theme="dark"] {
-    --primary: #6BA6C1;
-    --primary-light: #89BDD3;
-    --surface: #0D1B24;
-    --surface-alt: #152731;
-    --text-main: #E6EEF4;
-    --text-soft: #A4B2BD;
-    --border-color: rgba(107, 166, 193, 0.22);
-    --glow: rgba(137, 189, 211, 0.45);
-    --highlight: rgba(107, 166, 193, 0.15);
-    --shadow: rgba(0, 0, 0, 0.45);
+  .dark, [data-theme="dark"] {
+    --primary: #63B3ED;
+    --primary-light: #90CDF4;
+    --primary-dark: #4299E1;
+    --accent: #38BDF8;
+    --accent-light: #7DD3FC;
+    --surface: #0F1724;
+    --surface-alt: #1A2332;
+    --card-bg: rgba(26, 35, 50, 0.85);
+    --card-bg-solid: #1A2332;
+    --text-main: #F7FAFC;
+    --text-soft: #CBD5E0;
+    --text-muted: #A0AEC0;
+    --border-color: rgba(99, 179, 237, 0.2);
+    --glow: rgba(99, 179, 237, 0.3);
+    --highlight: rgba(99, 179, 237, 0.1);
+    --shadow: rgba(0, 0, 0, 0.4);
   }
 
   body {
-    @apply font-sans antialiased;
+    @apply font-sans antialiased transition-colors duration-300;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     background: var(--surface);
     color: var(--text-main);
@@ -72,27 +55,68 @@
 }
 
 @layer components {
-  /* Glassmorphism Card */
+  /* Modern Transparent Glass Card - Like Smart Home UI */
   .glass-card {
-    @apply bg-white/70 backdrop-blur-xl rounded-3xl border border-white/20 shadow-glass;
+    @apply backdrop-blur-xl rounded-2xl border shadow-lg transition-all duration-300;
+    background: var(--card-bg);
+    border-color: var(--border-color);
   }
 
-  .glass-card-dark {
-    @apply bg-navy-primary/80 backdrop-blur-xl rounded-3xl border border-white/10 shadow-glass-lg;
+  .dark .glass-card {
+    background: var(--card-bg);
+    border-color: var(--border-color);
   }
 
-  /* Futuristic Button */
+  /* Solid Card for forms and important content */
+  .solid-card {
+    @apply rounded-2xl border shadow-lg transition-all duration-300;
+    background: var(--card-bg-solid);
+    border-color: var(--border-color);
+  }
+
+  /* Primary Gradient Button */
   .btn-futuristic {
-    @apply relative px-6 py-3 bg-gradient-to-r from-accent-blue to-accent-cyan text-white font-semibold rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-neon-blue hover:scale-105;
+    @apply relative px-6 py-3.5 bg-gradient-to-r from-sky-500 to-blue-500 text-white font-semibold rounded-xl overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-sky-500/30 hover:scale-[1.02] active:scale-[0.98];
   }
 
   .btn-futuristic::before {
     content: '';
-    @apply absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] transition-transform duration-700;
+    @apply absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent translate-x-[-200%] transition-transform duration-700;
   }
 
   .btn-futuristic:hover::before {
     @apply translate-x-[200%];
+  }
+
+  /* Accent Button */
+  .btn-accent {
+    @apply relative px-6 py-3.5 bg-gradient-to-r from-cyan-500 to-sky-500 text-white font-semibold rounded-xl overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/30 hover:scale-[1.02] active:scale-[0.98];
+  }
+
+  /* Outline Button */
+  .btn-outline {
+    @apply px-6 py-3 bg-transparent border-2 border-sky-500 text-sky-600 font-semibold rounded-xl transition-all duration-300 hover:bg-sky-500 hover:text-white hover:shadow-lg hover:shadow-sky-500/30;
+  }
+
+  .dark .btn-outline {
+    @apply border-sky-400 text-sky-400 hover:bg-sky-500 hover:text-white;
+  }
+
+  /* Category Pill - Like in the Smart Home UI */
+  .category-pill {
+    @apply inline-flex items-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all duration-300 cursor-pointer;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+  }
+
+  .category-pill:hover {
+    @apply shadow-md scale-[1.02];
+    background: var(--card-bg-solid);
+  }
+
+  .category-pill.active {
+    @apply bg-sky-500 text-white border-sky-500 shadow-lg shadow-sky-500/25;
   }
 
   /* Glowing Border */
@@ -102,13 +126,13 @@
 
   .glow-border::before {
     content: '';
-    @apply absolute inset-0 rounded-2xl bg-gradient-to-r from-accent-blue via-accent-cyan to-accent-purple opacity-75 blur-xl;
+    @apply absolute inset-0 rounded-2xl bg-gradient-to-r from-sky-500 via-cyan-500 to-sky-500 opacity-50 blur-xl;
     z-index: -1;
   }
 
   /* Animated Gradient Background */
   .animated-gradient {
-    @apply bg-gradient-to-r from-accent-blue via-accent-purple to-accent-pink;
+    @apply bg-gradient-to-r from-sky-600 via-sky-500 to-cyan-500;
     background-size: 200% 200%;
     animation: gradient 8s ease infinite;
   }
@@ -132,27 +156,34 @@
 
   /* Custom scrollbar */
   .custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-steel-100 rounded-full;
+    @apply bg-slate-100 rounded-full;
+  }
+
+  .dark .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-slate-800 rounded-full;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-gradient-to-b from-accent-blue to-accent-cyan rounded-full hover:from-accent-cyan hover:to-accent-blue;
+    @apply bg-gradient-to-b from-sky-400 to-cyan-400 rounded-full;
   }
 
   /* Card hover effect */
   .card-hover {
-    @apply transition-all duration-300 ease-out hover:shadow-soft-lg hover:-translate-y-2 hover:scale-[1.02];
+    @apply transition-all duration-300 ease-out hover:shadow-xl hover:-translate-y-1;
   }
 
-  /* Neon Glow Text */
+  /* Text gradient glow */
   .text-glow {
-    @apply text-transparent bg-clip-text bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple;
-    text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-sky-600 via-sky-500 to-cyan-500;
+  }
+
+  .dark .text-glow {
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-sky-300 to-cyan-400;
   }
 
   /* Pulse animation for active indicators */
@@ -162,7 +193,7 @@
 
   .pulse-dot::before {
     content: '';
-    @apply absolute inset-0 rounded-full bg-accent-cyan opacity-75 animate-ping;
+    @apply absolute inset-0 rounded-full bg-cyan-400 opacity-75 animate-ping;
   }
 
   /* Floating Animation */
@@ -170,43 +201,43 @@
     animation: float 6s ease-in-out infinite;
   }
 
-  /* Stat Card */
+  /* Stat Card - Clean transparent look */
   .stat-card {
     @apply glass-card p-6 card-hover cursor-pointer;
   }
 
   .stat-card-icon {
-    @apply w-14 h-14 rounded-2xl flex items-center justify-center bg-gradient-to-br transition-all duration-300;
+    @apply w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br transition-all duration-300;
   }
 
   .stat-card:hover .stat-card-icon {
-    @apply scale-110 rotate-3;
+    @apply scale-110;
   }
 
   /* Input Futuristic */
   .input-futuristic {
-    @apply w-full px-4 py-3 bg-white/50 backdrop-blur-sm border-2 border-steel-300 rounded-2xl focus:outline-none focus:border-accent-blue focus:ring-4 focus:ring-accent-blue/20 transition-all duration-300;
+    @apply w-full px-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all duration-300 text-slate-800 placeholder-slate-400;
   }
 
   /* Badge */
   .badge-futuristic {
-    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r backdrop-blur-sm border;
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
   }
 
   /* Loading Skeleton */
   .skeleton {
-    @apply animate-pulse bg-gradient-to-r from-steel-200 via-steel-300 to-steel-200 bg-[length:200%_100%] rounded-2xl;
+    @apply animate-pulse bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 bg-[length:200%_100%] rounded-xl;
     animation: shimmer 2s infinite;
   }
 
   /* Zone Card */
   .zone-card {
-    @apply relative glass-card p-6 overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-neon-blue;
+    @apply relative glass-card p-6 overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/20;
   }
 
   .zone-card::before {
     content: '';
-    @apply absolute inset-0 bg-gradient-to-br from-accent-blue/10 to-accent-cyan/10 opacity-0 transition-opacity duration-300;
+    @apply absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-teal-500/5 opacity-0 transition-opacity duration-300;
   }
 
   .zone-card:hover::before {
@@ -215,26 +246,26 @@
 
   /* Timeline */
   .timeline-item {
-    @apply relative pl-8 pb-8 border-l-2 border-steel-300;
+    @apply relative pl-8 pb-8 border-l-2 border-slate-200;
   }
 
   .timeline-item::before {
     content: '';
-    @apply absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-accent-blue border-4 border-white shadow-neon-blue;
+    @apply absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-indigo-500 border-4 border-white shadow-lg shadow-indigo-500/30;
   }
 
   /* Modal Backdrop */
   .modal-backdrop {
-    @apply fixed inset-0 bg-navy-darker/60 backdrop-blur-sm z-40;
+    @apply fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40;
   }
 
   /* Sidebar Active Link */
   .sidebar-link {
-    @apply flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 text-steel-600 hover:bg-accent-blue/10 hover:text-accent-blue;
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600;
   }
 
   .sidebar-link-active {
-    @apply bg-gradient-to-r from-accent-blue to-accent-cyan text-white shadow-neon-blue;
+    @apply bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-500/30;
   }
 
   /* Chart Container */
@@ -244,15 +275,15 @@
 
   /* Status Badge */
   .status-online {
-    @apply badge-futuristic from-green-400 to-emerald-500 border-green-300 text-white;
+    @apply badge-futuristic bg-teal-100 text-teal-700 border border-teal-200;
   }
 
   .status-offline {
-    @apply badge-futuristic from-red-400 to-rose-500 border-red-300 text-white;
+    @apply badge-futuristic bg-red-100 text-red-700 border border-red-200;
   }
 
   .status-away {
-    @apply badge-futuristic from-yellow-400 to-amber-500 border-yellow-300 text-white;
+    @apply badge-futuristic bg-amber-100 text-amber-700 border border-amber-200;
   }
 }
 

@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { successResponse } from '../utils/response.js';
 import { NotFoundError, BadRequestError } from '../utils/errors.js';
 import { HTTP_STATUS, SUCCESS_MESSAGES } from '../config/constants.js';
+import { savePersonImages, deletePersonImages } from '../services/imageSaving.service.js';
 
 /**
  * @route   GET /api/students
@@ -105,6 +106,19 @@ export const createStudent = asyncHandler(async (req, res) => {
     },
   });
 
+  // Save face images to training folder for new algorithm
+  try {
+    await savePersonImages('student', student.Student_ID, Name, {
+      Face_Picture_1,
+      Face_Picture_2,
+      Face_Picture_3,
+      Face_Picture_4,
+      Face_Picture_5
+    });
+  } catch (err) {
+    console.warn('[STUDENT] Failed to save images to train folder:', err.message);
+  }
+
   successResponse(
     res,
     student,
@@ -171,11 +185,26 @@ export const updateStudent = asyncHandler(async (req, res) => {
     data: updateData,
     include: {
       TimeTable: {
-        orderBy: { Entry_Time: 'desc' },
+        orderBy: { EntryTime: 'desc' },
         take: 5,
       },
     },
   });
+
+  // Save updated face images to training folder for new algorithm
+  if (Face_Picture_1 || Face_Picture_2 || Face_Picture_3 || Face_Picture_4 || Face_Picture_5) {
+    try {
+      await savePersonImages('student', student.Student_ID, student.Name, {
+        Face_Picture_1: Face_Picture_1 || student.Face_Picture_1,
+        Face_Picture_2: Face_Picture_2 || student.Face_Picture_2,
+        Face_Picture_3: Face_Picture_3 || student.Face_Picture_3,
+        Face_Picture_4: Face_Picture_4 || student.Face_Picture_4,
+        Face_Picture_5: Face_Picture_5 || student.Face_Picture_5
+      });
+    } catch (err) {
+      console.warn('[STUDENT] Failed to save images to train folder:', err.message);
+    }
+  }
 
   // Convert base64 pictures for response
   const studentWithBase64 = {
@@ -205,6 +234,13 @@ export const deleteStudent = asyncHandler(async (req, res) => {
 
   if (!existingStudent) {
     throw new NotFoundError(`Student with ID ${id} not found`);
+  }
+
+  // Delete face images from training folder
+  try {
+    await deletePersonImages(existingStudent.Name);
+  } catch (err) {
+    console.warn('[STUDENT] Failed to delete images from train folder:', err.message);
   }
 
   await prisma.students.delete({

@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { successResponse } from '../utils/response.js';
 import { NotFoundError, BadRequestError } from '../utils/errors.js';
 import { HTTP_STATUS, SUCCESS_MESSAGES } from '../config/constants.js';
+import { savePersonImages, deletePersonImages } from '../services/imageSaving.service.js';
 
 /**
  * @route   GET /api/teachers
@@ -100,6 +101,19 @@ export const createTeacher = asyncHandler(async (req, res) => {
     },
   });
 
+  // Save face images to training folder for new algorithm
+  try {
+    await savePersonImages('teacher', teacher.Teacher_ID, Name, {
+      Face_Picture_1,
+      Face_Picture_2,
+      Face_Picture_3,
+      Face_Picture_4,
+      Face_Picture_5
+    });
+  } catch (err) {
+    console.warn('[TEACHER] Failed to save images to train folder:', err.message);
+  }
+
   successResponse(
     res,
     teacher,
@@ -160,6 +174,21 @@ export const updateTeacher = asyncHandler(async (req, res) => {
     },
   });
 
+  // Save updated face images to training folder for new algorithm
+  if (Face_Picture_1 || Face_Picture_2 || Face_Picture_3 || Face_Picture_4 || Face_Picture_5) {
+    try {
+      await savePersonImages('teacher', teacher.Teacher_ID, teacher.Name, {
+        Face_Picture_1: Face_Picture_1 || teacher.Face_Picture_1,
+        Face_Picture_2: Face_Picture_2 || teacher.Face_Picture_2,
+        Face_Picture_3: Face_Picture_3 || teacher.Face_Picture_3,
+        Face_Picture_4: Face_Picture_4 || teacher.Face_Picture_4,
+        Face_Picture_5: Face_Picture_5 || teacher.Face_Picture_5
+      });
+    } catch (err) {
+      console.warn('[TEACHER] Failed to save images to train folder:', err.message);
+    }
+  }
+
   successResponse(res, teacher, SUCCESS_MESSAGES.UPDATED);
 });
 
@@ -184,6 +213,13 @@ export const deleteTeacher = asyncHandler(async (req, res) => {
   await prisma.timeTable.deleteMany({
     where: { Teacher_ID: parseInt(id) },
   });
+
+  // Delete face images from training folder
+  try {
+    await deletePersonImages(existingTeacher.Name);
+  } catch (err) {
+    console.warn('[TEACHER] Failed to delete images from train folder:', err.message);
+  }
 
   // Now delete the teacher
   await prisma.teacher.delete({

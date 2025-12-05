@@ -7,6 +7,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Path to the new Facerecongination folder (DeepFace FaceNet algorithm)
+const FACE_RECOGNITION_PATH = path.join(__dirname, '../../Facerecongination');
+
 /**
  * Enroll face embeddings for a student or teacher
  * POST /api/face-recognition/enroll
@@ -44,8 +47,8 @@ export const enrollPerson = async (req, res) => {
       });
     }
 
-    // Run Python enrollment script
-    const scriptPath = path.join(__dirname, '../../face-recognition/enrollment.py');
+    // Run Python enrollment script from new Facerecongination folder
+    const scriptPath = path.join(FACE_RECOGNITION_PATH, 'enrollment.py');
     const python = spawn('python', [
       scriptPath,
       '--type', personType.toLowerCase(),
@@ -112,7 +115,7 @@ export const enrollPerson = async (req, res) => {
  */
 export const enrollAll = async (req, res) => {
   try {
-    const scriptPath = path.join(__dirname, '../../face-recognition/enrollment.py');
+    const scriptPath = path.join(FACE_RECOGNITION_PATH, 'enrollment.py');
     const python = spawn('python', [scriptPath, '--all']);
 
     let output = '';
@@ -394,8 +397,8 @@ export const startRecognition = async (req, res) => {
       });
     }
 
-    // Start recognition process (non-blocking)
-    const scriptPath = path.join(__dirname, '../../face-recognition/recognition.py');
+    // Start recognition process (non-blocking) - using new DeepFace algorithm
+    const scriptPath = path.join(FACE_RECOGNITION_PATH, 'recognition_live.py');
     const python = spawn('python', [scriptPath, '--zone', zoneId.toString()], {
       detached: true,
       stdio: 'ignore'

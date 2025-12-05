@@ -1,10 +1,12 @@
 /**
  * Image Preprocessing Service
  * Preprocesses and stores optimized face images for faster detection
+ * Also saves images to Facerecongination/images folder for training
  */
 
 import { PrismaClient } from '@prisma/client';
 import sharp from 'sharp';
+import { savePersonImages } from './imageSaving.service.js';
 
 const prisma = new PrismaClient();
 
@@ -72,6 +74,20 @@ export const preprocessAllImages = async () => {
         image4: student.Face_Picture_4,
         image5: student.Face_Picture_5
       });
+      
+      // Save images to training folder for new algorithm
+      try {
+        await savePersonImages('student', student.Student_ID, student.Name, {
+          Face_Picture_1: student.Face_Picture_1,
+          Face_Picture_2: student.Face_Picture_2,
+          Face_Picture_3: student.Face_Picture_3,
+          Face_Picture_4: student.Face_Picture_4,
+          Face_Picture_5: student.Face_Picture_5
+        });
+      } catch (err) {
+        console.warn(`⚠️ Failed to save training images for student ${student.Name}:`, err.message);
+      }
+      
       processedCount++;
       console.log(`✅ Processed student: ${student.Name} (${processedCount}/${students.length + teachers.length})`);
     }
@@ -85,6 +101,20 @@ export const preprocessAllImages = async () => {
         image4: teacher.Face_Picture_4,
         image5: teacher.Face_Picture_5
       });
+      
+      // Save images to training folder for new algorithm
+      try {
+        await savePersonImages('teacher', teacher.Teacher_ID, teacher.Name, {
+          Face_Picture_1: teacher.Face_Picture_1,
+          Face_Picture_2: teacher.Face_Picture_2,
+          Face_Picture_3: teacher.Face_Picture_3,
+          Face_Picture_4: teacher.Face_Picture_4,
+          Face_Picture_5: teacher.Face_Picture_5
+        });
+      } catch (err) {
+        console.warn(`⚠️ Failed to save training images for teacher ${teacher.Name}:`, err.message);
+      }
+      
       processedCount++;
       console.log(`✅ Processed teacher: ${teacher.Name} (${processedCount}/${students.length + teachers.length})`);
     }

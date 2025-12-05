@@ -59,6 +59,7 @@ model Teacher {
   AttendanceLog   AttendanceLog[]
   Logs            Logs[]
   ProcessedImages ProcessedFaceImages[]
+  FaceEmbeddings  FaceEmbeddings[]
 
   @@map("Teacher")
 }
@@ -82,6 +83,7 @@ model Students {
   AttendanceLog   AttendanceLog[]
   Logs            Logs[]
   ProcessedImages ProcessedFaceImages[]
+  FaceEmbeddings  FaceEmbeddings[]
 
   @@map("Students")
 }
@@ -145,6 +147,23 @@ model ProcessedFaceImages {
   teacher      Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
 
   @@map("ProcessedFaceImages")
+}
+
+model FaceEmbeddings {
+  Embedding_ID   Int       @id @default(autoincrement())
+  PersonType     String
+  Student_ID     Int?
+  Teacher_ID     Int?
+  PersonName     String?
+  ImagePath      String?
+  Embedding      Bytes
+  EmbeddingJson  String?
+  CreatedAt      DateTime  @default(now())
+  UpdatedAt      DateTime  @updatedAt
+  student        Students? @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
+  teacher        Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
+
+  @@map("FaceEmbeddings")
 }
 
 model Logs {

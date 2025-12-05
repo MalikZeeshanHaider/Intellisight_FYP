@@ -999,15 +999,15 @@ export const reEnrollFaces = async (req, res) => {
     
     console.log('🔄 Re-enrollment requested...');
     
-    // Path to Python training script
-    const scriptPath = path.join(process.cwd(), 'face-recognition', 'train_from_database.py');
-    const pythonCommand = `python "${scriptPath}"`;
+    // Path to Python training script (using new DeepFace algorithm)
+    const scriptPath = path.join(process.cwd(), 'Facerecongination', 'enrollment.py');
+    const pythonCommand = `python "${scriptPath}" --all`;
     
     console.log(`📝 Running: ${pythonCommand}`);
     
     // Execute Python training script
     const { stdout, stderr } = await execAsync(pythonCommand, {
-      cwd: path.join(process.cwd(), 'face-recognition'),
+      cwd: path.join(process.cwd(), 'Facerecongination'),
       timeout: 120000 // 2 minutes timeout
     });
     
