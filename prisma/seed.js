@@ -9,7 +9,7 @@ async function main() {
   // Clear existing data and reset primary key sequences so IDs start from 1
   console.log('🗑️  Clearing existing data and resetting sequences...');
   // Using TRUNCATE with RESTART IDENTITY to ensure deterministic IDs for tests
-  await prisma.$executeRawUnsafe('TRUNCATE "TimeTable", "Students", "Teacher", "Camara", "Admin", "Zone" RESTART IDENTITY CASCADE');
+  await prisma.$executeRawUnsafe('TRUNCATE "AttendanceLog", "ActivePresence", "Logs", "ProcessedFaceImages", "FaceEmbeddings", "UnknownFaces", "Students", "Teacher", "Camara", "Admin", "Zone" RESTART IDENTITY CASCADE');
 
   // Hash password for admins
   const hashedPassword = await bcrypt.hash('admin123', 10);
@@ -208,115 +208,113 @@ async function main() {
   ]);
   console.log(`✅ Created ${students.length} students`);
 
-  // Seed TimeTable entries
-  console.log('⏰ Seeding TimeTable entries...');
+  // Seed AttendanceLog entries (replaced TimeTable)
+  console.log('⏰ Seeding AttendanceLog entries...');
   const now = new Date();
   
-  const timetableEntries = await Promise.all([
+  const attendanceEntries = await Promise.all([
     // Teacher entries
-    prisma.timeTable.create({
+    prisma.attendanceLog.create({
       data: {
         EntryTime: new Date(now.getTime() - 2 * 60 * 60 * 1000), // 2 hours ago
         ExitTime: new Date(now.getTime() - 30 * 60 * 1000), // 30 mins ago
         PersonType: 'TEACHER',
-        Admin_ID: admins[0].Admin_ID,
         Teacher_ID: teachers[0].Teacher_ID,
         Zone_id: zones[0].Zone_id,
+        Duration: 90,
       },
     }),
-    prisma.timeTable.create({
+    prisma.attendanceLog.create({
       data: {
         EntryTime: new Date(now.getTime() - 3 * 60 * 60 * 1000), // 3 hours ago
         ExitTime: new Date(now.getTime() - 1 * 60 * 60 * 1000), // Exited 1 hour ago
         PersonType: 'TEACHER',
-        Admin_ID: admins[0].Admin_ID,
         Teacher_ID: teachers[1].Teacher_ID,
         Zone_id: zones[1].Zone_id,
+        Duration: 120,
       },
     }),
-    prisma.timeTable.create({
+    prisma.attendanceLog.create({
       data: {
         EntryTime: new Date(now.getTime() - 1 * 60 * 60 * 1000), // 1 hour ago
         ExitTime: new Date(now.getTime() - 15 * 60 * 1000), // 15 mins ago
         PersonType: 'TEACHER',
-        Admin_ID: admins[1].Admin_ID,
         Teacher_ID: teachers[2].Teacher_ID,
         Zone_id: zones[2].Zone_id,
+        Duration: 45,
       },
     }),
     // Student entries
-    prisma.timeTable.create({
+    prisma.attendanceLog.create({
       data: {
         EntryTime: new Date(now.getTime() - 4 * 60 * 60 * 1000), // 4 hours ago
         ExitTime: new Date(now.getTime() - 1 * 60 * 60 * 1000), // 1 hour ago
         PersonType: 'STUDENT',
-        Admin_ID: admins[0].Admin_ID,
         Student_ID: students[0].Student_ID,
         Zone_id: zones[0].Zone_id,
+        Duration: 180,
       },
     }),
-    prisma.timeTable.create({
+    prisma.attendanceLog.create({
       data: {
         EntryTime: new Date(now.getTime() - 3 * 60 * 60 * 1000), // 3 hours ago
         ExitTime: new Date(now.getTime() - 30 * 60 * 1000), // Exited 30 mins ago
         PersonType: 'STUDENT',
-        Admin_ID: admins[0].Admin_ID,
         Student_ID: students[1].Student_ID,
         Zone_id: zones[0].Zone_id,
+        Duration: 150,
       },
     }),
-    prisma.timeTable.create({
+    prisma.attendanceLog.create({
       data: {
         EntryTime: new Date(now.getTime() - 5 * 60 * 60 * 1000), // 5 hours ago
         ExitTime: new Date(now.getTime() - 2 * 60 * 60 * 1000), // 2 hours ago
         PersonType: 'STUDENT',
-        Admin_ID: admins[1].Admin_ID,
         Student_ID: students[2].Student_ID,
         Zone_id: zones[1].Zone_id,
+        Duration: 180,
       },
     }),
-    prisma.timeTable.create({
+    prisma.attendanceLog.create({
       data: {
         EntryTime: new Date(now.getTime() - 2 * 60 * 60 * 1000), // 2 hours ago
         ExitTime: null, // Still inside
         PersonType: 'STUDENT',
-        Admin_ID: admins[1].Admin_ID,
         Student_ID: students[3].Student_ID,
         Zone_id: zones[2].Zone_id,
       },
     }),
-    prisma.timeTable.create({
+    prisma.attendanceLog.create({
       data: {
         EntryTime: new Date(now.getTime() - 1 * 60 * 60 * 1000), // 1 hour ago
         ExitTime: new Date(now.getTime() - 10 * 60 * 1000), // 10 mins ago
         PersonType: 'STUDENT',
-        Admin_ID: admins[2].Admin_ID,
         Student_ID: students[4].Student_ID,
         Zone_id: zones[3].Zone_id,
+        Duration: 50,
       },
     }),
-    prisma.timeTable.create({
+    prisma.attendanceLog.create({
       data: {
         EntryTime: new Date(now.getTime() - 6 * 60 * 60 * 1000), // 6 hours ago
         ExitTime: new Date(now.getTime() - 3 * 60 * 60 * 1000), // 3 hours ago
         PersonType: 'STUDENT',
-        Admin_ID: admins[0].Admin_ID,
         Student_ID: students[5].Student_ID,
         Zone_id: zones[0].Zone_id,
+        Duration: 180,
       },
     }),
-    prisma.timeTable.create({
+    prisma.attendanceLog.create({
       data: {
         EntryTime: new Date(now.getTime() - 4 * 60 * 60 * 1000), // 4 hours ago
         ExitTime: null, // Still inside
         PersonType: 'STUDENT',
-        Admin_ID: admins[1].Admin_ID,
         Student_ID: students[6].Student_ID,
         Zone_id: zones[1].Zone_id,
       },
     }),
   ]);
-  console.log(`✅ Created ${timetableEntries.length} timetable entries`);
+  console.log(`✅ Created ${attendanceEntries.length} attendance log entries`);
 
   console.log('\n🎉 Database seeding completed successfully!');
   console.log('\n📊 Summary:');
@@ -325,7 +323,7 @@ async function main() {
   console.log(`   - Cameras: ${cameras.length}`);
   console.log(`   - Teachers: ${teachers.length}`);
   console.log(`   - Students: ${students.length}`);
-  console.log(`   - TimeTable Entries: ${timetableEntries.length}`);
+  console.log(`   - Attendance Entries: ${attendanceEntries.length}`);
   console.log('\n🔑 Test Admin Credentials:');
   console.log('   Email: john.admin@intellisight.com');
   console.log('   Password: admin123');

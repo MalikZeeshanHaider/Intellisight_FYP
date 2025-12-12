@@ -1,0 +1,42 @@
+{
+  "name": "IntelliSight Camera Testing",
+  "cameras": [
+    {
+      "id": 1,
+      "name": "Main Entrance Camera",
+      "rtsp_url": "rtsp://admin:password@192.168.1.100:554/cam/realmonitor?channel=1&subtype=0",
+      "type": "Entry",
+      "zone_id": 1,
+      "notes": "Dahua camera, 1080p, 25fps"
+    },
+    {
+      "id": 2,
+      "name": "Exit Door Camera",
+      "rtsp_url": "rtsp://admin:password@192.168.1.101:554/cam/realmonitor?channel=1&subtype=0",
+      "type": "Exit",
+      "zone_id": 1,
+      "notes": "Dahua camera, 1080p, 25fps"
+    },
+    {
+      "id": 3,
+      "name": "Lab Camera",
+      "rtsp_url": "rtsp://admin:password@192.168.1.102/cam/realmonitor?channel=1&subtype=0",
+      "type": "Both",
+      "zone_id": 2,
+      "notes": "Without explicit port (default 554)"
+    }
+  ],
+  "common_formats": {
+    "dahua": "rtsp://username:password@ip:554/cam/realmonitor?channel=1&subtype=0",
+    "hikvision": "rtsp://username:password@ip:554/Streaming/Channels/101",
+    "axis": "rtsp://username:password@ip:554/axis-media/media.amp",
+    "generic": "rtsp://username:password@ip:554/stream"
+  },
+  "testing_instructions": [
+    "Replace IP addresses with your actual camera IPs",
+    "Replace username and password with camera credentials",
+    "Test each camera individually before adding to system",
+    "Use VLC Media Player to verify RTSP URL works",
+    "Check camera manual for correct RTSP path"
+  ]
+}

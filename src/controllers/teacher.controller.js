@@ -29,7 +29,7 @@ export const getTeacherById = asyncHandler(async (req, res) => {
   const teacher = await prisma.teacher.findUnique({
     where: { Teacher_ID: parseInt(id) },
     include: {
-      TimeTable: {
+      AttendanceLog: {
         orderBy: { EntryTime: 'desc' },
         take: 10,
       },
@@ -167,7 +167,7 @@ export const updateTeacher = asyncHandler(async (req, res) => {
     where: { Teacher_ID: parseInt(id) },
     data: updateData,
     include: {
-      TimeTable: {
+      AttendanceLog: {
         orderBy: { EntryTime: 'desc' },
         take: 5,
       },
@@ -208,11 +208,6 @@ export const deleteTeacher = asyncHandler(async (req, res) => {
   if (!existingTeacher) {
     throw new NotFoundError(`Teacher with ID ${id} not found`);
   }
-
-  // Delete related TimeTable entries first
-  await prisma.timeTable.deleteMany({
-    where: { Teacher_ID: parseInt(id) },
-  });
 
   // Delete face images from training folder
   try {

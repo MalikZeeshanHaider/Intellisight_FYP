@@ -141,6 +141,61 @@ class DatabaseHandler:
         
         return cameras
 
+    def get_zone_cameras_list(self, zone_id):
+        """Get all cameras for a zone as a list"""
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT "Camara_Id", "Camera_URL", "Camera_Type", "Zone_id"
+                    FROM "Camara" 
+                    WHERE "Zone_id" = %s
+                """, (zone_id,))
+                
+                return cur.fetchall()
+        except Exception as e:
+            print(f"[DB ERROR] get_zone_cameras_list: {e}")
+            return []
+
+    def mark_entry(self, name, role, zone_id, camera_id):
+        """Mark person entry (for streaming service)"""
+        try:
+            # Parse role to get person ID
+            if role == 'STUDENT':
+                with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute('SELECT "Student_ID" FROM "Students" WHERE "Name" = %s', (name,))
+                    result = cur.fetchone()
+                    if result:
+                        return self.add_to_active_presence(result['Student_ID'], 'Student', zone_id)
+            else:
+                with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute('SELECT "Teacher_ID" FROM "Teacher" WHERE "Name" = %s', (name,))
+                    result = cur.fetchone()
+                    if result:
+                        return self.add_to_active_presence(result['Teacher_ID'], 'Teacher', zone_id)
+        except Exception as e:
+            print(f"[DB ERROR] mark_entry: {e}")
+            return False
+
+    def mark_exit(self, name, role, zone_id, camera_id):
+        """Mark person exit (for streaming service)"""
+        try:
+            # Parse role to get person ID
+            if role == 'STUDENT':
+                with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute('SELECT "Student_ID" FROM "Students" WHERE "Name" = %s', (name,))
+                    result = cur.fetchone()
+                    if result:
+                        return self.remove_from_active_presence(result['Student_ID'], 'Student', zone_id)
+            else:
+                with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute('SELECT "Teacher_ID" FROM "Teacher" WHERE "Name" = %s', (name,))
+                    result = cur.fetchone()
+                    if result:
+                        return self.remove_from_active_presence(result['Teacher_ID'], 'Teacher', zone_id)
+        except Exception as e:
+            print(f"[DB ERROR] mark_exit: {e}")
+            return False
+
     def add_to_active_presence(self, person_id, person_type, zone_id):
         """
         Add person to ActivePresence table (entry detected).

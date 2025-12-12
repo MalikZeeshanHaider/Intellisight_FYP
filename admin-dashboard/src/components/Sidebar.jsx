@@ -73,6 +73,11 @@ const Sidebar = () => {
       label: 'Zones'
     },
     {
+      path: '/cameras',
+      icon: FiVideo,
+      label: 'Cameras'
+    },
+    {
       path: '/logs',
       icon: FiFileText,
       label: 'Logs'

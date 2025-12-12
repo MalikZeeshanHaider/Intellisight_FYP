@@ -29,9 +29,9 @@ export const getStudentById = asyncHandler(async (req, res) => {
   const student = await prisma.students.findUnique({
     where: { Student_ID: parseInt(id) },
     include: {
-      TimeTable: {
+      AttendanceLog: {
         select: {
-          TimeTable_ID: true,
+          Log_ID: true,
           EntryTime: true,
           ExitTime: true,
           zone: {
@@ -181,10 +181,10 @@ export const updateStudent = asyncHandler(async (req, res) => {
 
   // Update student
   const student = await prisma.students.update({
-    where: { Student_ID: id },
+    where: { Student_ID: parseInt(id) },
     data: updateData,
     include: {
-      TimeTable: {
+      AttendanceLog: {
         orderBy: { EntryTime: 'desc' },
         take: 5,
       },
@@ -229,7 +229,7 @@ export const deleteStudent = asyncHandler(async (req, res) => {
 
   // Check if student exists
   const existingStudent = await prisma.students.findUnique({
-    where: { Student_ID: id },
+    where: { Student_ID: parseInt(id) },
   });
 
   if (!existingStudent) {
@@ -244,12 +244,12 @@ export const deleteStudent = asyncHandler(async (req, res) => {
   }
 
   await prisma.students.delete({
-    where: { Student_ID: id },
+    where: { Student_ID: parseInt(id) },
   });
 
   successResponse(
     res,
-    { Student_ID: id },
+    { Student_ID: parseInt(id) },
     SUCCESS_MESSAGES.DELETED,
     HTTP_STATUS.OK
   );
@@ -266,7 +266,7 @@ export const uploadFacePicture = asyncHandler(async (req, res) => {
 
   // Check if student exists
   const existingStudent = await prisma.students.findUnique({
-    where: { Student_ID: id },
+    where: { Student_ID: parseInt(id) },
   });
 
   if (!existingStudent) {
@@ -282,7 +282,7 @@ export const uploadFacePicture = asyncHandler(async (req, res) => {
   if (Face_Picture_5 !== undefined) updateData.Face_Picture_5 = Face_Picture_5;
 
   const student = await prisma.students.update({
-    where: { Student_ID: id },
+    where: { Student_ID: parseInt(id) },
     data: updateData,
     select: {
       Student_ID: true,

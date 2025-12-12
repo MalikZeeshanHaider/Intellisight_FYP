@@ -6,8 +6,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FiRefreshCw, FiAlertCircle, FiArrowLeft, FiCamera, FiPlus, FiX, FiVideo } from 'react-icons/fi';
+import { FiRefreshCw, FiAlertCircle, FiArrowLeft, FiCamera, FiPlus, FiX, FiVideo, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
+import { cameraAPI, zoneAPI } from '../api/api';
 
 const ZoneLive = () => {
   const { zoneId } = useParams();
@@ -18,61 +19,177 @@ const ZoneLive = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAddCameraModal, setShowAddCameraModal] = useState(false);
+  const [showEditCameraModal, setShowEditCameraModal] = useState(false);
+  const [editingCamera, setEditingCamera] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [newCamera, setNewCamera] = useState({
-    label: '',
-    type: 'Entry',
-    ipAddress: '',
-    port: '554',
-    username: '',
-    password: '',
-    streamPath: '/stream'
+    Camera_URL: '',
+    Camera_Type: 'Entry',
+    Password: ''
   });
 
-  // Fetch zone details
-  useEffect(() => {
-    const fetchZoneData = async () => {
-      try {
-        setLoading(true);
-        // Fetch zone details and cameras from API
-        // This would need backend endpoints for dynamic zones
-        setZone({
-          Zone_id: parseInt(zoneId),
-          Zone_Name: `Zone ${zoneId}`,
-          Description: 'Live tracking zone'
-        });
-        
-        // Fetch cameras for this zone
-        // setCameras(await fetchZoneCameras(zoneId));
-        
-        setLoading(false);
-      } catch (err) {
-        console.error('Error loading zone:', err);
-        setError('Failed to load zone');
-        setLoading(false);
-      }
-    };
+  // Fetch zone details and cameras
+  const fetchZoneData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
+      const [zoneResponse, camerasResponse] = await Promise.all([
+        zoneAPI.getZoneById(zoneId),
+        cameraAPI.getAllCameras()
+      ]);
+
+      if (zoneResponse.success && zoneResponse.data) {
+        setZone(zoneResponse.data);
+      }
+
+      if (camerasResponse.success && camerasResponse.data) {
+        // Filter cameras for this zone
+        const zoneCameras = camerasResponse.data.filter(
+          cam => cam.Zone_id === parseInt(zoneId)
+        );
+        setCameras(zoneCameras);
+      }
+
+      setLoading(false);
+    } catch (err) {
+      console.error('Error loading zone:', err);
+      setError('Failed to load zone data');
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchZoneData();
   }, [zoneId]);
 
-  const handleAddCamera = () => {
-    const camera = {
-      id: Date.now(),
-      ...newCamera,
-      enabled: true
-    };
-    
-    setCameras([...cameras, camera]);
-    setShowAddCameraModal(false);
-    setNewCamera({
-      label: '',
-      type: 'Entry',
-      ipAddress: '',
-      port: '554',
-      username: '',
-      password: '',
-      streamPath: '/stream'
-    });
+  // Start camera streaming
+  const startCameraStream = async (camera) => {
+    try {
+      const response = await fetch('http://localhost:5001/cameras/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          camera_id: camera.Camara_Id,
+          camera_url: camera.Camera_URL,
+          camera_type: camera.Camera_Type,
+          zone_id: parseInt(zoneId)
+        })
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        console.log(`Camera ${camera.Camara_Id} started successfully`);
+      }
+    } catch (err) {
+      console.error(`Failed to start camera ${camera.Camara_Id}:`, err);
+    }
+  };
+
+  // Start all cameras in zone
+  const startAllCameras = async () => {
+    try {
+      const response = await fetch(`http://localhost:5001/zones/${zoneId}/start_all`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        console.log('All cameras started:', data);
+        setError(null);
+      }
+    } catch (err) {
+      console.error('Failed to start cameras:', err);
+      setError('Streaming service not available. Please start camera_streaming_service.py');
+    }
+  };
+
+  // Add new camera
+  const handleAddCamera = async () => {
+    if (!newCamera.Camera_URL.trim()) {
+      setError('Please enter a camera URL');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
+      const response = await cameraAPI.createCamera({
+        ...newCamera,
+        Zone_id: parseInt(zoneId)
+      });
+
+      if (response.success) {
+        setShowAddCameraModal(false);
+        setNewCamera({
+          Camera_URL: '',
+          Camera_Type: 'Entry',
+          Password: ''
+        });
+        await fetchZoneData();
+      }
+    } catch (err) {
+      console.error('Error adding camera:', err);
+      setError(err.response?.data?.message || 'Failed to add camera');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Edit camera
+  const handleEditCamera = async () => {
+    if (!editingCamera.Camera_URL.trim()) {
+      setError('Please enter a camera URL');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
+      const response = await cameraAPI.updateCamera(editingCamera.Camara_Id, {
+        Camera_URL: editingCamera.Camera_URL,
+        Camera_Type: editingCamera.Camera_Type,
+        Password: editingCamera.Password,
+        Zone_id: parseInt(zoneId)
+      });
+
+      if (response.success) {
+        setShowEditCameraModal(false);
+        setEditingCamera(null);
+        await fetchZoneData();
+      }
+    } catch (err) {
+      console.error('Error updating camera:', err);
+      setError(err.response?.data?.message || 'Failed to update camera');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Delete camera
+  const handleDeleteCamera = async (cameraId) => {
+    if (!window.confirm('Are you sure you want to delete this camera?')) {
+      return;
+    }
+
+    try {
+      setError(null);
+      const response = await cameraAPI.deleteCamera(cameraId);
+
+      if (response.success) {
+        await fetchZoneData();
+      }
+    } catch (err) {
+      console.error('Error deleting camera:', err);
+      setError(err.response?.data?.message || 'Failed to delete camera');
+    }
   };
 
   if (loading) {
@@ -91,7 +208,11 @@ const ZoneLive = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="space-y-6"
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
@@ -111,14 +232,46 @@ const ZoneLive = () => {
           </div>
         </div>
 
-        <button
-          onClick={() => setShowAddCameraModal(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-        >
-          <FiPlus size={18} />
-          <span>Add IP Camera</span>
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={startAllCameras}
+            className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+            title="Start camera streaming (requires Python service)"
+          >
+            <FiVideo size={18} />
+            <span>Start Cameras</span>
+          </button>
+          <button
+            onClick={fetchZoneData}
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            <FiRefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+            <span>Refresh</span>
+          </button>
+          <button
+            onClick={() => setShowAddCameraModal(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+          >
+            <FiPlus size={18} />
+            <span>Add Camera</span>
+          </button>
+        </div>
       </div>
+
+      {/* Error Alert */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded-lg p-4 flex items-start"
+          >
+            <FiAlertCircle className="text-red-500 mt-0.5 mr-3 flex-shrink-0" size={20} />
+            <p className="text-red-600 dark:text-red-400 font-medium">{error}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Camera Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -126,7 +279,7 @@ const ZoneLive = () => {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="col-span-full bg-white dark:bg-gray-800 rounded-lg p-12 text-center border-2 border-dashed border-gray-300 dark:border-gray-700"
+            className="col-span-full bg-white dark:bg-gray-800 rounded-xl p-12 text-center border-2 border-dashed border-gray-300 dark:border-gray-700"
           >
             <FiVideo size={48} className="mx-auto mb-4 text-gray-400" />
             <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">
@@ -144,19 +297,82 @@ const ZoneLive = () => {
           </motion.div>
         ) : (
           cameras.map((camera) => (
-            <div
-              key={camera.id}
-              className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow"
+            <motion.div
+              key={camera.Camara_Id}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-lg"
             >
-              <h3 className="text-lg font-bold mb-2">{camera.label}</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                {camera.type} Camera • {camera.ipAddress}:{camera.port}
-              </p>
-              {/* Camera feed would go here */}
-              <div className="aspect-video bg-gray-900 rounded-lg flex items-center justify-center">
-                <FiCamera size={48} className="text-gray-600" />
+              {/* Camera Header */}
+              <div className="flex items-start justify-between p-4 border-b dark:border-gray-700">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800 dark:text-white">
+                    Camera #{camera.Camara_Id}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
+                      camera.Camera_Type === 'Entry' 
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+                        : camera.Camera_Type === 'Exit'
+                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                    }`}>
+                      {camera.Camera_Type}
+                    </span>
+                    {camera.zone && (
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        • {camera.zone.Zone_Name}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingCamera(camera);
+                      setShowEditCameraModal(true);
+                    }}
+                    className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition"
+                  >
+                    <FiEdit2 size={18} />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteCamera(camera.Camara_Id)}
+                    className="p-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition"
+                  >
+                    <FiTrash2 size={18} />
+                  </button>
+                </div>
               </div>
-            </div>
+
+              {/* Live Video Stream */}
+              <div className="relative bg-black aspect-video">
+                <img
+                  src={`http://localhost:5001/stream/${camera.Camara_Id}`}
+                  alt={`Camera ${camera.Camara_Id}`}
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+                <div className="hidden absolute inset-0 flex-col items-center justify-center bg-gray-900 text-white">
+                  <FiVideo size={48} className="mb-4 opacity-50" />
+                  <p className="text-sm opacity-75">Camera Offline</p>
+                  <p className="text-xs opacity-50 mt-2">Check connection</p>
+                </div>
+              </div>
+
+              {/* Camera Info */}
+              {camera.Camera_URL && (
+                <div className="p-4 border-t dark:border-gray-700">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">RTSP URL</p>
+                  <p className="text-sm font-mono bg-gray-100 dark:bg-gray-900 rounded-lg p-2 truncate">
+                    {camera.Camera_URL}
+                  </p>
+                </div>
+              )}
+            </motion.div>
           ))
         )}
       </div>
@@ -185,7 +401,7 @@ const ZoneLive = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-            onClick={() => setShowAddCameraModal(false)}
+            onClick={() => !isSubmitting && setShowAddCameraModal(false)}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
@@ -195,121 +411,180 @@ const ZoneLive = () => {
               className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-2xl w-full shadow-2xl"
             >
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Add IP Camera</h2>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Add Camera</h2>
                 <button
-                  onClick={() => setShowAddCameraModal(false)}
+                  onClick={() => !isSubmitting && setShowAddCameraModal(false)}
                   className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                  disabled={isSubmitting}
                 >
                   <FiX size={20} />
                 </button>
               </div>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">Camera Label *</label>
-                    <input
-                      type="text"
-                      value={newCamera.label}
-                      onChange={(e) => setNewCamera({ ...newCamera, label: e.target.value })}
-                      placeholder="e.g., Main Entrance"
-                      className="w-full px-4 py-2 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">Camera Type</label>
-                    <select
-                      value={newCamera.type}
-                      onChange={(e) => setNewCamera({ ...newCamera, type: e.target.value })}
-                      className="w-full px-4 py-2 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-blue-500"
-                    >
-                      <option value="Entry">Entry</option>
-                      <option value="Exit">Exit</option>
-                    </select>
-                  </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                    Camera Type *
+                  </label>
+                  <select
+                    value={newCamera.Camera_Type}
+                    onChange={(e) => setNewCamera({ ...newCamera, Camera_Type: e.target.value })}
+                    className="w-full px-4 py-3 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="Entry">Entry</option>
+                    <option value="Exit">Exit</option>
+                    <option value="Both">Both</option>
+                  </select>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="col-span-2">
-                    <label className="block text-sm font-semibold mb-2">IP Address *</label>
-                    <input
-                      type="text"
-                      value={newCamera.ipAddress}
-                      onChange={(e) => setNewCamera({ ...newCamera, ipAddress: e.target.value })}
-                      placeholder="192.168.1.100"
-                      className="w-full px-4 py-2 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">Port</label>
-                    <input
-                      type="text"
-                      value={newCamera.port}
-                      onChange={(e) => setNewCamera({ ...newCamera, port: e.target.value })}
-                      placeholder="554"
-                      className="w-full px-4 py-2 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">Username</label>
-                    <input
-                      type="text"
-                      value={newCamera.username}
-                      onChange={(e) => setNewCamera({ ...newCamera, username: e.target.value })}
-                      placeholder="admin"
-                      className="w-full px-4 py-2 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">Password</label>
-                    <input
-                      type="password"
-                      value={newCamera.password}
-                      onChange={(e) => setNewCamera({ ...newCamera, password: e.target.value })}
-                      placeholder="••••••••"
-                      className="w-full px-4 py-2 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-blue-500"
-                    />
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                    RTSP URL *
+                  </label>
+                  <input
+                    type="text"
+                    value={newCamera.Camera_URL}
+                    onChange={(e) => setNewCamera({ ...newCamera, Camera_URL: e.target.value })}
+                    placeholder="rtsp://username:password@192.168.1.100/stream"
+                    className="w-full px-4 py-3 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-blue-500"
+                  />
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <strong>With port:</strong> rtsp://user:pass@IP:554/cam/realmonitor?channel=1
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <strong>Without port:</strong> rtsp://admin:password@192.168.10.4/cam/realmonitor?channel=1&subtype=0
+                    </p>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Stream Path</label>
+                  <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                    Password (Optional)
+                  </label>
                   <input
-                    type="text"
-                    value={newCamera.streamPath}
-                    onChange={(e) => setNewCamera({ ...newCamera, streamPath: e.target.value })}
-                    placeholder="/stream or /h264"
-                    className="w-full px-4 py-2 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-blue-500"
+                    type="password"
+                    value={newCamera.Password}
+                    onChange={(e) => setNewCamera({ ...newCamera, Password: e.target.value })}
+                    placeholder="Camera access password"
+                    className="w-full px-4 py-3 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-blue-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Full URL: rtsp://{newCamera.username}:{newCamera.password || '****'}@{newCamera.ipAddress || 'IP'}:{newCamera.port}{newCamera.streamPath}
-                  </p>
                 </div>
               </div>
 
               <div className="flex gap-3 mt-6">
                 <button
                   onClick={() => setShowAddCameraModal(false)}
-                  className="flex-1 px-4 py-3 rounded-lg font-bold border-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                  disabled={isSubmitting}
+                  className="flex-1 px-4 py-3 rounded-lg font-bold border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddCamera}
-                  disabled={!newCamera.label.trim() || !newCamera.ipAddress.trim()}
+                  disabled={!newCamera.Camera_URL.trim() || isSubmitting}
                   className="flex-1 px-4 py-3 rounded-lg font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
-                  Add Camera
+                  {isSubmitting ? 'Adding...' : 'Add Camera'}
                 </button>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+
+      {/* Edit Camera Modal */}
+      <AnimatePresence>
+        {showEditCameraModal && editingCamera && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => !isSubmitting && setShowEditCameraModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-2xl w-full shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Edit Camera</h2>
+                <button
+                  onClick={() => !isSubmitting && setShowEditCameraModal(false)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                  disabled={isSubmitting}
+                >
+                  <FiX size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                    Camera Type *
+                  </label>
+                  <select
+                    value={editingCamera.Camera_Type}
+                    onChange={(e) => setEditingCamera({ ...editingCamera, Camera_Type: e.target.value })}
+                    className="w-full px-4 py-3 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="Entry">Entry</option>
+                    <option value="Exit">Exit</option>
+                    <option value="Both">Both</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                    RTSP URL *
+                  </label>
+                  <input
+                    type="text"
+                    value={editingCamera.Camera_URL || ''}
+                    onChange={(e) => setEditingCamera({ ...editingCamera, Camera_URL: e.target.value })}
+                    placeholder="rtsp://username:password@192.168.1.100/stream"
+                    className="w-full px-4 py-3 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                    Password (Optional)
+                  </label>
+                  <input
+                    type="password"
+                    value={editingCamera.Password || ''}
+                    onChange={(e) => setEditingCamera({ ...editingCamera, Password: e.target.value })}
+                    placeholder="Camera access password"
+                    className="w-full px-4 py-3 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowEditCameraModal(false)}
+                  disabled={isSubmitting}
+                  className="flex-1 px-4 py-3 rounded-lg font-bold border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEditCamera}
+                  disabled={!editingCamera.Camera_URL.trim() || isSubmitting}
+                  className="flex-1 px-4 py-3 rounded-lg font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  {isSubmitting ? 'Updating...' : 'Update Camera'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 };
 

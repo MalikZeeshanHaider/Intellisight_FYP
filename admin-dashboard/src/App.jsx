@@ -20,6 +20,7 @@ import Zones from './pages/Zones';
 import ZoneDetail from './pages/ZoneDetail';
 import Zone1 from './pages/Zone1';
 import ZoneLive from './pages/ZoneLive';
+import Cameras from './pages/Cameras';
 import UnknownFaces from './pages/UnknownFaces';
 import Logs from './pages/Logs';
 import Settings from './pages/Settings';
@@ -126,6 +127,19 @@ function App() {
                   <Layout>
                     <ErrorBoundary>
                       <ZoneDetail />
+                    </ErrorBoundary>
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/cameras"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ErrorBoundary>
+                      <Cameras />
                     </ErrorBoundary>
                   </Layout>
                 </ProtectedRoute>

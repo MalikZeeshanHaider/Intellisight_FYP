@@ -193,6 +193,40 @@ export const teacherAPI = {
   },
 };
 
+// ============== CAMERA APIs ==============
+
+export const cameraAPI = {
+  // Get all cameras
+  getAllCameras: async () => {
+    const response = await api.get('/cameras');
+    return response.data;
+  },
+
+  // Get camera by ID
+  getCameraById: async (cameraId) => {
+    const response = await api.get(`/cameras/${cameraId}`);
+    return response.data;
+  },
+
+  // Create camera
+  createCamera: async (cameraData) => {
+    const response = await api.post('/cameras', cameraData);
+    return response.data;
+  },
+
+  // Update camera
+  updateCamera: async (cameraId, cameraData) => {
+    const response = await api.put(`/cameras/${cameraId}`, cameraData);
+    return response.data;
+  },
+
+  // Delete camera
+  deleteCamera: async (cameraId) => {
+    const response = await api.delete(`/cameras/${cameraId}`);
+    return response.data;
+  },
+};
+
 // ============== STATISTICS APIs ==============
 
 export const statsAPI = {

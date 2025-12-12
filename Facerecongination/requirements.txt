@@ -18,7 +18,9 @@ retina-face>=0.0.14
 psycopg2-binary>=2.9.0
 python-dotenv>=0.19.0
 
-# HTTP/API (if needed)
+# HTTP/API (for streaming service)
+Flask>=2.3.0
+Flask-Cors>=4.0.0
 requests>=2.27.1
 
 # Utilities

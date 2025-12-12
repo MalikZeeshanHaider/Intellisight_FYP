@@ -18,12 +18,6 @@ export const getAllCameras = asyncHandler(async (req, res) => {
           Zone_Name: true,
         },
       },
-      _count: {
-        select: {
-          Teacher: true,
-          Students: true,
-        },
-      },
     },
     orderBy: { Camara_Id: 'asc' },
   });
@@ -40,26 +34,12 @@ export const getCameraById = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   const camera = await prisma.camara.findUnique({
-    where: { Camara_Id: id },
+    where: { Camara_Id: parseInt(id) },
     include: {
       zone: {
         select: {
           Zone_id: true,
           Zone_Name: true,
-        },
-      },
-      Teacher: {
-        select: {
-          Teacher_ID: true,
-          Name: true,
-          Email: true,
-        },
-      },
-      Students: {
-        select: {
-          Student_ID: true,
-          Name: true,
-          Email: true,
         },
       },
     },
@@ -78,12 +58,14 @@ export const getCameraById = asyncHandler(async (req, res) => {
  * @access  Private
  */
 export const createCamera = asyncHandler(async (req, res) => {
-  const { Password, Zone_id } = req.body;
+  const { Password, Zone_id, Camera_URL, Camera_Type } = req.body;
 
   const camera = await prisma.camara.create({
     data: {
       Password,
       Zone_id,
+      Camera_URL,
+      Camera_Type: Camera_Type || 'Entry',
     },
     include: {
       zone: {
@@ -110,11 +92,11 @@ export const createCamera = asyncHandler(async (req, res) => {
  */
 export const updateCamera = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { Password, Zone_id } = req.body;
+  const { Password, Zone_id, Camera_URL, Camera_Type } = req.body;
 
   // Check if camera exists
   const existingCamera = await prisma.camara.findUnique({
-    where: { Camara_Id: id },
+    where: { Camara_Id: parseInt(id) },
   });
 
   if (!existingCamera) {
@@ -124,9 +106,11 @@ export const updateCamera = asyncHandler(async (req, res) => {
   const updateData = {};
   if (Password !== undefined) updateData.Password = Password;
   if (Zone_id !== undefined) updateData.Zone_id = Zone_id;
+  if (Camera_URL !== undefined) updateData.Camera_URL = Camera_URL;
+  if (Camera_Type !== undefined) updateData.Camera_Type = Camera_Type;
 
   const camera = await prisma.camara.update({
-    where: { Camara_Id: id },
+    where: { Camara_Id: parseInt(id) },
     data: updateData,
     include: {
       zone: {
@@ -151,7 +135,7 @@ export const deleteCamera = asyncHandler(async (req, res) => {
 
   // Check if camera exists
   const existingCamera = await prisma.camara.findUnique({
-    where: { Camara_Id: id },
+    where: { Camara_Id: parseInt(id) },
   });
 
   if (!existingCamera) {
@@ -159,7 +143,7 @@ export const deleteCamera = asyncHandler(async (req, res) => {
   }
 
   await prisma.camara.delete({
-    where: { Camara_Id: id },
+    where: { Camara_Id: parseInt(id) },
   });
 
   successResponse(
