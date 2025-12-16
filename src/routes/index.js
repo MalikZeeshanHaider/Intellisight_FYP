@@ -16,7 +16,7 @@ const router = express.Router();
 router.use('/health', healthRoutes);
 
 // Mount all routes
-router.use('/admin', authRoutes);
+router.use('/auth', authRoutes); // Changed from /admin to /auth
 router.use('/zones/1', zone1Routes); // Zone 1 live tracking - must be before generic /zones
 router.use('/zones', zoneRoutes);
 router.use('/cameras', cameraRoutes);

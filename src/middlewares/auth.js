@@ -24,7 +24,27 @@ export const authenticateToken = async (req, res, next) => {
       adminId: decoded.adminId,
       email: decoded.email,
       role: decoded.role,
+      isSuperAdmin: decoded.isSuperAdmin || false
     };
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Middleware to check if user is super admin
+ */
+export const requireSuperAdmin = (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw new UnauthorizedError(ERROR_MESSAGES.UNAUTHORIZED);
+    }
+
+    if (!req.user.isSuperAdmin || req.user.role !== 'SuperAdmin') {
+      throw new UnauthorizedError('Super admin access required');
+    }
 
     next();
   } catch (error) {

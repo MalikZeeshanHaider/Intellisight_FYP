@@ -17,11 +17,17 @@ const FACE_RECOGNITION_PATH = path.join(__dirname, '../../Facerecongination');
 const RECOGNITION_SCRIPT = path.join(FACE_RECOGNITION_PATH, 'recognition_live.py');
 const TRAIN_SCRIPT = path.join(FACE_RECOGNITION_PATH, 'train_incremental.py');
 
-// Python executable - try venv first, then system python
+// Python executable - try Facerecongination venv first, then root venv, then system python
+const FACE_VENV_PYTHON_WIN = path.join(FACE_RECOGNITION_PATH, 'venv/Scripts/python.exe');
+const FACE_VENV_PYTHON_UNIX = path.join(FACE_RECOGNITION_PATH, 'venv/bin/python');
 const VENV_PYTHON_WIN = path.join(__dirname, '../../.venv/Scripts/python.exe');
 const VENV_PYTHON_UNIX = path.join(__dirname, '../../.venv/bin/python');
 
 const getPythonExe = () => {
+  // Prioritize Facerecongination venv (has all dependencies)
+  if (existsSync(FACE_VENV_PYTHON_WIN)) return FACE_VENV_PYTHON_WIN;
+  if (existsSync(FACE_VENV_PYTHON_UNIX)) return FACE_VENV_PYTHON_UNIX;
+  // Fallback to root venv
   if (existsSync(VENV_PYTHON_WIN)) return VENV_PYTHON_WIN;
   if (existsSync(VENV_PYTHON_UNIX)) return VENV_PYTHON_UNIX;
   return 'python';

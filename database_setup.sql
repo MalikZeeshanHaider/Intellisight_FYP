@@ -376,3 +376,18 @@ ORDER BY tc.table_name;
 -- =====================================================
 -- END OF SQL SCRIPT
 -- =====================================================
+/*
+select * from "ActivePresence";
+select * from "Admin";
+select * from "AttendanceLog";
+select * from "Camara";
+select * from "FaceEmbeddings";
+select * from "Logs";
+select * from "ProcessedFaceImages";
+select * from "Students";
+select * from "Teacher";
+select * from "ActivePresence";
+select * from "UnknownFaces";
+select * from "Zone";
+select * from "_prisma_migrations";
+*/

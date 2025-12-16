@@ -5,7 +5,6 @@
 
 import React from 'react';
 import { FiAlertTriangle, FiRefreshCw, FiHome } from 'react-icons/fi';
-import { Link } from 'react-router-dom';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -34,6 +33,10 @@ class ErrorBoundary extends React.Component {
 
   handleReload = () => {
     window.location.reload();
+  };
+
+  handleGoHome = () => {
+    window.location.href = '/';
   };
 
   handleReset = () => {
@@ -96,13 +99,13 @@ class ErrorBoundary extends React.Component {
                 <span>Reload Page</span>
               </button>
               
-              <Link
-                to="/"
+              <button
+                onClick={this.handleGoHome}
                 className="flex-1 flex items-center justify-center space-x-2 px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition font-medium shadow-md hover:shadow-lg"
               >
                 <FiHome size={18} />
                 <span>Go to Dashboard</span>
-              </Link>
+              </button>
             </div>
 
             {/* Help Text */}

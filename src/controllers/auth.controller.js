@@ -1,29 +1,192 @@
 import asyncHandler from 'express-async-handler';
-import { registerAdmin, loginAdmin } from '../services/auth.service.js';
+import {
+  registerUser,
+  registerAdmin,
+  loginAdmin,
+  verifyUserRegistration,
+  forgotPassword,
+  resetPassword,
+  getPendingUsers,
+  getAdminStatistics,
+  getAllAdmins,
+  approvePendingUser,
+  rejectPendingUser,
+  deleteAdminUser,
+  addUserByAdmin
+} from '../services/auth.service.js';
 import { successResponse } from '../utils/response.js';
-import { HTTP_STATUS, SUCCESS_MESSAGES } from '../config/constants.js';
 
 /**
+ * @desc    Register new user (requires admin approval)
  * @route   POST /api/auth/register
- * @desc    Register new admin
  * @access  Public
  */
 export const register = asyncHandler(async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password } = req.body;
 
-  const result = await registerAdmin({ name, email, password, role });
+  const result = await registerUser({ name, email, password });
 
-  successResponse(
-    res,
-    result,
-    SUCCESS_MESSAGES.REGISTER_SUCCESS,
-    HTTP_STATUS.CREATED
-  );
+  return successResponse(res, result, 'Registration request submitted successfully');
 });
 
 /**
+ * @desc    Register new admin (direct registration for admins)
+ * @route   POST /api/auth/register-admin
+ * @access  Private/Admin
+ */
+export const registerAdminDirect = asyncHandler(async (req, res) => {
+  const { name, email, password, role } = req.body;
+
+  const result = await registerAdmin({ name, email, password, role: role || 'Admin' });
+
+  return successResponse(res, result, 'Admin registered successfully', 201);
+});
+
+/**
+ * @desc    Verify user registration (approve/reject)
+ * @route   GET /api/auth/verify-user/:token/:action
+ * @access  Public (link from email)
+ */
+export const verifyUser = asyncHandler(async (req, res) => {
+  const { token, action } = req.params;
+
+  const result = await verifyUserRegistration(token, action);
+
+  // Send HTML response for email link clicks
+  const htmlResponse = action === 'approve' 
+    ? `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>User Approved - IntelliSight</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+          }
+          .container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            text-align: center;
+            max-width: 500px;
+          }
+          .success-icon {
+            font-size: 60px;
+            color: #28a745;
+            margin-bottom: 20px;
+          }
+          h1 {
+            color: #333;
+            margin: 0 0 20px 0;
+          }
+          p {
+            color: #666;
+            line-height: 1.6;
+            margin: 15px 0;
+          }
+          .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-top: 20px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="success-icon">✓</div>
+          <h1>User Approved Successfully!</h1>
+          <p>The user has been approved and can now log in to IntelliSight.</p>
+          <p>An approval email has been sent to the user.</p>
+          <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard" class="btn">Back to Dashboard</a>
+        </div>
+      </body>
+      </html>
+    `
+    : `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>User Rejected - IntelliSight</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+          }
+          .container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            text-align: center;
+            max-width: 500px;
+          }
+          .warning-icon {
+            font-size: 60px;
+            color: #dc3545;
+            margin-bottom: 20px;
+          }
+          h1 {
+            color: #333;
+            margin: 0 0 20px 0;
+          }
+          p {
+            color: #666;
+            line-height: 1.6;
+            margin: 15px 0;
+          }
+          .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-top: 20px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="warning-icon">✗</div>
+          <h1>User Registration Rejected</h1>
+          <p>The user registration request has been rejected.</p>
+          <p>A rejection email has been sent to the user.</p>
+          <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard" class="btn">Back to Dashboard</a>
+        </div>
+      </body>
+      </html>
+    `;
+
+  res.status(200).send(htmlResponse);
+});
+
+/**
+ * @desc    Login user/admin
  * @route   POST /api/auth/login
- * @desc    Login admin
  * @access  Public
  */
 export const login = asyncHandler(async (req, res) => {
@@ -31,19 +194,129 @@ export const login = asyncHandler(async (req, res) => {
 
   const result = await loginAdmin({ email, password });
 
-  // Custom response format as per requirements
-  res.status(HTTP_STATUS.OK).json({
-    message: SUCCESS_MESSAGES.LOGIN_SUCCESS,
-    token: result.token,
-    admin: result.admin,
-  });
+  return successResponse(res, result, 'Login successful');
 });
 
 /**
- * @route   GET /api/auth/me
- * @desc    Get current admin info
+ * @desc    Logout user
+ * @route   POST /api/auth/logout
  * @access  Private
  */
-export const getCurrentAdmin = asyncHandler(async (req, res) => {
-  successResponse(res, { admin: req.user }, 'Admin info retrieved');
+export const logout = asyncHandler(async (req, res) => {
+  // For JWT-based auth, logout is handled on client side
+  // This endpoint can be used for cleanup if needed
+  return successResponse(res, {}, 'Logged out successfully');
+});
+
+/**
+ * @desc    Forgot password - send reset link
+ * @route   POST /api/auth/forgot-password
+ * @access  Public
+ */
+export const forgotPasswordHandler = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  const result = await forgotPassword(email);
+
+  return successResponse(res, result, 'Password reset link sent');
+});
+
+/**
+ * @desc    Reset password
+ * @route   POST /api/auth/reset-password/:token
+ * @access  Public
+ */
+export const resetPasswordHandler = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+  const { password } = req.body;
+
+  const result = await resetPassword(token, password);
+
+  return successResponse(res, result, 'Password reset successful');
+});
+
+/**
+ * @desc    Get all pending users
+ * @route   GET /api/auth/pending-users
+ * @access  Private/Admin
+ */
+export const getPendingUsersHandler = asyncHandler(async (req, res) => {
+  const pendingUsers = await getPendingUsers();
+
+  return successResponse(res, { users: pendingUsers, count: pendingUsers.length }, 'Pending users retrieved successfully');
+});
+
+/**
+ * @desc    Get current user
+ * @route   GET /api/auth/me
+ * @access  Private
+ */
+export const getCurrentUser = asyncHandler(async (req, res) => {
+  // User is added to req by auth middleware
+  return successResponse(res, { user: req.user }, 'User retrieved successfully');
+});
+
+/**
+ * @desc    Get admin statistics (Super Admin only)
+ * @route   GET /api/auth/admin/statistics
+ * @access  Private/SuperAdmin
+ */
+export const getStatistics = asyncHandler(async (req, res) => {
+  const statistics = await getAdminStatistics();
+  return successResponse(res, statistics, 'Statistics retrieved successfully');
+});
+
+/**
+ * @desc    Get all admins (Super Admin only)
+ * @route   GET /api/auth/admin/all
+ * @access  Private/SuperAdmin
+ */
+export const getAllAdminsHandler = asyncHandler(async (req, res) => {
+  const admins = await getAllAdmins();
+  return successResponse(res, { admins, count: admins.length }, 'Admins retrieved successfully');
+});
+
+/**
+ * @desc    Approve pending user (Super Admin only)
+ * @route   POST /api/auth/admin/approve/:userId
+ * @access  Private/SuperAdmin
+ */
+export const approveUser = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const result = await approvePendingUser(userId);
+  return successResponse(res, result, 'User approved successfully');
+});
+
+/**
+ * @desc    Reject pending user (Super Admin only)
+ * @route   POST /api/auth/admin/reject/:userId
+ * @access  Private/SuperAdmin
+ */
+export const rejectUser = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const { reason } = req.body;
+  const result = await rejectPendingUser(userId, reason);
+  return successResponse(res, result, 'User rejected successfully');
+});
+
+/**
+ * @desc    Delete admin user (Super Admin only)
+ * @route   DELETE /api/auth/admin/:adminId
+ * @access  Private/SuperAdmin
+ */
+export const deleteAdmin = asyncHandler(async (req, res) => {
+  const { adminId } = req.params;
+  const result = await deleteAdminUser(adminId);
+  return successResponse(res, result, 'Admin deleted successfully');
+});
+
+/**
+ * @desc    Add user directly (Super Admin only)
+ * @route   POST /api/auth/admin/add-user
+ * @access  Private/SuperAdmin
+ */
+export const addUser = asyncHandler(async (req, res) => {
+  const { name, email } = req.body;
+  const result = await addUserByAdmin({ name, email });
+  return successResponse(res, result, 'User added successfully', 201);
 });

@@ -12,19 +12,25 @@ export const AuthProvider = ({ children }) => {
     const storedUser = localStorage.getItem('user');
     const storedToken = localStorage.getItem('token');
 
-    if (storedUser && storedToken) {
-      setUser(JSON.parse(storedUser));
-      setToken(storedToken);
+    if (storedUser && storedToken && storedUser !== 'undefined' && storedToken !== 'undefined') {
+      try {
+        setUser(JSON.parse(storedUser));
+        setToken(storedToken);
+      } catch (error) {
+        console.error('Error parsing stored user data:', error);
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+      }
     }
     setLoading(false);
   }, []);
 
   const login = async (email, password) => {
     try {
-      const data = await authAPI.login(email, password);
+      const response = await authAPI.login(email, password);
 
-      // data structure: { message, token, admin }
-      const { token, admin } = data;
+      // Response structure: { success, data: { token, admin }, message }
+      const { token, admin } = response.data;
 
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(admin));

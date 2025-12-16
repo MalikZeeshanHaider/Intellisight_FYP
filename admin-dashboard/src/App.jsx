@@ -13,7 +13,10 @@ import Layout from './components/Layout';
 // Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import Students from './pages/Students';
 import Teachers from './pages/Teachers';
 import Zones from './pages/Zones';
@@ -40,8 +43,21 @@ function App() {
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
 
             {/* Protected Routes */}
+            <Route
+              path="/super-admin"
+              element={
+                <ProtectedRoute>
+                  <ErrorBoundary>
+                    <SuperAdminDashboard />
+                  </ErrorBoundary>
+                </ProtectedRoute>
+              }
+            />
+
             <Route
               path="/dashboard"
               element={

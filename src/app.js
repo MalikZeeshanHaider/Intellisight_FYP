@@ -35,13 +35,13 @@ app.get('/health', async (req, res) => {
   
   try {
     await prisma.$queryRaw`SELECT 1`;
-    successResponse(res, {
+    return successResponse(res, {
       status: 'ok',
       timestamp: new Date().toISOString(),
       database: 'connected',
     });
   } catch (error) {
-    successResponse(res, {
+    return successResponse(res, {
       status: 'degraded',
       timestamp: new Date().toISOString(),
       database: 'disconnected',
