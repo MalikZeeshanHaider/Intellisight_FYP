@@ -19,6 +19,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import { prisma } from '../config/database.js';
+import { runTraining } from './pythonService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -97,9 +98,37 @@ export const saveImageToTrainFolder = async (base64Image, personType, personId, 
  * @param {number} personId - Person's database ID
  * @param {string} personName - Person's name
  * @param {object} facePictures - Object containing Face_Picture_1 to Face_Picture_5
+ * @param {boolean} isUpdate - If true, clears old images/embeddings first
  * @returns {Promise<string[]>} - Array of saved image paths
  */
-export const savePersonImages = async (personType, personId, personName, facePictures) => {
+export const savePersonImages = async (personType, personId, personName, facePictures, isUpdate = false) => {
+  const safeName = personName 
+    ? personName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50)
+    : `${personType}_${personId}`;
+  
+  // If updating, delete old images and embeddings first
+  if (isUpdate) {
+    console.log(`[IMAGE SERVICE] Updating images for ${personName}, clearing old data...`);
+    
+    // Delete old image folder
+    const folderPath = path.join(IMAGES_FOLDER, safeName);
+    if (existsSync(folderPath)) {
+      try {
+        await fs.rm(folderPath, { recursive: true, force: true });
+        console.log(`[IMAGE SERVICE] Cleared old images folder: ${folderPath}`);
+      } catch (err) {
+        console.warn(`[IMAGE SERVICE] Failed to clear old images: ${err.message}`);
+      }
+    }
+    
+    // Delete old embeddings from database
+    try {
+      await deletePersonEmbeddings(personType, personId);
+    } catch (err) {
+      console.warn(`[IMAGE SERVICE] Failed to clear old embeddings: ${err.message}`);
+    }
+  }
+  
   const savedPaths = [];
 
   for (let i = 1; i <= 5; i++) {
@@ -131,16 +160,46 @@ export const savePersonImages = async (personType, personId, personName, facePic
     }
   }
   
-  // Auto-trigger incremental training after saving images
+  // Auto-trigger training after saving images
   if (savedPaths.length > 0) {
-    // Get the person's folder name for targeted training
-    const safeName = personName 
-      ? personName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50)
-      : `${personType}_${personId}`;
     triggerAutoTraining(safeName, personType, personId);
   }
   
   return savedPaths;
+};
+
+/**
+ * Delete embeddings for a person from the database
+ * @param {string} personType - 'student' or 'teacher'
+ * @param {number} personId - Person's database ID
+ */
+export const deletePersonEmbeddings = async (personType, personId) => {
+  try {
+    // Delete from FaceEmbeddings table
+    const deleteCount = await prisma.faceEmbeddings.deleteMany({
+      where: personType === 'student'
+        ? { Student_ID: personId }
+        : { Teacher_ID: personId }
+    });
+    
+    // Clear Face_Embeddings field in Students/Teacher table
+    if (personType === 'student') {
+      await prisma.students.update({
+        where: { Student_ID: personId },
+        data: { Face_Embeddings: null }
+      });
+    } else {
+      await prisma.teacher.update({
+        where: { Teacher_ID: personId },
+        data: { Face_Embeddings: null }
+      });
+    }
+    
+    console.log(`[DB] Deleted ${deleteCount.count} embeddings for ${personType} ${personId}`);
+  } catch (error) {
+    console.error(`[DB ERROR] Failed to delete embeddings: ${error.message}`);
+    throw error;
+  }
 };
 
 /**
@@ -245,59 +304,28 @@ export const saveEmbeddingsToDb = async (personType, personId, embeddings) => {
  * @param {string} personType - 'student' or 'teacher' (optional)
  * @param {number} personId - Person's database ID (optional)
  */
-export const triggerAutoTraining = (personName = null, personType = null, personId = null) => {
-  console.log(`[AUTO-TRAIN] Starting incremental training for: ${personName || 'all'}`);
+export const triggerAutoTraining = async (personName = null, personType = null, personId = null) => {
+  console.log(`[AUTO-TRAIN] Starting training for: ${personName || 'all'}`);
   
-  const trainScript = path.join(FACE_RECOGNITION_PATH, 'train_incremental.py');
-  
-  if (!existsSync(trainScript)) {
-    console.error(`[AUTO-TRAIN ERROR] train_incremental.py not found at: ${trainScript}`);
-    return;
-  }
-
-  // Use venv Python if available, otherwise system Python
-  const pythonExe = existsSync(VENV_PYTHON) ? VENV_PYTHON : 'python';
-  console.log(`[AUTO-TRAIN] Using Python: ${pythonExe}`);
-
-  // Run training script in background
-  const pythonProcess = spawn(pythonExe, [trainScript], {
-    cwd: FACE_RECOGNITION_PATH,
-    detached: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
-  });
-
-  pythonProcess.stdout.on('data', (data) => {
-    console.log(`[TRAIN] ${data.toString().trim()}`);
-  });
-
-  pythonProcess.stderr.on('data', (data) => {
-    console.error(`[TRAIN ERROR] ${data.toString().trim()}`);
-  });
-
-  pythonProcess.on('close', async (code) => {
-    if (code === 0) {
-      console.log('[AUTO-TRAIN] [OK] Training completed successfully!');
-      
-      // Save embeddings to database if personType and personId are provided
-      if (personType && personId && personName) {
-        try {
-          await saveEmbeddingsFromFileToDb(personName, personType, personId);
-        } catch (err) {
-          console.warn(`[AUTO-TRAIN] Failed to save embeddings to DB: ${err.message}`);
-        }
+  try {
+    // Use the centralized Python service for training
+    const result = await runTraining(personName);
+    console.log('[AUTO-TRAIN] Training completed successfully');
+    
+    // After training, save embeddings to database if person info provided
+    if (personType && personId && personName) {
+      try {
+        await saveEmbeddingsFromFileToDb(personName, personType, personId);
+      } catch (err) {
+        console.warn(`[AUTO-TRAIN] Failed to save embeddings to DB: ${err.message}`);
       }
-    } else {
-      console.error(`[AUTO-TRAIN] Training exited with code ${code}`);
     }
-  });
-
-  pythonProcess.on('error', (err) => {
-    console.error(`[AUTO-TRAIN ERROR] Failed to start training: ${err.message}`);
-  });
-
-  // Unref to allow the main process to exit independently
-  pythonProcess.unref();
+    
+    return result;
+  } catch (err) {
+    console.error(`[AUTO-TRAIN ERROR] ${err.message}`);
+    throw err;
+  }
 };
 
 /**
@@ -317,28 +345,30 @@ const saveEmbeddingsFromFileToDb = async (personName, personType, personId) => {
   try {
     const embeddingsData = JSON.parse(await fs.readFile(embeddingsFile, 'utf-8'));
     
-    // Find embeddings for this person
+    // Find embeddings for this person - check both 'person' and folder name in path
     const personEmbeddings = embeddingsData.filter(item => {
-      const imagePath = item.identity || item.image_path || '';
-      return imagePath.includes(personName);
+      const itemPerson = item.person || '';
+      const imagePath = item.image_path || item.identity || '';
+      return itemPerson.toLowerCase() === personName.toLowerCase() || 
+             imagePath.toLowerCase().includes(personName.toLowerCase());
     });
     
     if (personEmbeddings.length > 0) {
       // Delete existing embeddings for this person
       await prisma.faceEmbeddings.deleteMany({
         where: personType === 'student'
-          ? { Student_ID: personId, PersonType: 'STUDENT' }
-          : { Teacher_ID: personId, PersonType: 'TEACHER' }
+          ? { Student_ID: personId, PersonType: 'Student' }
+          : { Teacher_ID: personId, PersonType: 'Teacher' }
       });
       
       // Save each embedding to FaceEmbeddings table
       for (const item of personEmbeddings) {
-        const embedding = item.embedding || item.representation || [];
-        const imagePath = item.identity || item.image_path || '';
+        const embedding = item.embedding || [];
+        const imagePath = item.image_path || '';
         
         await prisma.faceEmbeddings.create({
           data: {
-            PersonType: personType.toUpperCase(),
+            PersonType: personType === 'student' ? 'Student' : 'Teacher',
             Student_ID: personType === 'student' ? personId : null,
             Teacher_ID: personType === 'teacher' ? personId : null,
             PersonName: personName,
@@ -350,7 +380,7 @@ const saveEmbeddingsFromFileToDb = async (personName, personType, personId) => {
       }
       
       // Also update the Face_Embeddings field in Students/Teacher table (aggregated)
-      const allEmbeddings = personEmbeddings.map(item => item.embedding || item.representation || []);
+      const allEmbeddings = personEmbeddings.map(item => item.embedding || []);
       await saveEmbeddingsToDb(personType, personId, allEmbeddings);
       
       console.log(`[EMBEDDINGS] Saved ${personEmbeddings.length} embeddings to FaceEmbeddings table for ${personName}`);

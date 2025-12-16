@@ -45,7 +45,42 @@ class DatabaseHandler:
         """
         persons = {}
         
-        # Try to load from JSON embeddings file first (DeepFace format)
+        # PRIMARY: Load from FaceEmbeddings table in database
+        try:
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT "Embedding_ID", "PersonType", "Student_ID", "Teacher_ID", 
+                           "PersonName", "ImagePath", "EmbeddingJson"
+                    FROM "FaceEmbeddings"
+                    WHERE "EmbeddingJson" IS NOT NULL
+                """)
+                rows = cur.fetchall()
+                
+                if rows:
+                    for row in rows:
+                        try:
+                            person_name = row['PersonName'] or 'Unknown'
+                            person_key = person_name.lower()
+                            embedding = json.loads(row['EmbeddingJson']) if row['EmbeddingJson'] else None
+                            
+                            if embedding:
+                                if person_key not in persons:
+                                    persons[person_key] = {
+                                        'id': row['Student_ID'] or row['Teacher_ID'],
+                                        'name': person_name,
+                                        'type': row['PersonType'],
+                                        'embeddings': []
+                                    }
+                                persons[person_key]['embeddings'].append(embedding)
+                        except Exception as e:
+                            print(f"[DB ERROR] Failed to parse embedding: {e}")
+                    
+                    print(f"[DB] Loaded {len(persons)} persons from FaceEmbeddings table")
+                    return persons
+        except Exception as e:
+            print(f"[DB WARNING] Error loading from FaceEmbeddings table: {e}")
+        
+        # FALLBACK 1: Try to load from JSON embeddings file (DeepFace format)
         try:
             with open(EMBEDDINGS_FILE, 'r') as f:
                 embeddings_data = json.load(f)
@@ -61,7 +96,7 @@ class DatabaseHandler:
                 print(f"[DB] Loaded {len(persons)} persons from embeddings file")
                 return persons
         except FileNotFoundError:
-            print("[DB] No embeddings file found, loading from database")
+            print("[DB] No embeddings file found, trying legacy database format")
         except Exception as e:
             print(f"[DB WARNING] Error loading embeddings file: {e}")
 

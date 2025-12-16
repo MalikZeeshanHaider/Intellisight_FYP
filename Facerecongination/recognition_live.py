@@ -98,17 +98,43 @@ class DualCameraRecognizer:
             return camera_url
 
     def load_embeddings(self):
-        """Load embeddings from JSON file"""
+        """Load embeddings from database (FaceEmbeddings table) with JSON file fallback"""
+        # First try to load from database
+        db_persons = self.db_handler.fetch_all_persons()
+        
+        if db_persons:
+            # Convert database format to expected format for recognition
+            embeddings_data = []
+            for person_key, person_data in db_persons.items():
+                for embedding in person_data.get('embeddings', []):
+                    embeddings_data.append({
+                        'person': person_data['name'],
+                        'embedding': embedding,
+                        'type': person_data.get('type', 'Unknown'),
+                        'id': person_data.get('id')
+                    })
+            
+            if embeddings_data:
+                persons = set([d['person'] for d in embeddings_data])
+                print(f"[EMBEDDINGS] Loaded {len(embeddings_data)} embeddings from DB for: {', '.join(persons)}")
+                return embeddings_data
+        
+        # Fallback to JSON file
         embeddings_data = load_embeddings_from_json(EMBEDDINGS_FILE)
         
         if not embeddings_data:
-            print(f"[WARNING] No embeddings found in {EMBEDDINGS_FILE}")
-            print("[WARNING] Run 'python train.py' or 'python enrollment.py --train' first!")
+            print(f"[WARNING] No embeddings found in database or {EMBEDDINGS_FILE}")
+            print("[WARNING] Run 'python train.py' or add persons through the UI first!")
             return []
         
         persons = set([d['person'] for d in embeddings_data])
-        print(f"[EMBEDDINGS] Loaded {len(embeddings_data)} embeddings for: {', '.join(persons)}")
+        print(f"[EMBEDDINGS] Loaded {len(embeddings_data)} embeddings from file for: {', '.join(persons)}")
         return embeddings_data
+    
+    def reload_embeddings(self):
+        """Reload embeddings from database (call when embeddings are updated)"""
+        self.embeddings_data = self.load_embeddings()
+        print(f"[EMBEDDINGS] Reloaded {len(self.embeddings_data)} embeddings")
 
     def recognize_face(self, face_crop):
         """

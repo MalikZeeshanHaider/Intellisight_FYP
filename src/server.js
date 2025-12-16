@@ -3,6 +3,7 @@ import app from './app.js';
 import { testConnection, disconnect } from './config/database.js';
 import logger from './utils/logger.js';
 import imagePreprocessingService from './services/imagePreprocessing.service.js';
+import { initializePythonServices, stopAllProcesses } from './services/pythonService.js';
 
 // Load environment variables
 dotenv.config();
@@ -21,6 +22,15 @@ try {
   logger.warn('⚠️ Image preprocessing failed, system will use original images:', error.message);
 }
 
+// Initialize Python face recognition services
+logger.info('🐍 Initializing Python face recognition...');
+try {
+  const pythonResult = await initializePythonServices();
+  logger.info(`✅ ${pythonResult.message}`);
+} catch (error) {
+  logger.warn('⚠️ Python services initialization failed:', error.message);
+}
+
 // Start server
 const server = app.listen(PORT, () => {
   logger.info(`🚀 Server running on port ${PORT}`);
@@ -32,6 +42,9 @@ const server = app.listen(PORT, () => {
 // Graceful shutdown
 const gracefulShutdown = async (signal) => {
   logger.info(`\n${signal} received. Closing server gracefully...`);
+
+  // Stop all Python processes
+  stopAllProcesses();
 
   server.close(async () => {
     logger.info('HTTP server closed');

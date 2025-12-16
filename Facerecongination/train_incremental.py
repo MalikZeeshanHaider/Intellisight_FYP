@@ -1,7 +1,8 @@
 """
-Incremental Face Recognition Training (Simple Version)
-Uses OpenCV for face detection and simple embedding generation
+Incremental Face Recognition Training (DeepFace Version)
+Uses DeepFace with FaceNet for face embedding generation
 Only trains NEW images that are not already in the embeddings file
+Syncs embeddings to PostgreSQL database
 """
 
 import os
@@ -22,15 +23,38 @@ except ImportError:
     print("[ERROR] OpenCV not installed. Run: pip install opencv-python numpy")
     sys.exit(1)
 
+try:
+    from deepface import DeepFace
+    DEEPFACE_AVAILABLE = True
+except ImportError:
+    print("[WARNING] DeepFace not installed. Using simple embeddings.")
+    DEEPFACE_AVAILABLE = False
+
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+except ImportError:
+    print("[WARNING] psycopg2 not installed. Database sync will be skipped.")
+    psycopg2 = None
+
 # Configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IMAGES_FOLDER = os.path.join(BASE_DIR, "images")
 EMBEDDINGS_FOLDER = os.path.join(BASE_DIR, "embeddings")
 EMBEDDINGS_FILE = os.path.join(EMBEDDINGS_FOLDER, "representations_facenet.json")
 
-# Face detector
-FACE_CASCADE_PATH = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-face_cascade = cv2.CascadeClassifier(FACE_CASCADE_PATH)
+# Database configuration
+DB_CONFIG = {
+    'host': 'localhost',
+    'port': 5000,
+    'database': 'FYP_Intellisight',
+    'user': 'postgres',
+    'password': 'zeeshan'
+}
+
+# DeepFace configuration (must match recognition_live.py)
+MODEL_NAME = "Facenet"
+DETECTOR_BACKEND = "opencv"
 
 
 def load_existing_embeddings():
@@ -84,59 +108,29 @@ def find_new_images(trained_set):
 
 def extract_face_embedding(image_path):
     """
-    Extract a simple face embedding from an image
-    Uses histogram-based features for simplicity
+    Extract face embedding from an image using DeepFace FaceNet
+    This matches the embedding format used in recognition_live.py
     """
     try:
-        # Read image
-        img = cv2.imread(image_path)
-        if img is None:
+        if not DEEPFACE_AVAILABLE:
+            print("  [ERROR] DeepFace not available")
             return None
         
-        # Convert to grayscale
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # Use DeepFace to generate embedding
+        results = DeepFace.represent(
+            img_path=image_path,
+            model_name=MODEL_NAME,
+            detector_backend=DETECTOR_BACKEND,
+            enforce_detection=False,  # Don't fail if face detection fails
+            align=True  # Align face for better results
+        )
         
-        # Detect faces
-        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-        
-        if len(faces) == 0:
-            # Try with entire image if no face detected
-            face_region = gray
+        if results and len(results) > 0:
+            embedding = results[0]["embedding"]
+            return embedding
         else:
-            # Get the largest face
-            x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
-            face_region = gray[y:y+h, x:x+w]
-        
-        # Resize to standard size
-        face_resized = cv2.resize(face_region, (128, 128))
-        
-        # Generate embedding using multiple features
-        embedding = []
-        
-        # 1. Histogram features (normalized)
-        hist = cv2.calcHist([face_resized], [0], None, [64], [0, 256])
-        hist = cv2.normalize(hist, hist).flatten()
-        embedding.extend(hist.tolist())
-        
-        # 2. LBP-like features (simplified)
-        cell_h, cell_w = 32, 32
-        for i in range(4):
-            for j in range(4):
-                cell = face_resized[i*cell_h:(i+1)*cell_h, j*cell_w:(j+1)*cell_w]
-                embedding.append(float(np.mean(cell)) / 255.0)
-                embedding.append(float(np.std(cell)) / 255.0)
-        
-        # 3. Edge density features
-        edges = cv2.Canny(face_resized, 50, 150)
-        edge_density = np.sum(edges > 0) / (128 * 128)
-        embedding.append(edge_density)
-        
-        # Normalize to 128 dimensions
-        while len(embedding) < 128:
-            embedding.append(0.0)
-        embedding = embedding[:128]
-        
-        return embedding
+            print("  [WARNING] No face detected in image")
+            return None
         
     except Exception as e:
         print(f"  [ERROR] {str(e)[:50]}")
@@ -199,10 +193,113 @@ def main():
         print("-"*50)
         print(f"[OK] Added {len(new_embeddings)} new embeddings")
         print(f"[OK] Total embeddings: {len(all_embeddings)}")
+        
+        # Sync to database
+        sync_embeddings_to_database(all_embeddings)
     else:
         print("[WARN] No new embeddings generated")
     
     print("="*50 + "\n")
+
+
+def sync_embeddings_to_database(embeddings_data):
+    """
+    Sync embeddings to the PostgreSQL database FaceEmbeddings table.
+    Links embeddings to Students or Teachers based on folder name matching.
+    """
+    if psycopg2 is None:
+        print("[WARN] psycopg2 not available, skipping database sync")
+        return
+    
+    print("\n" + "-"*50)
+    print("SYNCING TO DATABASE")
+    print("-"*50)
+    
+    conn = None
+    synced_count = 0
+    
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        print("[DB] Connected successfully")
+        
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Clear old embeddings from FaceEmbeddings table
+            cur.execute('DELETE FROM "FaceEmbeddings"')
+            
+            # Get all students and teachers
+            cur.execute('SELECT "Student_ID", "Name" FROM "Students"')
+            students = {row['Name'].lower().strip(): row for row in cur.fetchall() if row['Name']}
+            
+            cur.execute('SELECT "Teacher_ID", "Name" FROM "Teacher"')
+            teachers = {row['Name'].lower().strip(): row for row in cur.fetchall() if row['Name']}
+            
+            print(f"[DB] Found {len(students)} students, {len(teachers)} teachers")
+            
+            for item in embeddings_data:
+                person_name = item["person"]
+                person_name_lower = person_name.lower().strip()
+                embedding = item["embedding"]
+                image_path = item.get("image_path", "")
+                
+                embedding_json = json.dumps(embedding)
+                embedding_bytes = embedding_json.encode('utf-8')
+                
+                # Match with student or teacher
+                person_type = None
+                person_id = None
+                
+                if person_name_lower in students:
+                    person_type = "Student"
+                    person_id = students[person_name_lower]['Student_ID']
+                elif person_name_lower in teachers:
+                    person_type = "Teacher"
+                    person_id = teachers[person_name_lower]['Teacher_ID']
+                else:
+                    # Try partial matching
+                    for name, s in students.items():
+                        if person_name_lower in name or name in person_name_lower:
+                            person_type = "Student"
+                            person_id = s['Student_ID']
+                            break
+                    if not person_type:
+                        for name, t in teachers.items():
+                            if person_name_lower in name or name in person_name_lower:
+                                person_type = "Teacher"
+                                person_id = t['Teacher_ID']
+                                break
+                
+                if person_type:
+                    if person_type == "Student":
+                        cur.execute("""
+                            INSERT INTO "FaceEmbeddings" 
+                            ("PersonType", "Student_ID", "PersonName", "ImagePath", "Embedding", "EmbeddingJson", "CreatedAt", "UpdatedAt")
+                            VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
+                        """, (person_type, person_id, person_name, image_path, embedding_bytes, embedding_json))
+                    else:
+                        cur.execute("""
+                            INSERT INTO "FaceEmbeddings" 
+                            ("PersonType", "Teacher_ID", "PersonName", "ImagePath", "Embedding", "EmbeddingJson", "CreatedAt", "UpdatedAt")
+                            VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
+                        """, (person_type, person_id, person_name, image_path, embedding_bytes, embedding_json))
+                    synced_count += 1
+                else:
+                    # Save without linking
+                    cur.execute("""
+                        INSERT INTO "FaceEmbeddings" 
+                        ("PersonType", "PersonName", "ImagePath", "Embedding", "EmbeddingJson", "CreatedAt", "UpdatedAt")
+                        VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+                    """, ("Unknown", person_name, image_path, embedding_bytes, embedding_json))
+            
+            conn.commit()
+            print(f"[DB] Synced {synced_count} embeddings to database")
+            
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"[DB ERROR] {e}")
+    finally:
+        if conn:
+            conn.close()
 
 
 if __name__ == "__main__":

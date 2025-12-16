@@ -1,73 +1,145 @@
+# ============================================================
+# IntelliSight - Git Ignore File
+# ============================================================
+
+# ========================
 # Dependencies
+# ========================
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 package-lock.json
 yarn.lock
+.npm
+.yarn-integrity
 
-# Environment variables
+# ========================
+# Environment Variables
+# ========================
 .env
 .env.local
 .env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# IDE
+# ========================
+# IDE / Editor
+# ========================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.sublime-workspace
+*.sublime-project
 
-# OS
+# ========================
+# OS Generated Files
+# ========================
 .DS_Store
 Thumbs.db
+desktop.ini
+ehthumbs.db
 
-# Test coverage
+# ========================
+# Test Coverage
+# ========================
 coverage/
 .nyc_output/
+*.lcov
 
+# ========================
 # Logs
+# ========================
 logs/
 *.log
+combined.log
+error.log
 
-# Build outputs
+# ========================
+# Build Outputs
+# ========================
 dist/
 build/
+*.tsbuildinfo
 
+# ========================
 # Prisma
+# ========================
 prisma/dev.db
 prisma/dev.db-journal
+prisma/*.db
+prisma/*.db-journal
 
+# ========================
 # Docker
+# ========================
 .dockerignore
+.docker/
 
-# Temporary files
+# ========================
+# Temporary Files
+# ========================
 tmp/
 temp/
 *.tmp
+*.temp
+*.bak
+*.cache
+.cache/
 
+# ========================
 # Python
+# ========================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+.venv/
 venv/
 env/
 ENV/
 *.egg-info/
-dist/
-build/
 *.egg
+pip-log.txt
 
-# Face Recognition
+# ========================
+# Face Recognition Data
+# ========================
+# Embeddings (generated files - regenerated on training)
+Facerecongination/embeddings/*.pkl
+Facerecongination/embeddings/*.json
+!Facerecongination/embeddings/.gitkeep
+
+# Face images (user uploaded - personal data, don't commit)
+Facerecongination/images/*/
+!Facerecongination/images/README.md
+
+# Legacy paths
 face-recognition/models/encodings.pickle
 face-recognition/dataset/*/
 face-recognition/logs/*.log
 face-recognition/logs/*.json
 
+# ========================
 # Admin Dashboard
+# ========================
 admin-dashboard/node_modules/
 admin-dashboard/dist/
 admin-dashboard/.env
 admin-dashboard/.env.local
+admin-dashboard/.cache/
+
+# Face-api models (large binary files - download separately)
+admin-dashboard/public/models/*.json
+admin-dashboard/public/models/*.bin
+admin-dashboard/public/models/*.weights
+!admin-dashboard/public/models/.gitkeep
+
+# ========================
+# Uploads
+# ========================
+uploads/

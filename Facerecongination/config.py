@@ -15,7 +15,7 @@ DB_CONFIG = {
     'port': int(os.getenv('DB_PORT', 5000)),
     'database': os.getenv('DB_NAME', 'FYP_Intellisight'),
     'user': os.getenv('DB_USER', 'postgres'),
-    'password': os.getenv('DB_PASSWORD', 'ozair')  # Updated to match main .env
+    'password': os.getenv('DB_PASSWORD', 'zeeshan')
 }
 
 # Face recognition settings - DeepFace with FaceNet

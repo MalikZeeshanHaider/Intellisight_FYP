@@ -183,7 +183,7 @@ export const updateTeacher = asyncHandler(async (req, res) => {
         Face_Picture_3: Face_Picture_3 || teacher.Face_Picture_3,
         Face_Picture_4: Face_Picture_4 || teacher.Face_Picture_4,
         Face_Picture_5: Face_Picture_5 || teacher.Face_Picture_5
-      });
+      }, true); // isUpdate = true to clear old embeddings
     } catch (err) {
       console.warn('[TEACHER] Failed to save images to train folder:', err.message);
     }
