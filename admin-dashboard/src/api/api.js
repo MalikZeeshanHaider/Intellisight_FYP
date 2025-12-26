@@ -270,4 +270,26 @@ export const statsAPI = {
   },
 };
 
+// ============== DAILY RESET APIs ==============
+
+export const dailyResetAPI = {
+  // Get daily statistics
+  getStatistics: async () => {
+    const response = await api.get('/daily-reset/statistics');
+    return response.data;
+  },
+
+  // Trigger manual reset (admin only)
+  manualReset: async () => {
+    const response = await api.post('/daily-reset/manual');
+    return response.data;
+  },
+
+  // Clear active presence only
+  clearActivePresence: async () => {
+    const response = await api.post('/daily-reset/clear-active');
+    return response.data;
+  },
+};
+
 export default api;

@@ -22,6 +22,7 @@ import { statsAPI, timetableAPI, zoneAPI } from '../api/api';
 import { zone1API } from '../api/zone1';
 import { format } from 'date-fns';
 import DailyDetectionChart from '../components/DailyDetectionChart';
+import DailyResetStats from '../components/DailyResetStats';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -431,8 +432,13 @@ const Dashboard = () => {
             </motion.div>
           </motion.div>
 
+          {/* Daily Reset Statistics */}
+          <motion.div variants={itemVariants}>
+            <DailyResetStats />
+          </motion.div>
+
           {/* Daily Detection Chart - Compact */}
-          <motion.div variants={itemVariants} className="relative p-4 rounded-2xl overflow-hidden h-[calc(100%-140px)]"
+          <motion.div variants={itemVariants} className="relative p-4 rounded-2xl overflow-hidden h-[calc(100%-300px)]"
             style={{
               background: document.documentElement.classList.contains('dark')
                 ? 'linear-gradient(135deg, rgba(0, 255, 255, 0.05), rgba(99, 102, 241, 0.05))'
@@ -465,14 +471,22 @@ const Dashboard = () => {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-1 text-cyan-400">
-                <motion.div
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="w-2 h-2 bg-cyan-400 rounded-full"
-                  style={{ boxShadow: '0 0 8px #00ffff' }}
-                />
-                <span className="text-xs font-bold uppercase">Live</span>
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-1 text-cyan-400">
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="w-2 h-2 bg-cyan-400 rounded-full"
+                    style={{ boxShadow: '0 0 8px #00ffff' }}
+                  />
+                  <span className="text-xs font-bold uppercase">Live</span>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-medium" style={{ color: 'var(--text-soft)' }}>Today's Total</p>
+                  <p className="text-2xl font-black text-cyan-400">
+                    {dailyDetectionData.find(d => d.isToday)?.totalDetections || 0}
+                  </p>
+                </div>
               </div>
             </div>
             

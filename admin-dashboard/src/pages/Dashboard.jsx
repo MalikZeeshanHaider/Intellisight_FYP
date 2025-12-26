@@ -517,10 +517,10 @@ const Dashboard = () => {
                 {dailyDetectionData.length > 0 && (
                   <div className="text-right mr-2">
                     <p className="text-xs font-bold" style={{ color: 'var(--text-soft)' }}>
-                      Total Last 7 Days
+                      Today's Total
                     </p>
                     <p className="text-lg font-black text-cyan-400">
-                      {dailyDetectionData.reduce((sum, day) => sum + (day.totalDetections || 0), 0)}
+                      {dailyDetectionData.find(d => d.isToday)?.totalDetections || 0}
                     </p>
                   </div>
                 )}

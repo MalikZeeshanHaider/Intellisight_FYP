@@ -9,6 +9,7 @@ import timetableRoutes from './timetable.routes.js';
 import healthRoutes from './health.routes.js';
 import faceRecognitionRoutes from './faceRecognition.routes.js';
 import liveRecognitionRoutes from './liveRecognition.routes.js';
+import dailyResetRoutes from './dailyReset.routes.js';
 
 const router = express.Router();
 
@@ -25,5 +26,6 @@ router.use('/students', studentRoutes);
 router.use('/timetable', timetableRoutes);
 router.use('/face-recognition', faceRecognitionRoutes);
 router.use('/live-recognition', liveRecognitionRoutes); // Auto live recognition
+router.use('/daily-reset', dailyResetRoutes); // Daily reset operations
 
 export default router;

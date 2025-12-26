@@ -181,9 +181,19 @@ export class TimetableService {
 
   /**
    * Get all currently active persons (those with open entries)
+   * Only includes persons who entered within the last 24 hours
    */
   async getActivePersons() {
+    // Only get active presence from last 24 hours
+    const twentyFourHoursAgo = new Date();
+    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+    
     const activeEntries = await prisma.activePresence.findMany({
+      where: {
+        EntryTime: {
+          gte: twentyFourHoursAgo,
+        },
+      },
       include: {
         zone: { select: { Zone_Name: true, Zone_id: true } },
         teacher: { select: { Teacher_ID: true, Name: true, Email: true } },
@@ -192,6 +202,7 @@ export class TimetableService {
       orderBy: { EntryTime: 'desc' },
     });
 
+    console.log(`Active persons (last 24h): ${activeEntries.length} (cutoff: ${twentyFourHoursAgo.toISOString()})`);
     return activeEntries;
   }
 
@@ -435,6 +446,28 @@ export class TimetableService {
 
     console.log('Found attendance logs:', attendanceLogs.length);
 
+    // Get active presence for today (people currently in building)
+    // Only include entries from the last 24 hours
+    const twentyFourHoursAgo = new Date(now);
+    twentyFourHoursAgo.setHours(now.getHours() - 24);
+    
+    const activePresence = await prisma.activePresence.findMany({
+      where: {
+        EntryTime: {
+          gte: twentyFourHoursAgo,
+        },
+      },
+      select: {
+        PersonType: true,
+        Student_ID: true,
+        Teacher_ID: true,
+        EntryTime: true,
+      },
+    });
+    
+    console.log('24 hours ago cutoff:', twentyFourHoursAgo.toISOString());
+    console.log('Active presence (last 24h):', activePresence.length);
+
     // Initialize stats for each day in the range
     const dailyStats = [];
     const dailyStatsMap = {};
@@ -486,6 +519,27 @@ export class TimetableService {
         }
       } else {
         console.log(`  -> WARNING: Date ${dateKey} not found in dailyStatsMap!`);
+      }
+    });
+
+    // Add active presence to TODAY'S stats (people currently in building count towards today)
+    console.log('Adding active presence to today\'s stats...');
+    activePresence.forEach((presence, index) => {
+      // Count active presence towards TODAY, not their entry date
+      const dateKey = todayDateKey;
+      
+      const normalizedPersonType = presence.PersonType?.toUpperCase();
+      
+      console.log(`Active presence #${index + 1}: PersonType=${presence.PersonType}, Student_ID=${presence.Student_ID}, Teacher_ID=${presence.Teacher_ID}, Counting towards TODAY (${dateKey})`);
+      
+      if (dailyStatsMap[dateKey]) {
+        if (normalizedPersonType === PERSON_TYPES.STUDENT && presence.Student_ID) {
+          dailyStatsMap[dateKey].students.add(presence.Student_ID);
+          console.log(`  -> Added active student ${presence.Student_ID} to TODAY (${dateKey})`);
+        } else if (normalizedPersonType === PERSON_TYPES.TEACHER && presence.Teacher_ID) {
+          dailyStatsMap[dateKey].teachers.add(presence.Teacher_ID);
+          console.log(`  -> Added active teacher ${presence.Teacher_ID} to TODAY (${dateKey})`);
+        }
       }
     });
 
