@@ -137,10 +137,12 @@ echo.
 
 echo [*] Starting Backend Server (Port 3000)...
 echo [*] Starting Frontend Dev Server (Port 3001)...
+echo [*] Starting Camera Streaming Service (Port 5001)...
 echo.
 echo  ----------------------------------------------------------------
 echo  ^| Backend API:    http://localhost:3000                       ^|
 echo  ^| Frontend App:   http://localhost:3001                       ^|
+echo  ^| Camera Service: http://localhost:5001                       ^|
 echo  ^| Prisma Studio:  Run 'npx prisma studio' separately          ^|
 echo  ----------------------------------------------------------------
 echo.
@@ -157,6 +159,12 @@ timeout /t 3 /nobreak >nul
 REM Start frontend in a new window
 start "IntelliSight - Frontend (Port 3001)" cmd /k "cd /d "%PROJECT_DIR%\admin-dashboard" && npm run dev"
 
+REM Wait a moment for frontend to start
+timeout /t 2 /nobreak >nul
+
+REM Start Camera Streaming Service in a new window
+start "IntelliSight - Camera Service (Port 5001)" cmd /k "cd /d "%PROJECT_DIR%\Facerecongination" && python camera_streaming_service.py"
+
 echo.
 echo [OK] All services started!
 echo.
@@ -164,10 +172,11 @@ echo  ================================================================
 echo  ^|                  SYSTEM IS RUNNING                           ^|
 echo  ================================================================
 echo.
-echo  Backend API:    http://localhost:3000
-echo  Frontend App:   http://localhost:3001
+echo  Backend API:      http://localhost:3000
+echo  Frontend App:     http://localhost:3001
+echo  Camera Service:   http://localhost:5001
 echo.
-echo  Python face recognition services will auto-start with backend.
+echo  Camera streaming service runs on port 5001 for live video feeds.
 echo.
 echo  Press any key to open the frontend in your browser...
 pause >nul

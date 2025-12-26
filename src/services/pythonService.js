@@ -24,12 +24,8 @@ const VENV_PYTHON_WIN = path.join(__dirname, '../../.venv/Scripts/python.exe');
 const VENV_PYTHON_UNIX = path.join(__dirname, '../../.venv/bin/python');
 
 const getPythonExe = () => {
-  // Prioritize Facerecongination venv (has all dependencies)
-  if (existsSync(FACE_VENV_PYTHON_WIN)) return FACE_VENV_PYTHON_WIN;
-  if (existsSync(FACE_VENV_PYTHON_UNIX)) return FACE_VENV_PYTHON_UNIX;
-  // Fallback to root venv
-  if (existsSync(VENV_PYTHON_WIN)) return VENV_PYTHON_WIN;
-  if (existsSync(VENV_PYTHON_UNIX)) return VENV_PYTHON_UNIX;
+  // Use system python (anaconda) first since it has all dependencies
+  // The venv might not have opencv and other packages installed
   return 'python';
 };
 

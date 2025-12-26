@@ -34,7 +34,7 @@ class CameraStream:
     
     def __init__(self, camera_id, camera_url, camera_type, zone_id):
         self.camera_id = camera_id
-        self.camera_url = camera_url
+        self.camera_url = camera_url.strip() if camera_url else ""  # Remove whitespace!
         self.camera_type = camera_type
         self.zone_id = zone_id
         self.cap = None
@@ -53,25 +53,42 @@ class CameraStream:
         self.connect()
     
     def connect(self):
-        """Connect to RTSP camera"""
+        """Connect to RTSP camera with enhanced authentication support"""
+        import os
+        
+        # Set FFMPEG options - these settings worked in the test tool
+        os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp|rtsp_flags;prefer_tcp|stimeout;5000000'
+        
+        print(f"[Camera {self.camera_id}] Attempting connection to: {self.camera_url[:50]}...")
+        
         try:
-            self.cap = cv2.VideoCapture(self.camera_url)
+            # Use the exact settings that worked in test_camera_auth.py
+            cap = cv2.VideoCapture(self.camera_url, cv2.CAP_FFMPEG)
+            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 5000)  # 5 second timeout
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             
-            if self.cap.isOpened():
-                self.is_running = True
-                print(f"[Camera {self.camera_id}] Connected: {self.camera_url}")
-                
-                # Start capture thread
-                thread = threading.Thread(target=self._capture_loop, daemon=True)
-                thread.start()
-                return True
+            if cap.isOpened():
+                # Test read a frame
+                ret, frame = cap.read()
+                if ret and frame is not None:
+                    self.cap = cap
+                    self.is_running = True
+                    print(f"[Camera {self.camera_id}] ✓ Connected! Frame: {frame.shape[1]}x{frame.shape[0]}")
+                    
+                    # Start capture thread
+                    thread = threading.Thread(target=self._capture_loop, daemon=True)
+                    thread.start()
+                    return True
+                else:
+                    cap.release()
+                    print(f"[Camera {self.camera_id}] Opened but cannot read frames")
             else:
-                print(f"[Camera {self.camera_id}] Failed to connect: {self.camera_url}")
-                return False
+                print(f"[Camera {self.camera_id}] Failed to open stream")
                 
         except Exception as e:
             print(f"[Camera {self.camera_id}] Connection error: {e}")
-            return False
+        
+        return False
     
     def _capture_loop(self):
         """Background thread to continuously capture frames"""
@@ -399,9 +416,70 @@ def initialize():
     db_handler = DatabaseHandler()
     print("Database connected")
     
+    # Auto-start all cameras from database
+    print("\n[*] Auto-starting all cameras from database...")
+    auto_start_all_cameras()
+    
     print("="*70)
     print("Service ready!")
     print("="*70)
+
+
+def auto_start_all_cameras():
+    """Auto-start all cameras from database on service startup"""
+    global active_cameras, db_handler
+    
+    try:
+        # Get all cameras from database
+        conn = db_handler.conn
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute("""
+            SELECT c.*, z."Zone_Name"
+            FROM "Camara" c
+            LEFT JOIN "Zone" z ON c."Zone_id" = z."Zone_id"
+            ORDER BY c."Zone_id", c."Camera_Type"
+        """)
+        
+        cameras = cursor.fetchall()
+        cursor.close()
+        
+        print(f"[*] Found {len(cameras)} cameras in database")
+        
+        started = 0
+        failed = 0
+        
+        for camera in cameras:
+            camera_id = camera['Camara_Id']
+            camera_url = camera['Camera_URL']
+            camera_type = camera.get('Camera_Type', 'Entry')
+            zone_id = camera.get('Zone_id')
+            zone_name = camera.get('Zone_Name', 'Unknown')
+            
+            if not camera_url:
+                print(f"[!] Camera {camera_id}: No URL configured, skipping")
+                continue
+            
+            print(f"[*] Starting Camera {camera_id} ({camera_type}) for Zone: {zone_name}...")
+            
+            try:
+                cam_stream = CameraStream(camera_id, camera_url, camera_type, zone_id)
+                
+                if cam_stream.is_running:
+                    active_cameras[camera_id] = cam_stream
+                    print(f"[OK] Camera {camera_id} started successfully")
+                    started += 1
+                else:
+                    print(f"[FAIL] Camera {camera_id} failed to connect")
+                    failed += 1
+            except Exception as e:
+                print(f"[ERROR] Camera {camera_id}: {e}")
+                failed += 1
+        
+        print(f"\n[*] Auto-start complete: {started} started, {failed} failed")
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to auto-start cameras: {e}")
 
 
 if __name__ == '__main__':
