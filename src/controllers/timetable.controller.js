@@ -107,3 +107,16 @@ export const getRecentActivity = asyncHandler(async (req, res) => {
 
   successResponse(res, recentActivity, 'Recent activity retrieved successfully');
 });
+
+/**
+ * @route   GET /api/timetable/daily-stats
+ * @desc    Get daily detection statistics for the last N days (default 7)
+ * @access  Private
+ */
+export const getDailyDetectionStats = asyncHandler(async (req, res) => {
+  const days = req.query.days ? parseInt(req.query.days) : 7;
+
+  const stats = await timetableService.getDailyDetectionStats(days);
+
+  successResponse(res, stats, 'Daily detection statistics retrieved successfully');
+});

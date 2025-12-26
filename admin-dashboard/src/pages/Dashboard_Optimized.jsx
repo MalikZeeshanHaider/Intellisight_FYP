@@ -37,33 +37,18 @@ const Dashboard = () => {
   const [chartLoading, setChartLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(new Date());
-  const [currentTime, setCurrentTime] = useState(new Date());
 
   const POLLING_INTERVAL = parseInt(import.meta.env.VITE_POLLING_INTERVAL) || 5000;
-
-  // Update current time every second
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
 
   // Fetch daily detection statistics
   const fetchDailyDetectionStats = async () => {
     try {
       setChartLoading(true);
-      console.log('Fetching daily detection stats...');
       const response = await statsAPI.getDailyDetectionStats();
       
-      console.log('Daily detection stats response:', response);
-      
       if (response?.success && response.data?.dailyStats) {
-        console.log('Daily stats data:', response.data.dailyStats);
         setDailyDetectionData(response.data.dailyStats);
       } else {
-        console.warn('No daily stats data in response');
         setDailyDetectionData([]);
       }
       setChartLoading(false);
@@ -246,45 +231,12 @@ const Dashboard = () => {
             <span className="font-semibold">Real-time Analytics</span>
           </p>
         </div>
-
-        {/* Live Date and Time Display */}
+        
         <div className="flex items-center space-x-3">
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="px-4 py-2 rounded-xl dark:bg-gradient-to-br dark:from-indigo-500/20 dark:to-purple-500/20 bg-gradient-to-br from-indigo-100 to-purple-100 dark:border-indigo-500/30 border-indigo-300 border"
-          >
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <div className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>
-                  {format(currentTime, 'EEEE')}
-                </div>
-                <div className="text-sm font-black" style={{ color: 'var(--text-main)' }}>
-                  {format(currentTime, 'MMMM d, yyyy')}
-                </div>
-              </div>
-              <div className="w-px h-8 bg-gradient-to-b from-transparent via-indigo-400 to-transparent" />
-              <div className="text-right">
-                <div className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>
-                  Time
-                </div>
-                <motion.div 
-                  className="text-2xl font-black tabular-nums"
-                  style={{ 
-                    color: 'var(--text-main)',
-                    textShadow: document.documentElement.classList.contains('dark') ? '0 0 10px rgba(99, 102, 241, 0.5)' : 'none'
-                  }}
-                >
-                  {format(currentTime, 'HH:mm:ss')}
-                </motion.div>
-              </div>
-            </div>
-          </motion.div>
-          
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="px-4 py-2 rounded-xl flex items-center gap-2 dark:bg-cyan-500/10 bg-indigo-100 dark:border-cyan-500/30 border-indigo-300 border"
+            className="px-4 py-2 rounded-xl flex items-center gap-2 dark:bg-cyan-500/10 bg-indigo-100 dark:border-cyan-500/30 border-indigo-300"
           >
             <FiClock className="text-cyan-400" size={16} />
             <div className="text-xs">
@@ -509,30 +461,18 @@ const Dashboard = () => {
                     Daily Detection Statistics
                   </h2>
                   <p className="text-xs font-medium" style={{ color: 'var(--text-soft)' }}>
-                    {dailyDetectionData.length > 0 ? 'Last 7 days trend' : 'Waiting for detection data'}
+                    Population detected each day this month
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {dailyDetectionData.length > 0 && (
-                  <div className="text-right mr-2">
-                    <p className="text-xs font-bold" style={{ color: 'var(--text-soft)' }}>
-                      Total Last 7 Days
-                    </p>
-                    <p className="text-lg font-black text-cyan-400">
-                      {dailyDetectionData.reduce((sum, day) => sum + (day.totalDetections || 0), 0)}
-                    </p>
-                  </div>
-                )}
-                <div className="flex items-center gap-1 text-cyan-400">
-                  <motion.div
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="w-2 h-2 bg-cyan-400 rounded-full"
-                    style={{ boxShadow: '0 0 8px #00ffff' }}
-                  />
-                  <span className="text-xs font-bold uppercase">Live</span>
-                </div>
+              <div className="flex items-center gap-1 text-cyan-400">
+                <motion.div
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="w-2 h-2 bg-cyan-400 rounded-full"
+                  style={{ boxShadow: '0 0 8px #00ffff' }}
+                />
+                <span className="text-xs font-bold uppercase">Live</span>
               </div>
             </div>
             

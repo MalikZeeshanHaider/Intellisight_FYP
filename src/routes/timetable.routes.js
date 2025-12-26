@@ -6,6 +6,7 @@ import {
   getActivePersons,
   getAnalytics,
   getRecentActivity,
+  getDailyDetectionStats,
 } from '../controllers/timetable.controller.js';
 import { validateRequest } from '../middlewares/validateRequest.js';
 import {
@@ -26,5 +27,6 @@ router.get('/', validateRequest(queryTimetableSchema), queryTimetable);
 router.get('/active', getActivePersons);
 router.get('/analytics', getAnalytics);
 router.get('/recent', getRecentActivity);
+router.get('/daily-stats', getDailyDetectionStats);
 
 export default router;

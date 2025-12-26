@@ -384,6 +384,146 @@ export class TimetableService {
 
     return zone;
   }
+
+  /**
+   * Get daily detection statistics for the last 7 days
+   * Returns count of unique persons detected each day
+   */
+  async getDailyDetectionStats(days = 7) {
+    // Calculate dates for the last N days including today
+    const now = new Date(); // Current time
+    
+    // Get today's date at midnight in local timezone
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    
+    console.log('=== DATE CALCULATION DEBUG ===');
+    console.log('Current time (now):', now.toISOString());
+    console.log('Current local date:', now.toLocaleDateString());
+    console.log('Today (midnight local):', today.toISOString());
+    console.log('Today date:', today.getDate(), 'Month:', today.getMonth() + 1, 'Year:', today.getFullYear());
+    
+    // Calculate start date (N-1 days ago from today)
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - (days - 1));
+    
+    // End date is end of today (23:59:59.999)
+    const endDate = new Date(today);
+    endDate.setHours(23, 59, 59, 999);
+
+    console.log('Start date:', startDate.toISOString(), '(Day:', startDate.getDate(), ')');
+    console.log('End date:', endDate.toISOString(), '(Day:', endDate.getDate(), ')');
+    console.log('Fetching daily stats from:', startDate.toISOString(), 'to:', endDate.toISOString());
+
+    // Get all attendance logs for the last N days
+    const attendanceLogs = await prisma.attendanceLog.findMany({
+      where: {
+        EntryTime: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      select: {
+        EntryTime: true,
+        PersonType: true,
+        Student_ID: true,
+        Teacher_ID: true,
+      },
+      orderBy: {
+        EntryTime: 'asc',
+      },
+    });
+
+    console.log('Found attendance logs:', attendanceLogs.length);
+
+    // Initialize stats for each day in the range
+    const dailyStats = [];
+    const dailyStatsMap = {};
+
+    // Create entries for all days in range (including today)
+    // Use local date for comparison
+    const todayDateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    
+    console.log('Today date key for comparison:', todayDateKey);
+    
+    for (let i = 0; i < days; i++) {
+      const currentDate = new Date(startDate);
+      currentDate.setDate(startDate.getDate() + i);
+      
+      // Create date key from local date components to avoid timezone issues
+      const dateKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+      
+      dailyStatsMap[dateKey] = {
+        day: currentDate.getDate(),
+        date: dateKey,
+        dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
+        students: new Set(),
+        teachers: new Set(),
+        isToday: dateKey === todayDateKey,
+      };
+    }
+
+    console.log('Initialized days:', Object.keys(dailyStatsMap));
+    console.log('Number of attendance logs to process:', attendanceLogs.length);
+
+    // Process attendance logs
+    attendanceLogs.forEach((log, index) => {
+      const logDate = new Date(log.EntryTime);
+      // Use local date components to create date key
+      const dateKey = `${logDate.getFullYear()}-${String(logDate.getMonth() + 1).padStart(2, '0')}-${String(logDate.getDate()).padStart(2, '0')}`;
+      
+      // Normalize PersonType to uppercase for comparison (handles both 'Student' and 'STUDENT')
+      const normalizedPersonType = log.PersonType?.toUpperCase();
+      
+      console.log(`Log #${index + 1}: dateKey=${dateKey}, PersonType=${log.PersonType}, EntryTime=${log.EntryTime}, Student_ID=${log.Student_ID}, Teacher_ID=${log.Teacher_ID}, Found in map: ${!!dailyStatsMap[dateKey]}`);
+      
+      if (dailyStatsMap[dateKey]) {
+        if (normalizedPersonType === PERSON_TYPES.STUDENT && log.Student_ID) {
+          dailyStatsMap[dateKey].students.add(log.Student_ID);
+          console.log(`  -> Added student ${log.Student_ID} to ${dateKey}`);
+        } else if (normalizedPersonType === PERSON_TYPES.TEACHER && log.Teacher_ID) {
+          dailyStatsMap[dateKey].teachers.add(log.Teacher_ID);
+          console.log(`  -> Added teacher ${log.Teacher_ID} to ${dateKey}`);
+        }
+      } else {
+        console.log(`  -> WARNING: Date ${dateKey} not found in dailyStatsMap!`);
+      }
+    });
+
+    // Convert to array and calculate totals
+    const result = Object.values(dailyStatsMap).map((stat) => {
+      console.log(`Final stats for ${stat.date}: students=${stat.students.size}, teachers=${stat.teachers.size}, total=${stat.students.size + stat.teachers.size}`);
+      return {
+        day: stat.day,
+        date: stat.date,
+        dayOfWeek: stat.dayOfWeek,
+        totalDetections: stat.students.size + stat.teachers.size,
+        studentDetections: stat.students.size,
+        teacherDetections: stat.teachers.size,
+        isToday: stat.isToday,
+      };
+    });
+
+    // Sort by date
+    result.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const totalDetections = result.reduce((sum, day) => sum + day.totalDetections, 0);
+
+    console.log('Daily stats result:', JSON.stringify(result, null, 2));
+    console.log('Total detections across all days:', totalDetections);
+
+    return {
+      days: days,
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0],
+      currentTime: endDate.toISOString(),
+      dailyStats: result,
+      summary: {
+        totalDays: days,
+        totalDetections: totalDetections,
+        averagePerDay: (totalDetections / days).toFixed(2),
+      },
+    };
+  }
 }
 
 export default new TimetableService();

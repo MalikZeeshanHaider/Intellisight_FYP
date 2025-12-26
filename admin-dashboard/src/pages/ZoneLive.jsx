@@ -16,12 +16,14 @@ const ZoneLive = () => {
   
   const [zone, setZone] = useState(null);
   const [cameras, setCameras] = useState([]);
+  const [cameraStatuses, setCameraStatuses] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAddCameraModal, setShowAddCameraModal] = useState(false);
   const [showEditCameraModal, setShowEditCameraModal] = useState(false);
   const [editingCamera, setEditingCamera] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serviceOnline, setServiceOnline] = useState(false);
   const [newCamera, setNewCamera] = useState({
     Camera_URL: '',
     Camera_Type: 'Entry',
@@ -59,54 +61,59 @@ const ZoneLive = () => {
     }
   };
 
-  useEffect(() => {
-    fetchZoneData();
-  }, [zoneId]);
-
-  // Start camera streaming
-  const startCameraStream = async (camera) => {
+  // Check camera service status
+  const checkServiceStatus = async () => {
     try {
-      const response = await fetch('http://localhost:5001/cameras/start', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          camera_id: camera.Camara_Id,
-          camera_url: camera.Camera_URL,
-          camera_type: camera.Camera_Type,
-          zone_id: parseInt(zoneId)
-        })
-      });
-      
+      const response = await fetch('http://localhost:5001/health');
       const data = await response.json();
-      if (data.success) {
-        console.log(`Camera ${camera.Camara_Id} started successfully`);
+      if (data.status === 'ok') {
+        setServiceOnline(true);
+        return true;
       }
     } catch (err) {
-      console.error(`Failed to start camera ${camera.Camara_Id}:`, err);
+      setServiceOnline(false);
+    }
+    return false;
+  };
+
+  // Fetch camera statuses from persistent service
+  const fetchCameraStatuses = async () => {
+    try {
+      const response = await fetch('http://localhost:5001/cameras/status');
+      const data = await response.json();
+      
+      if (data.success) {
+        // Create a map of camera_id -> status
+        const statusMap = {};
+        Object.values(data.cameras).forEach(status => {
+          statusMap[status.camera_id] = status;
+        });
+        setCameraStatuses(statusMap);
+      }
+    } catch (err) {
+      console.error('Failed to fetch camera statuses:', err);
     }
   };
 
-  // Start all cameras in zone
-  const startAllCameras = async () => {
-    try {
-      const response = await fetch(`http://localhost:5001/zones/${zoneId}/start_all`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      const data = await response.json();
-      if (data.success) {
-        console.log('All cameras started:', data);
-        setError(null);
-      }
-    } catch (err) {
-      console.error('Failed to start cameras:', err);
-      setError('Streaming service not available. Please start camera_streaming_service.py');
-    }
+  useEffect(() => {
+    fetchZoneData();
+    checkServiceStatus();
+    
+    // Poll for camera statuses every 3 seconds
+    const statusInterval = setInterval(() => {
+      fetchCameraStatuses();
+    }, 3000);
+    
+    return () => clearInterval(statusInterval);
+  }, [zoneId]);
+
+  // Refresh data
+  const handleRefresh = async () => {
+    await Promise.all([
+      fetchZoneData(),
+      fetchCameraStatuses(),
+      checkServiceStatus()
+    ]);
   };
 
   // Add new camera
@@ -233,16 +240,20 @@ const ZoneLive = () => {
         </div>
 
         <div className="flex gap-3">
+          {!serviceOnline && (
+            <div className="flex items-center space-x-2 px-4 py-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-lg">
+              <FiAlertCircle size={18} />
+              <span className="text-sm font-medium">Service Offline</span>
+            </div>
+          )}
+          {serviceOnline && (
+            <div className="flex items-center space-x-2 px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-sm font-medium">Service Running</span>
+            </div>
+          )}
           <button
-            onClick={startAllCameras}
-            className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
-            title="Start camera streaming (requires Python service)"
-          >
-            <FiVideo size={18} />
-            <span>Start Cameras</span>
-          </button>
-          <button
-            onClick={fetchZoneData}
+            onClick={handleRefresh}
             className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
           >
             <FiRefreshCw size={18} className={loading ? 'animate-spin' : ''} />
@@ -306,9 +317,27 @@ const ZoneLive = () => {
               {/* Camera Header */}
               <div className="flex items-start justify-between p-4 border-b dark:border-gray-700">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-800 dark:text-white">
-                    Camera #{camera.Camara_Id}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white">
+                      Camera #{camera.Camara_Id}
+                    </h3>
+                    {/* Connection Status Indicator */}
+                    {cameraStatuses[camera.Camara_Id] && (
+                      <div className="flex items-center gap-1">
+                        {cameraStatuses[camera.Camara_Id].is_connected ? (
+                          <>
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                            <span className="text-xs text-green-600 dark:text-green-400 font-medium">Live</span>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                            <span className="text-xs text-red-600 dark:text-red-400 font-medium">Offline</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 mt-1">
                     <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
                       camera.Camera_Type === 'Entry' 
@@ -322,6 +351,12 @@ const ZoneLive = () => {
                     {camera.zone && (
                       <span className="text-sm text-gray-500 dark:text-gray-400">
                         • {camera.zone.Zone_Name}
+                      </span>
+                    )}
+                    {/* FPS Counter */}
+                    {cameraStatuses[camera.Camara_Id] && cameraStatuses[camera.Camara_Id].fps && (
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        • {cameraStatuses[camera.Camara_Id].fps.toFixed(1)} FPS
                       </span>
                     )}
                   </div>
