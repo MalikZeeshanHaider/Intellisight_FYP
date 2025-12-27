@@ -175,7 +175,7 @@ export const verifyUser = asyncHandler(async (req, res) => {
           <h1>User Registration Rejected</h1>
           <p>The user registration request has been rejected.</p>
           <p>A rejection email has been sent to the user.</p>
-          <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard" class="btn">Back to Dashboard</a>
+          <a href="${process.env.FRONTEND_URL || 'http://localhost:3001'}/dashboard" class="btn">Back to Dashboard</a>
         </div>
       </body>
       </html>

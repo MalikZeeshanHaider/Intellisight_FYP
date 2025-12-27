@@ -6,7 +6,7 @@ import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS) || 10;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || '442fa66927da31788406801dabb2b33ab5262bdcbd75986a064368ae4e814cc4';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 // Email configuration
@@ -19,7 +19,7 @@ const emailConfig = {
 };
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '221083@students.au.edu.pk';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001';
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
 
 // Super Admin Configuration

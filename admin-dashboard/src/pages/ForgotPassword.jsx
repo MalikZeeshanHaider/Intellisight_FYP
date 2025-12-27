@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FaEnvelope, FaKey, FaCheckCircle } from 'react-icons/fa';
+import { FaEnvelope, FaKey, FaCheckCircle, FaShieldAlt } from 'react-icons/fa';
 import { HiLightningBolt } from 'react-icons/hi';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +15,18 @@ const ForgotPassword = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // System theme detection
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsDarkMode(mediaQuery.matches);
+
+    const handleChange = (e) => setIsDarkMode(e.matches);
+    mediaQuery.addEventListener('change', handleChange);
+
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   // Redirect to dashboard if already logged in
   useEffect(() => {
@@ -50,23 +62,58 @@ const ForgotPassword = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden px-6">
+      <div 
+        className="h-screen flex items-center justify-center relative overflow-hidden transition-colors duration-300"
+        style={{
+          background: isDarkMode 
+            ? 'linear-gradient(180deg, #0a0e27 0%, #1a1f3a 50%, #0f1729 100%)'
+            : 'linear-gradient(180deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%)'
+        }}
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="relative z-10 w-full max-w-md bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/20 text-center"
+          className="relative z-10 w-full max-w-md mx-6 rounded-3xl shadow-2xl p-8 transition-colors duration-300 text-center"
+          style={{
+            background: isDarkMode ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.7)',
+            backdropFilter: 'blur(20px)',
+            border: isDarkMode 
+              ? '1px solid rgba(255, 255, 255, 0.15)' 
+              : '1px solid rgba(15, 23, 42, 0.15)',
+            boxShadow: isDarkMode 
+              ? '0 8px 32px 0 rgba(0, 0, 0, 0.5)' 
+              : '0 8px 32px 0 rgba(0, 0, 0, 0.15)'
+          }}
         >
-          <FaCheckCircle className="text-6xl text-green-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Check Your Email</h2>
-          <p className="text-blue-200 mb-4">
+          <FaCheckCircle 
+            className="text-6xl mx-auto mb-4" 
+            style={{ color: '#22c55e' }}
+          />
+          <h2 
+            className="text-2xl font-bold mb-2 transition-colors duration-300"
+            style={{ color: isDarkMode ? '#E5E7EB' : '#0F172A' }}
+          >
+            Check Your Email
+          </h2>
+          <p 
+            className="mb-4 text-sm transition-colors duration-300"
+            style={{ color: isDarkMode ? '#94a3b8' : '#475569' }}
+          >
             We've sent a password reset link to <strong>{email}</strong>
           </p>
-          <p className="text-blue-300 text-sm mb-6">
+          <p 
+            className="text-xs mb-6 transition-colors duration-300"
+            style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}
+          >
             The link will expire in 15 minutes. Please check your spam folder if you don't see it.
           </p>
           <Link
             to="/login"
-            className="inline-block px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-semibold text-white hover:shadow-blue-500/50 transition-all"
+            className="inline-block px-6 py-2.5 rounded-xl font-medium text-white text-sm transition-all duration-300"
+            style={{
+              background: 'linear-gradient(135deg, #4f46e5 0%, #2563eb 100%)',
+              boxShadow: '0 2px 8px rgba(79, 70, 229, 0.25)'
+            }}
           >
             Back to Login
           </Link>
@@ -76,51 +123,136 @@ const ForgotPassword = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
-      {/* Animated background circles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3],
-          }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-0 left-0 w-96 h-96 bg-blue-500 rounded-full blur-3xl"
-        />
-        <motion.div
-          animate={{
-            scale: [1.2, 1, 1.2],
-            opacity: [0.2, 0.4, 0.2],
-          }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute bottom-0 right-0 w-96 h-96 bg-cyan-500 rounded-full blur-3xl"
-        />
+    <div 
+      className="h-screen flex items-center justify-center relative overflow-hidden transition-colors duration-300"
+      style={{
+        background: isDarkMode 
+          ? 'linear-gradient(180deg, #0a0e27 0%, #1a1f3a 50%, #0f1729 100%)'
+          : 'linear-gradient(180deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%)'
+      }}
+    >
+      {/* Animated Background Grid */}
+      <div className="absolute inset-0" style={{ opacity: isDarkMode ? 0.1 : 0.15 }}>
+        <div className="absolute inset-0" style={{
+          backgroundImage: `
+            linear-gradient(${isDarkMode ? 'rgba(6, 182, 212, 0.3)' : 'rgba(100, 116, 139, 0.4)'} 1px, transparent 1px),
+            linear-gradient(90deg, ${isDarkMode ? 'rgba(6, 182, 212, 0.3)' : 'rgba(100, 116, 139, 0.4)'} 1px, transparent 1px)
+          `,
+          backgroundSize: '40px 40px'
+        }} />
       </div>
+
+      {/* Ambient Glow Effects */}
+      <div 
+        className="absolute top-20 left-20 w-96 h-96 rounded-full pointer-events-none"
+        style={{
+          background: isDarkMode ? 'radial-gradient(circle, #06b6d4 0%, transparent 70%)' : 'radial-gradient(circle, #3b82f6 0%, transparent 70%)',
+          filter: 'blur(80px)',
+          opacity: isDarkMode ? 0.15 : 0.2
+        }}
+      />
+      <div 
+        className="absolute bottom-20 right-20 w-96 h-96 rounded-full pointer-events-none"
+        style={{
+          background: isDarkMode ? 'radial-gradient(circle, #3b82f6 0%, transparent 70%)' : 'radial-gradient(circle, #06b6d4 0%, transparent 70%)',
+          filter: 'blur(80px)',
+          opacity: isDarkMode ? 0.15 : 0.2
+        }}
+      />
+
+      {/* Animated Network Nodes */}
+      <motion.div
+        animate={{ x: [0, 30, 0], y: [0, -40, 0], opacity: [0.4, 0.7, 0.4] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute pointer-events-none"
+        style={{ top: '15%', right: '15%' }}
+      >
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle cx="20" cy="20" r="3" fill={isDarkMode ? '#06b6d4' : '#3b82f6'} opacity="0.6" />
+          <circle cx="100" cy="40" r="4" fill={isDarkMode ? '#3b82f6' : '#06b6d4'} opacity="0.5" />
+          <circle cx="60" cy="100" r="3" fill={isDarkMode ? '#06b6d4' : '#3b82f6'} opacity="0.6" />
+          <line x1="20" y1="20" x2="100" y2="40" stroke={isDarkMode ? '#06b6d4' : '#3b82f6'} strokeWidth="1" opacity="0.3" />
+          <line x1="100" y1="40" x2="60" y2="100" stroke={isDarkMode ? '#3b82f6' : '#06b6d4'} strokeWidth="1" opacity="0.3" />
+          <line x1="60" y1="100" x2="20" y2="20" stroke={isDarkMode ? '#06b6d4' : '#3b82f6'} strokeWidth="1" opacity="0.3" />
+        </svg>
+      </motion.div>
+
+      <motion.div
+        animate={{ rotate: [0, 360], opacity: [0.3, 0.5, 0.3] }}
+        transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+        className="absolute pointer-events-none"
+        style={{ top: '40%', left: '8%' }}
+      >
+        <svg width="60" height="60" viewBox="0 0 60 60">
+          <path 
+            d="M30 5 L50 20 L50 40 L30 55 L10 40 L10 20 Z" 
+            fill="none" 
+            stroke={isDarkMode ? '#06b6d4' : '#3b82f6'} 
+            strokeWidth="1.5" 
+            opacity="0.4"
+          />
+        </svg>
+      </motion.div>
 
       <div className="relative z-10 w-full max-w-md px-6">
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 p-8"
+          className="rounded-3xl shadow-2xl transition-colors duration-300 px-8 py-6"
+          style={{
+            background: isDarkMode ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.7)',
+            backdropFilter: 'blur(20px)',
+            border: isDarkMode 
+              ? '1px solid rgba(255, 255, 255, 0.15)' 
+              : '1px solid rgba(15, 23, 42, 0.15)',
+            boxShadow: isDarkMode 
+              ? '0 8px 32px 0 rgba(0, 0, 0, 0.5)' 
+              : '0 8px 32px 0 rgba(0, 0, 0, 0.15)'
+          }}
         >
-          {/* Logo and Title */}
-          <div className="text-center mb-8">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-              className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl mb-4 shadow-lg"
+          <div className="text-center mb-5">
+            <div 
+              className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-3 transition-colors duration-300"
+              style={{
+                background: isDarkMode ? 'rgba(15, 23, 42, 0.4)' : 'rgba(255, 255, 255, 0.5)',
+                border: isDarkMode 
+                  ? '1px solid rgba(148, 163, 184, 0.3)' 
+                  : '1px solid rgba(100, 116, 139, 0.3)'
+              }}
             >
-              <FaKey className="text-3xl text-white" />
-            </motion.div>
-            <h1 className="text-3xl font-bold text-white mb-2">Forgot Password?</h1>
-            <p className="text-blue-200">Enter your email to reset your password</p>
+              <FaKey 
+                className="text-xl" 
+                style={{ color: isDarkMode ? '#06b6d4' : '#0891b2' }}
+              />
+            </div>
+            <h2 
+              className="text-2xl font-bold mb-1 transition-colors duration-300"
+              style={{ color: isDarkMode ? '#E5E7EB' : '#0F172A' }}
+            >
+              Forgot Password?
+            </h2>
+            <p 
+              className="text-sm transition-colors duration-300"
+              style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}
+            >
+              We'll send you a reset link
+            </p>
           </div>
 
           {/* Info Notice */}
-          <div className="mb-6 p-4 bg-blue-500/20 border border-blue-500/50 rounded-xl">
-            <p className="text-blue-200 text-sm text-center">
+          <div 
+            className="mb-4 p-3 rounded-xl transition-colors duration-300"
+            style={{
+              background: isDarkMode ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.1)',
+              border: isDarkMode 
+                ? '1px solid rgba(59, 130, 246, 0.3)' 
+                : '1px solid rgba(59, 130, 246, 0.2)'
+            }}
+          >
+            <p 
+              className="text-xs text-center transition-colors duration-300"
+              style={{ color: isDarkMode ? '#93c5fd' : '#3b82f6' }}
+            >
               We'll send you a reset link valid for 15 minutes
             </p>
           </div>
@@ -130,45 +262,76 @@ const ForgotPassword = () => {
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-xl text-red-200 text-sm"
+              className="mb-4 p-3 rounded-xl text-sm transition-colors duration-300"
+              style={{
+                background: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)',
+                border: isDarkMode 
+                  ? '1px solid rgba(239, 68, 68, 0.3)' 
+                  : '1px solid rgba(239, 68, 68, 0.2)',
+                color: isDarkMode ? '#fca5a5' : '#dc2626'
+              }}
             >
               {error}
             </motion.div>
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email Input */}
             <div>
               <div className="relative">
-                <FaEnvelope className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-300" />
+                <FaEnvelope 
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-base pointer-events-none transition-colors duration-300" 
+                  style={{ color: isDarkMode ? '#06b6d4' : '#0891b2' }}
+                />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = isDarkMode ? 'rgba(255, 255, 255, 0.5)' : '#305796';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(148, 163, 184, 0.3)';
+                  }}
                   required
-                  className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  placeholder="Enter your email"
-                  disabled={isLoading}
+                  className="w-full pl-10 pr-10 py-2.5 rounded-xl text-sm focus:outline-none"
+                  style={{
+                    background: isDarkMode ? 'rgba(15, 23, 42, 0.4)' : 'rgba(255, 255, 255, 0.5)',
+                    border: '2px solid',
+                    borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(148, 163, 184, 0.3)',
+                    color: isDarkMode ? '#E5E7EB' : '#0F172A',
+                    transition: 'border-color 0.15s ease'
+                  }}
+                  placeholder="Email Address"
                 />
               </div>
             </div>
 
             {/* Submit Button */}
             <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: isLoading ? 1 : 1.01 }}
+              whileTap={{ scale: isLoading ? 1 : 0.99 }}
               type="submit"
               disabled={isLoading}
-              className={`w-full py-3 px-4 rounded-xl font-semibold text-white shadow-lg transition-all ${
-                isLoading
-                  ? 'bg-gray-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:shadow-blue-500/50'
-              }`}
+              className="w-full py-2.5 rounded-xl font-medium text-white text-sm transition-all duration-300"
+              style={{
+                background: isLoading 
+                  ? (isDarkMode ? 'rgba(71, 85, 105, 0.4)' : 'rgba(148, 163, 184, 0.4)')
+                  : 'linear-gradient(135deg, #4f46e5 0%, #2563eb 100%)',
+                boxShadow: isLoading ? 'none' : '0 2px 8px rgba(79, 70, 229, 0.25)',
+                cursor: isLoading ? 'not-allowed' : 'pointer'
+              }}
             >
               {isLoading ? (
                 <div className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div 
+                    className="w-4 h-4 rounded-full animate-spin"
+                    style={{
+                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      borderTopColor: '#ffffff'
+                    }}
+                  />
                   <span>Sending...</span>
                 </div>
               ) : (
@@ -181,31 +344,39 @@ const ForgotPassword = () => {
           </form>
 
           {/* Back to Login */}
-          <div className="mt-6 text-center">
-            <Link
-              to="/login"
-              className="text-sm text-blue-300 hover:text-blue-100 transition-colors"
+          <div className="mt-5 text-center">
+            <p 
+              className="text-xs transition-colors duration-300"
+              style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}
             >
-              ← Back to Login
-            </Link>
-          </div>
-
-          {/* Register Link */}
-          <div className="mt-4 text-center">
-            <p className="text-sm text-blue-200">
-              Don't have an account?{' '}
+              Remember your password?{' '}
               <Link
-                to="/register"
-                className="text-blue-300 hover:text-blue-100 transition-colors font-semibold"
+                to="/login"
+                className="font-medium transition-colors duration-300"
+                style={{ 
+                  color: isDarkMode ? '#93c5fd' : '#3b82f6',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.color = isDarkMode ? '#60a5fa' : '#2563eb';
+                  e.target.style.textDecoration = 'underline';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.color = isDarkMode ? '#93c5fd' : '#3b82f6';
+                  e.target.style.textDecoration = 'none';
+                }}
               >
-                Sign Up
+                Sign In
               </Link>
             </p>
           </div>
         </motion.div>
 
         {/* Footer */}
-        <p className="text-center text-blue-200/60 text-sm mt-6">
+        <p 
+          className="text-center text-xs mt-5 transition-colors duration-300"
+          style={{ color: isDarkMode ? 'rgba(148, 163, 184, 0.5)' : 'rgba(100, 116, 139, 0.6)' }}
+        >
           &copy; 2025 IntelliSight. All rights reserved.
         </p>
       </div>
