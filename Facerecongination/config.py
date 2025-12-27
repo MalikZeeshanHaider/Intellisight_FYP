@@ -20,10 +20,13 @@ DB_CONFIG = {
 
 # Face recognition settings - DeepFace with FaceNet
 MODEL_NAME = "Facenet"  # FaceNet model for embeddings (128-dimensional)
-DETECTOR_BACKEND = "retinaface"  # Most accurate detector
-DISTANCE_THRESHOLD = 10.0  # Euclidean distance threshold for matching
-MIN_FACE_SIZE = 30  # Minimum face size in pixels for detection
-CONSECUTIVE_MATCHES = 3  # Number of consecutive matches needed for confirmation
+DETECTOR_BACKEND = "ssd"  # SSD MobileNet - SAME as face-api.js TinyFaceDetector
+# FaceNet euclidean distance threshold: lower = stricter matching
+# Typical values: 0.4 (strict) - 1.0 (lenient)
+# Zone 1 (face-api.js) uses 0.6 threshold
+DISTANCE_THRESHOLD = 0.8  # FIXED: Was 10.0, now correct for FaceNet euclidean distance
+MIN_FACE_SIZE = 30  # Smaller minimum face size for distant faces
+CONSECUTIVE_MATCHES = 2  # Reduced from 3 for faster response
 FRAME_SKIP = 2  # Process every N frames for performance
 
 # Folder paths

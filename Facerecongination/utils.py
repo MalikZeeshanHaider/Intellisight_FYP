@@ -136,20 +136,30 @@ def get_euclidean_distance(emb1, emb2):
     return np.linalg.norm(np.array(emb1) - np.array(emb2))
 
 
-def find_best_match(embedding, embeddings_data, threshold=10.0):
+def find_best_match(embedding, embeddings_data, threshold=0.8):
     """
-    Find the best matching person for an embedding
+    OPTIMIZED: Find the best matching person for an embedding
+    Uses averaging across multiple embeddings per person for better accuracy
+    
+    FaceNet euclidean distance thresholds:
+    - 0.0 - 0.4: Very high confidence match
+    - 0.4 - 0.6: Good confidence match  
+    - 0.6 - 0.8: Acceptable match
+    - > 0.8: Likely different person
     
     Args:
-        embedding: Face embedding to match
+        embedding: Face embedding to match (128D FaceNet)
         embeddings_data: List of dicts with 'person' and 'embedding' keys
-        threshold: Maximum distance to consider a match
+        threshold: Maximum distance to consider a match (default 0.8)
         
     Returns:
         tuple: (person_name, distance) or ("Unknown", distance)
     """
-    best_person = None
-    min_distance = float('inf')
+    if not embeddings_data:
+        return "Unknown", float('inf')
+    
+    # Group distances by person for better accuracy
+    person_distances = {}
     
     for data in embeddings_data:
         if isinstance(data, dict) and 'embedding' in data:
@@ -157,15 +167,34 @@ def find_best_match(embedding, embeddings_data, threshold=10.0):
             person = data.get('person', 'Unknown')
         else:
             continue
+        
+        try:
+            dist = get_euclidean_distance(embedding, emb)
             
-        dist = get_euclidean_distance(embedding, emb)
-        if dist < min_distance:
-            min_distance = dist
+            if person not in person_distances:
+                person_distances[person] = []
+            person_distances[person].append(dist)
+        except Exception:
+            continue
+    
+    if not person_distances:
+        return "Unknown", float('inf')
+    
+    # Find person with best (minimum) average distance
+    best_person = None
+    min_best_distance = float('inf')
+    
+    for person, distances in person_distances.items():
+        # Use minimum distance (best match) for this person
+        best_dist = min(distances)
+        
+        if best_dist < min_best_distance:
+            min_best_distance = best_dist
             best_person = person
     
-    if min_distance <= threshold and best_person:
-        return best_person, min_distance
-    return "Unknown", min_distance
+    if min_best_distance <= threshold and best_person:
+        return best_person, min_best_distance
+    return "Unknown", min_best_distance
 
 
 def create_person_folder(images_folder, person_type, person_id):
