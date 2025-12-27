@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
     <div className="flex min-h-screen" style={{ background: 'var(--background)' }}>
@@ -45,15 +46,21 @@ const Layout = ({ children }) => {
         transform transition-transform duration-300 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-        <Sidebar onClose={() => setSidebarOpen(false)} />
+        <Sidebar onClose={() => setSidebarOpen(false)} onCollapseChange={setIsCollapsed} />
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 lg:ml-72 w-full">
+      {/* Main Content - Dynamic margin based on sidebar state */}
+      <motion.div 
+        animate={{ 
+          marginLeft: isCollapsed ? '5rem' : '18rem'
+        }}
+        transition={{ type: "spring", stiffness: 100, damping: 20 }}
+        className="flex-1 w-full lg:ml-72"
+      >
         <main className="p-4 sm:p-6 lg:p-8 pt-20 lg:pt-8">
           {children}
         </main>
-      </div>
+      </motion.div>
     </div>
   );
 };

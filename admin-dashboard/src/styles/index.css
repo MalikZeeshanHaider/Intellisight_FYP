@@ -450,3 +450,28 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 input[type="date"]::-webkit-calendar-picker-indicator:hover {
   background: rgba(139, 92, 246, 0.15);
 }
+
+/* Custom Scrollbar for Recent Activity */
+.custom-activity-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-activity-scrollbar::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 10px;
+}
+
+.custom-activity-scrollbar::-webkit-scrollbar-thumb {
+  background: #305796;
+  border-radius: 10px;
+}
+
+.custom-activity-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #244170;
+}
+
+/* Firefox scrollbar */
+.custom-activity-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #305796 #f3f4f6;
+}

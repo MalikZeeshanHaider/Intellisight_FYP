@@ -102,7 +102,10 @@ const Dashboard = () => {
         setRecentActivity([]);
       }
 
+      console.log('Zones API Response:', zonesData);
+      
       if (zonesData?.success && Array.isArray(zonesData.data)) {
+        console.log('Processing zones:', zonesData.data);
         const zonePromises = zonesData.data.map(async (zone) => {
           try {
             let personCount = 0;
@@ -135,9 +138,23 @@ const Dashboard = () => {
         });
 
         const zonesWithCounts = await Promise.all(zonePromises);
+        console.log('Zones with counts:', zonesWithCounts);
         setZoneOverview(zonesWithCounts);
       } else {
-        setZoneOverview([]);
+        console.warn('No zones data or invalid format:', zonesData);
+        // If we have zone count in stats but no zone data, create placeholder zones
+        if (dashboardStats?.totalZones > 0) {
+          console.log('Creating placeholder zones based on totalZones:', dashboardStats.totalZones);
+          const placeholderZones = Array.from({ length: dashboardStats.totalZones }, (_, i) => ({
+            Zone_id: i + 1,
+            Zone_Name: `Zone ${i + 1}`,
+            personCount: 0,
+            Capacity: 50
+          }));
+          setZoneOverview(placeholderZones);
+        } else {
+          setZoneOverview([]);
+        }
       }
 
       setLastUpdate(new Date());
@@ -235,82 +252,78 @@ const Dashboard = () => {
       {/* Compact Header */}
       <motion.div variants={itemVariants} className="flex items-center justify-between mb-4 relative z-10">
         <div>
-          <h1 className="text-3xl font-display font-black"
-            style={{
-              background: 'linear-gradient(135deg, #00ffff 0%, #6366f1 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
-          >
-            IntelliSight Dashboard
-          </h1>
-          <p className="flex items-center gap-2 text-sm mt-1" style={{ color: 'var(--text-soft)' }}>
-            <HiSparkles className="text-cyan-400" />
-            <span className="font-semibold">Real-time Analytics</span>
-          </p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-4xl font-display font-black"
+              style={{
+                color: '#003d82'
+              }}
+            >
+              Dashboard
+            </h1>
+            <div className="flex items-center gap-2">
+              <motion.div
+                animate={{ scale: [1, 1.3, 1], opacity: [0.7, 1, 0.7] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ 
+                  backgroundColor: '#305796',
+                  boxShadow: '0 0 8px #305796'
+                }}
+              />
+              <span className="text-sm font-bold" style={{ color: '#305796' }}>Live</span>
+            </div>
+          </div>
         </div>
 
-        {/* Live Date and Time Display */}
-        <div className="flex items-center space-x-3">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="px-4 py-2 rounded-xl dark:bg-gradient-to-br dark:from-indigo-500/20 dark:to-purple-500/20 bg-gradient-to-br from-indigo-100 to-purple-100 dark:border-indigo-500/30 border-indigo-300 border"
-          >
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <div className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>
-                  {format(currentTime, 'EEEE')}
-                </div>
-                <div className="text-sm font-black" style={{ color: 'var(--text-main)' }}>
-                  {format(currentTime, 'MMMM d, yyyy')}
-                </div>
-              </div>
-              <div className="w-px h-8 bg-gradient-to-b from-transparent via-indigo-400 to-transparent" />
-              <div className="text-right">
-                <div className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>
-                  Time
-                </div>
-                <motion.div 
-                  className="text-2xl font-black tabular-nums"
-                  style={{ 
-                    color: 'var(--text-main)',
-                    textShadow: document.documentElement.classList.contains('dark') ? '0 0 10px rgba(99, 102, 241, 0.5)' : 'none'
-                  }}
-                >
-                  {format(currentTime, 'HH:mm:ss')}
-                </motion.div>
-              </div>
+        {/* Live Date and Time Display - Minimal */}
+        <div className="flex items-center space-x-4">
+          {/* Compact Date Display */}
+          <div className="text-right">
+            <div className="text-xs font-medium text-gray-500">
+              {format(currentTime, 'EEEE, MMMM d, yyyy')}
             </div>
-          </motion.div>
-          
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="px-4 py-2 rounded-xl flex items-center gap-2 dark:bg-cyan-500/10 bg-indigo-100 dark:border-cyan-500/30 border-indigo-300 border"
-          >
-            <FiClock className="text-cyan-400" size={16} />
-            <div className="text-xs">
-              <div className="font-bold text-cyan-300">Last Update</div>
-              <div className="text-sm font-black text-white">
-                {format(lastUpdate, 'HH:mm:ss')}
-              </div>
+            <div className="text-sm font-bold" style={{ color: '#305796' }}>
+              {format(currentTime, 'HH:mm:ss')}
             </div>
-          </motion.div>
+          </div>
           
+          {/* Divider */}
+          <div className="w-px h-8 bg-gray-300" />
+          
+          {/* Last Update - Minimal */}
+          <div className="text-right">
+            <div className="text-xs font-medium text-gray-500">
+              Last Update
+            </div>
+            <div className="text-sm font-bold" style={{ color: '#305796' }}>
+              {format(lastUpdate, 'HH:mm:ss')}
+            </div>
+          </div>
+          
+          {/* Divider */}
+          <div className="w-px h-8 bg-gray-300" />
+          
+          {/* Refresh Icon Only */}
           <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileTap={{ scale: 0.9 }}
             onClick={handleRefresh}
-            className="px-4 py-2 rounded-xl flex items-center gap-2 font-bold dark:bg-gradient-to-br dark:from-cyan-500 dark:to-blue-500 bg-gradient-to-br from-indigo-600 to-indigo-700 border-2 dark:border-white/20 border-indigo-800/30"
+            className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300"
+            style={{
+              backgroundColor: loading ? '#e5e7eb' : '#f3f4f6',
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.06)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#305796';
+              const svg = e.currentTarget.querySelector('svg');
+              if (svg) svg.style.color = '#ffffff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6';
+              const svg = e.currentTarget.querySelector('svg');
+              if (svg) svg.style.color = '#305796';
+            }}
           >
-            <motion.div
-              animate={loading ? { rotate: 360 } : {}}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            >
-              <FiRefreshCw size={16} className="text-white" />
-            </motion.div>
-            <span className="text-white text-sm">Refresh</span>
+            <FiRefreshCw size={18} style={{ color: '#305796', transition: 'color 0.3s' }} />
           </motion.button>
         </div>
       </motion.div>
@@ -342,166 +355,152 @@ const Dashboard = () => {
           {/* Compact Stats Cards */}
           <motion.div variants={itemVariants} className="grid grid-cols-4 gap-3">
             {/* Students Card */}
-            <Link to="/students">
-              <motion.div
-                whileHover={{ scale: 1.02, y: -2 }}
-                className="relative p-4 rounded-2xl overflow-hidden group cursor-pointer"
+            <motion.div
+              whileHover={{ scale: 1.03 }}
+              className="relative p-5 rounded-2xl overflow-hidden bg-white transition-all duration-200 h-28 border-2 border-transparent hover:border-[#305796]"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(0, 255, 255, 0.1), rgba(0, 128, 255, 0.1))',
-                  border: '1px solid rgba(0, 255, 255, 0.3)',
-                  boxShadow: '0 4px 16px rgba(0, 255, 255, 0.2)'
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
                 }}
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-soft)' }}>
+                    <p className="text-xs font-bold uppercase tracking-wider mb-1 text-gray-600">
                       Students
                     </p>
                     <motion.p
                       key={stats.totalStudents}
                       initial={{ scale: 1.3, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      className="text-3xl font-black dark:text-[#00ffff] text-[#0369a1]"
+                      className="text-3xl font-black"
+                      style={{ color: '#305796' }}
                     >
                       {stats.totalStudents}
                     </motion.p>
                   </div>
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
                     style={{
-                      background: 'linear-gradient(135deg, #00ffff, #0080ff)',
-                      boxShadow: '0 0 20px rgba(0, 255, 255, 0.4)'
+                      backgroundColor: '#6365baff'
                     }}
                   >
-                    <FiUsers className="text-white" size={20} />
+                    <FiUsers className="text-white" size={22} />
                   </div>
                 </div>
               </motion.div>
-            </Link>
+
 
             {/* Teachers Card */}
-            <Link to="/teachers">
-              <motion.div
-                whileHover={{ scale: 1.02, y: -2 }}
-                className="relative p-4 rounded-2xl overflow-hidden group cursor-pointer"
+            <motion.div
+              whileHover={{ scale: 1.03 }}
+              className="relative p-5 rounded-2xl overflow-hidden bg-white transition-all duration-200 h-28 border-2 border-transparent hover:border-[#305796]"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1))',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  boxShadow: '0 4px 16px rgba(16, 185, 129, 0.2)'
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
                 }}
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-soft)' }}>
+                    <p className="text-xs font-bold uppercase tracking-wider mb-1 text-gray-600">
                       Teachers
                     </p>
                     <motion.p
                       key={stats.totalTeachers}
                       initial={{ scale: 1.3, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      className="text-3xl font-black dark:text-[#10b981] text-[#047857]"
+                      className="text-3xl font-black"
+                      style={{ color: '#305796' }}
                     >
                       {stats.totalTeachers}
                   </motion.p>
                 </div>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
                   style={{
-                    background: 'linear-gradient(135deg, #10b981, #059669)',
-                    boxShadow: '0 0 20px rgba(16, 185, 129, 0.4)'
+                    backgroundColor: '#247e5bff'
                   }}
                 >
-                  <GiTeacher className="text-white" size={20} />
+                  <GiTeacher className="text-white" size={22} />
                 </div>
               </div>
             </motion.div>
-            </Link>
 
-            {/* Active Persons Card */}
-            <Link to="/active-presence">
-              <motion.div
-                whileHover={{ scale: 1.02, y: -2 }}
-                className="relative p-4 rounded-2xl overflow-hidden group cursor-pointer"
+            {/* Active Presence Card */}
+            <motion.div
+              whileHover={{ scale: 1.03 }}
+              className="relative p-5 rounded-2xl overflow-hidden bg-white transition-all duration-200 h-28 border-2 border-transparent hover:border-[#305796]"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(147, 51, 234, 0.1))',
-                  border: '1px solid rgba(168, 85, 247, 0.3)',
-                  boxShadow: '0 4px 16px rgba(168, 85, 247, 0.2)'
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
                 }}
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-soft)' }}>
-                      In Building
+                    <p className="text-xs font-bold uppercase tracking-wider mb-1 text-gray-600">
+                      Active Presence
                     </p>
                     <motion.p
                       key={stats.activePersons}
                       initial={{ scale: 1.3, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      className="text-3xl font-black dark:text-[#a855f7] text-[#7c3aed]"
+                      className="text-3xl font-black"
+                      style={{ color: '#305796' }}
                     >
                       {stats.activePersons}
                     </motion.p>
                   </div>
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
                     style={{
-                      background: 'linear-gradient(135deg, #a855f7, #9333ea)',
-                      boxShadow: '0 0 20px rgba(168, 85, 247, 0.4)'
+                      backgroundColor: '#8849a1ff'
                     }}
                   >
-                    <FiActivity className="text-white" size={20} />
+                    <FiActivity className="text-white" size={22} />
                   </div>
                 </div>
               </motion.div>
-            </Link>
+
 
             {/* Zones Card */}
-            <Link to="/zones">
-              <motion.div
-                whileHover={{ scale: 1.02, y: -2 }}
-                className="relative p-4 rounded-2xl overflow-hidden group cursor-pointer"
+            <motion.div
+              whileHover={{ scale: 1.03 }}
+              className="relative p-5 rounded-2xl overflow-hidden bg-white transition-all duration-200 h-28 border-2 border-transparent hover:border-[#305796]"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(79, 70, 229, 0.1))',
-                  border: '1px solid rgba(99, 102, 241, 0.3)',
-                  boxShadow: '0 4px 16px rgba(99, 102, 241, 0.2)'
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
                 }}
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-soft)' }}>
+                    <p className="text-xs font-bold uppercase tracking-wider mb-1 text-gray-600">
                       Zones
                     </p>
                     <motion.p
                       key={stats.totalZones}
                       initial={{ scale: 1.3, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      className="text-3xl font-black dark:text-[#6366f1] text-[#4338ca]"
+                      className="text-3xl font-black"
+                      style={{ color: '#305796' }}
                     >
                       {stats.totalZones}
                     </motion.p>
                   </div>
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
                     style={{
-                      background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-                      boxShadow: '0 0 20px rgba(99, 102, 241, 0.4)'
+                      backgroundColor: '#3ca1afff'
                     }}
                   >
-                    <FiMapPin className="text-white" size={20} />
+                    <FiMapPin className="text-white" size={22} />
                   </div>
                 </div>
               </motion.div>
-            </Link>
           </motion.div>
 
           {/* Daily Detection Chart - Compact */}
           <motion.div variants={itemVariants} className="relative p-4 rounded-2xl overflow-hidden h-[calc(100%-140px)]"
             style={{
               background: document.documentElement.classList.contains('dark')
-                ? 'linear-gradient(135deg, rgba(0, 255, 255, 0.05), rgba(99, 102, 241, 0.05))'
+                ? 'linear-gradient(135deg, rgba(48, 87, 150, 0.05), rgba(48, 87, 150, 0.05))'
                 : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(224, 231, 255, 0.9))',
               border: document.documentElement.classList.contains('dark')
-                ? '1px solid rgba(0, 255, 255, 0.2)'
-                : '1px solid rgba(99, 102, 241, 0.3)',
+                ? '1px solid rgba(48, 87, 150, 0.2)'
+                : '1px solid rgba(48, 87, 150, 0.3)',
               boxShadow: document.documentElement.classList.contains('dark')
-                ? '0 4px 16px rgba(0, 255, 255, 0.15)'
-                : '0 4px 16px rgba(99, 102, 241, 0.15)',
+                ? '0 4px 16px rgba(48, 87, 150, 0.15)'
+                : '0 4px 16px rgba(48, 87, 150, 0.15)',
               backdropFilter: 'blur(10px)',
             }}
           >
@@ -509,46 +508,57 @@ const Dashboard = () => {
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center"
                   style={{
-                    background: 'linear-gradient(135deg, #00ffff, #6366f1)',
-                    boxShadow: '0 0 15px rgba(0, 255, 255, 0.4)',
+                    backgroundColor: '#305796'
                   }}
                 >
                   <FiTrendingUp className="text-white" size={16} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-display font-bold" style={{ color: 'var(--text-main)' }}>
-                    Daily Detection Statistics
+                  <h2 className="text-lg font-bold" style={{ color: '#6b7280' }}>
+                    Detection Tracking
                   </h2>
-                  <p className="text-xs font-medium" style={{ color: 'var(--text-soft)' }}>
-                    {dailyDetectionData.length > 0 ? 'Last 7 days trend' : 'Waiting for detection data'}
-                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {dailyDetectionData.length > 0 && (
-                  <div className="text-right mr-2">
-                    <p className="text-xs font-bold" style={{ color: 'var(--text-soft)' }}>
-                      Today's Total
-                    </p>
-                    <p className="text-lg font-black text-cyan-400">
-                      {dailyDetectionData.find(d => d.isToday)?.totalDetections || 0}
-                    </p>
-                  </div>
-                )}
-                <div className="flex items-center gap-1 text-cyan-400">
-                  <motion.div
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="w-2 h-2 bg-cyan-400 rounded-full"
-                    style={{ boxShadow: '0 0 8px #00ffff' }}
-                  />
-                  <span className="text-xs font-bold uppercase">Live</span>
-                </div>
+                <button 
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer"
+                  style={{ backgroundColor: '#305796', color: 'white' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#244170'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#305796'}
+                  onClick={() => console.log('Daily filter clicked')}
+                >
+                  Daily
+                </button>
+                <button 
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer"
+                  style={{ backgroundColor: '#f3f4f6', color: '#6b7280' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e5e7eb'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                  onClick={() => console.log('Weekly filter clicked')}
+                >
+                  Weekly
+                </button>
+                <button 
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer"
+                  style={{ backgroundColor: '#f3f4f6', color: '#6b7280' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e5e7eb'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                  onClick={() => console.log('Monthly filter clicked')}
+                >
+                  Monthly
+                </button>
               </div>
             </div>
             
-            <div className="h-[calc(100%-60px)]">
+            <div className="h-[calc(100%-60px)] relative">
               <DailyDetectionChart data={dailyDetectionData} loading={chartLoading} />
+              {dailyDetectionData.length > 0 && (
+                <div className="absolute bottom-2 left-2">
+                  <p className="text-xs font-semibold" style={{ color: '#6b7280' }}>
+                    Detected Today: <span className="font-black" style={{ color: '#305796' }}>{dailyDetectionData.find(d => d.isToday)?.totalDetections || 0}</span>
+                  </p>
+                </div>
+              )}
             </div>
           </motion.div>
         </div>
@@ -560,31 +570,22 @@ const Dashboard = () => {
           <motion.div variants={itemVariants} className="relative p-4 rounded-2xl overflow-hidden h-[50%]"
             style={{
               background: document.documentElement.classList.contains('dark')
-                ? 'linear-gradient(135deg, rgba(0, 255, 255, 0.05), rgba(99, 102, 241, 0.05))'
+                ? 'linear-gradient(135deg, rgba(48, 87, 150, 0.05), rgba(48, 87, 150, 0.05))'
                 : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(224, 231, 255, 0.9))',
               border: document.documentElement.classList.contains('dark')
-                ? '1px solid rgba(0, 255, 255, 0.2)'
-                : '1px solid rgba(99, 102, 241, 0.3)',
+                ? '1px solid rgba(48, 87, 150, 0.2)'
+                : '1px solid rgba(48, 87, 150, 0.3)',
               boxShadow: document.documentElement.classList.contains('dark')
-                ? '0 4px 16px rgba(0, 255, 255, 0.15)'
-                : '0 4px 16px rgba(99, 102, 241, 0.15)',
+                ? '0 4px 16px rgba(48, 87, 150, 0.15)'
+                : '0 4px 16px rgba(48, 87, 150, 0.15)',
               backdropFilter: 'blur(10px)',
             }}
           >
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-display font-bold" style={{ color: 'var(--text-main)' }}>Recent Activity</h2>
-              <div className="flex items-center gap-1 text-cyan-400">
-                <motion.div
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="w-2 h-2 bg-cyan-400 rounded-full"
-                  style={{ boxShadow: '0 0 8px #00ffff' }}
-                />
-                <span className="text-xs font-bold uppercase">Live</span>
-              </div>
+              <h2 className="text-lg font-bold" style={{ color: '#6b7280' }}>Recent Activity</h2>
             </div>
             
-            <div className="space-y-2 overflow-y-auto max-h-[calc(100%-50px)] custom-scrollbar">
+            <div className="space-y-2 overflow-y-auto max-h-[calc(100%-50px)] custom-activity-scrollbar">
               {recentActivity.length === 0 ? (
                 <div className="text-center py-8">
                   <FiClock size={32} className="mx-auto mb-2" style={{ color: 'var(--text-soft)' }} />
@@ -597,35 +598,39 @@ const Dashboard = () => {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className="p-3 rounded-xl transition-all duration-200"
-                    style={{
-                      background: 'rgba(0, 255, 255, 0.05)',
-                      border: '1px solid rgba(0, 255, 255, 0.1)'
-                    }}
                     whileHover={{
-                      background: 'rgba(0, 255, 255, 0.1)',
-                      borderColor: 'rgba(0, 255, 255, 0.3)'
+                      scale: 1.02,
+                      background: 'rgba(48, 87, 150, 0.15)',
+                      borderColor: 'rgba(48, 87, 150, 0.4)'
+                    }}
+                    className="p-3 rounded-xl transition-all duration-150"
+                    style={{
+                      background: 'rgba(48, 87, 150, 0.05)',
+                      border: '1px solid rgba(48, 87, 150, 0.1)'
                     }}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-lg flex items-center justify-center">
-                          <span className="text-white font-bold text-xs">
-                            {activity.student?.Name?.[0] || activity.teacher?.Name?.[0] || '?'}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold" style={{ color: 'var(--text-main)' }}>
-                            {activity.student?.Name || activity.teacher?.Name || 'Unknown'}
-                          </p>
-                          <p className="text-xs font-medium" style={{ color: 'var(--text-soft)' }}>
-                            {activity.zone?.Zone_Name || 'Unknown'}
-                          </p>
-                        </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold" style={{ color: '#305796' }}>
+                          {activity.student?.Name || activity.teacher?.Name || 'Unknown'}
+                        </p>
+                        <p className="text-xs font-medium" style={{ color: '#6b7280' }}>
+                          {activity.zone?.Zone_Name || 'Unknown'}
+                        </p>
+                        <p className="text-xs font-semibold mt-0.5" style={{ color: '#305796' }}>
+                          {activity.Timestamp ? format(new Date(activity.Timestamp), 'HH:mm') : 'N/A'}
+                        </p>
                       </div>
-                      <span className="text-xs font-semibold text-cyan-400">
-                        {activity.Timestamp ? format(new Date(activity.Timestamp), 'HH:mm') : 'N/A'}
-                      </span>
+                      <button 
+                        className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-white"
+                        style={{ color: '#305796' }}
+                        onClick={() => console.log('View details:', activity)}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      </button>
                     </div>
                   </motion.div>
                 ))
@@ -637,28 +642,19 @@ const Dashboard = () => {
           <motion.div variants={itemVariants} className="relative p-4 rounded-2xl overflow-hidden h-[calc(50%-16px)]"
             style={{
               background: document.documentElement.classList.contains('dark')
-                ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(168, 85, 247, 0.05))'
-                : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(243, 232, 255, 0.9))',
+                ? 'linear-gradient(135deg, rgba(48, 87, 150, 0.05), rgba(48, 87, 150, 0.05))'
+                : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(224, 231, 255, 0.9))',
               border: document.documentElement.classList.contains('dark')
-                ? '1px solid rgba(99, 102, 241, 0.2)'
-                : '1px solid rgba(168, 85, 247, 0.3)',
+                ? '1px solid rgba(48, 87, 150, 0.2)'
+                : '1px solid rgba(48, 87, 150, 0.3)',
               boxShadow: document.documentElement.classList.contains('dark')
-                ? '0 4px 16px rgba(99, 102, 241, 0.15)'
-                : '0 4px 16px rgba(168, 85, 247, 0.15)',
+                ? '0 4px 16px rgba(48, 87, 150, 0.15)'
+                : '0 4px 16px rgba(48, 87, 150, 0.15)',
               backdropFilter: 'blur(10px)',
             }}
           >
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-display font-bold" style={{ color: 'var(--text-main)' }}>Zone Distribution</h2>
-              <div className="flex items-center gap-1 text-indigo-400">
-                <motion.div
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="w-2 h-2 bg-indigo-400 rounded-full"
-                  style={{ boxShadow: '0 0 8px #6366f1' }}
-                />
-                <span className="text-xs font-bold uppercase">Live</span>
-              </div>
+              <h2 className="text-lg font-bold" style={{ color: '#6b7280' }}>Zone Overview</h2>
             </div>
             
             <div className="h-[calc(100%-50px)] flex items-center justify-center">

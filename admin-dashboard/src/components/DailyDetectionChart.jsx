@@ -10,7 +10,6 @@ import {
   ComposedChart,
   Area,
   Bar,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -47,7 +46,7 @@ const DailyDetectionChart = ({ data, loading }) => {
             background: document.documentElement.classList.contains('dark')
               ? 'rgba(15, 23, 42, 0.95)'
               : 'rgba(255, 255, 255, 0.95)',
-            border: '1px solid rgba(0, 255, 255, 0.3)',
+            border: '1px solid rgba(48, 87, 150, 0.3)',
             backdropFilter: 'blur(10px)',
           }}
         >
@@ -56,7 +55,7 @@ const DailyDetectionChart = ({ data, loading }) => {
               {label}
             </p>
             {dataPoint?.isToday && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-cyan-500 text-white">
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold" style={{ backgroundColor: '#305796', color: 'white' }}>
                 Today
               </span>
             )}
@@ -86,7 +85,8 @@ const DailyDetectionChart = ({ data, loading }) => {
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-          className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full"
+          className="w-12 h-12 border-4 border-t-transparent rounded-full"
+          style={{ borderColor: '#305796', borderTopColor: 'transparent' }}
         />
       </div>
     );
@@ -98,7 +98,8 @@ const DailyDetectionChart = ({ data, loading }) => {
         <motion.div
           animate={{ scale: [1, 1.1, 1] }}
           transition={{ duration: 2, repeat: Infinity }}
-          className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center mb-3"
+          className="w-16 h-16 rounded-full flex items-center justify-center mb-3"
+          style={{ backgroundColor: 'rgba(48, 87, 150, 0.1)' }}
         >
           <span className="text-3xl">📊</span>
         </motion.div>
@@ -120,28 +121,28 @@ const DailyDetectionChart = ({ data, loading }) => {
       >
         <defs>
           <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#00ffff" stopOpacity={0.8} />
-            <stop offset="95%" stopColor="#0080ff" stopOpacity={0.3} />
+            <stop offset="5%" stopColor="#305796" stopOpacity={0.8} />
+            <stop offset="95%" stopColor="#305796" stopOpacity={0.3} />
           </linearGradient>
           <linearGradient id="colorStudents" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.8} />
-            <stop offset="95%" stopColor="#4f46e5" stopOpacity={0.3} />
+            <stop offset="5%" stopColor="#6365baff" stopOpacity={0.8} />
+            <stop offset="95%" stopColor="#6365baff" stopOpacity={0.3} />
           </linearGradient>
           <linearGradient id="colorTeachers" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
-            <stop offset="95%" stopColor="#059669" stopOpacity={0.3} />
+            <stop offset="5%" stopColor="#247e5bff" stopOpacity={0.8} />
+            <stop offset="95%" stopColor="#247e5bff" stopOpacity={0.3} />
           </linearGradient>
           <linearGradient id="areaTotal" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#00ffff" stopOpacity={0.4} />
-            <stop offset="95%" stopColor="#0080ff" stopOpacity={0.05} />
+            <stop offset="5%" stopColor="#305796" stopOpacity={0.4} />
+            <stop offset="95%" stopColor="#305796" stopOpacity={0.05} />
           </linearGradient>
         </defs>
         <CartesianGrid
           strokeDasharray="3 3"
           stroke={
             document.documentElement.classList.contains('dark')
-              ? 'rgba(0, 255, 255, 0.1)'
-              : 'rgba(99, 102, 241, 0.2)'
+              ? 'rgba(48, 87, 150, 0.1)'
+              : 'rgba(48, 87, 150, 0.2)'
           }
           vertical={false}
         />
@@ -153,10 +154,10 @@ const DailyDetectionChart = ({ data, loading }) => {
               : 'rgba(100, 116, 139, 0.8)'
           }
           style={{
-            fontSize: '10px',
-            fontWeight: 'bold',
+            fontSize: '11px',
+            fontWeight: '600',
           }}
-          tick={{ fontSize: 10 }}
+          tick={{ fontSize: 11 }}
           angle={0}
           height={40}
         />
@@ -167,18 +168,18 @@ const DailyDetectionChart = ({ data, loading }) => {
               : 'rgba(100, 116, 139, 0.8)'
           }
           style={{
-            fontSize: '10px',
-            fontWeight: 'bold',
+            fontSize: '11px',
+            fontWeight: '600',
           }}
-          tick={{ fontSize: 10 }}
+          tick={{ fontSize: 11 }}
           allowDecimals={false}
         />
-        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0, 255, 255, 0.05)' }} />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(48, 87, 150, 0.05)' }} />
         <Legend
           wrapperStyle={{
             paddingTop: '10px',
-            fontSize: '10px',
-            fontWeight: 'bold',
+            fontSize: '11px',
+            fontWeight: '600',
           }}
           iconType="circle"
           iconSize={8}
@@ -188,9 +189,9 @@ const DailyDetectionChart = ({ data, loading }) => {
         <Area
           type="monotone"
           dataKey="totalDetections"
-          name="Total"
+          name="Total Detections"
           fill="url(#areaTotal)"
-          stroke="#00ffff"
+          stroke="#305796"
           strokeWidth={2}
           animationDuration={1000}
         />
@@ -211,27 +212,6 @@ const DailyDetectionChart = ({ data, loading }) => {
           radius={[6, 6, 0, 0]}
           animationDuration={1200}
           maxBarSize={50}
-        />
-        
-        {/* Line for trend */}
-        <Line
-          type="monotone"
-          dataKey="totalDetections"
-          stroke="#00ffff"
-          strokeWidth={2}
-          dot={{
-            fill: '#00ffff',
-            strokeWidth: 2,
-            r: 4,
-            stroke: document.documentElement.classList.contains('dark') ? '#0f172a' : '#ffffff'
-          }}
-          activeDot={{
-            r: 6,
-            stroke: '#00ffff',
-            strokeWidth: 3,
-            fill: document.documentElement.classList.contains('dark') ? '#0f172a' : '#ffffff'
-          }}
-          animationDuration={1400}
         />
       </ComposedChart>
     </ResponsiveContainer>
