@@ -10,6 +10,7 @@ import { FiMapPin, FiRefreshCw, FiPlus, FiAlertCircle, FiVideo, FiZap, FiX, FiEd
 import { HiSparkles } from 'react-icons/hi';
 import { zoneAPI } from '../api/api';
 import { zone1API } from '../api/zone1';
+import { MiniZoneGauge } from '../components/ZoneCapacityGauge';
 
 const Zones = () => {
   const [zones, setZones] = useState([]);
@@ -370,18 +371,10 @@ const Zones = () => {
                 <FiMapPin className="text-white" size={24} />
               </motion.div>
               <div className="text-right">
-                <motion.p
-                  key={zoneCounts[zone.Zone_id]}
-                  initial={{ scale: 1.5, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="text-4xl font-black dark:text-[#6366f1] text-[#4338ca]"
-                  style={{
-                    textShadow: document.documentElement.classList.contains('dark') ? '0 0 20px rgba(99, 102, 241, 0.8)' : '0 0 10px rgba(67, 56, 202, 0.3)'
-                  }}
-                >
-                  {zoneCounts[zone.Zone_id] || 0}
-                </motion.p>
-                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>persons</p>
+                <MiniZoneGauge 
+                  current={zoneCounts[zone.Zone_id] || 0} 
+                  capacity={zone.Capacity || 50} 
+                />
               </div>
             </div>
 

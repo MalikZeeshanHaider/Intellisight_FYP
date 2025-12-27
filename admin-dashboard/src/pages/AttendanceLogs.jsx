@@ -5,6 +5,8 @@ import { HiSparkles } from 'react-icons/hi';
 import { getAttendanceLogs } from '../api/faceRecognition';
 import { zoneAPI } from '../api/api';
 import CustomSelect from '../components/CustomSelect';
+import PeakHoursHeatmap from '../components/PeakHoursHeatmap';
+import WeeklyTrendsChart from '../components/WeeklyTrendsChart';
 
 export default function AttendanceLogs() {
   const [logs, setLogs] = useState([]);
@@ -689,6 +691,45 @@ export default function AttendanceLogs() {
           </div>
         )}
       </motion.div>
+
+      {/* Analytics Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+        {/* Peak Hours Heatmap */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="relative p-6 rounded-3xl overflow-visible dark:bg-gradient-to-br dark:from-purple-500/5 dark:to-indigo-500/5 bg-gradient-to-br from-white/80 to-purple-50/80 backdrop-blur-xl dark:border-purple-500/20 border-purple-200"
+          style={{
+            boxShadow: document.documentElement.classList.contains('dark') 
+              ? '0 8px 32px rgba(139, 92, 246, 0.15)' 
+              : '0 10px 40px rgba(124, 58, 237, 0.15), 0 4px 12px rgba(139, 92, 246, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+          }}
+        >
+          <PeakHoursHeatmap 
+            title="Peak Activity Hours"
+            colorScheme="purple"
+          />
+        </motion.div>
+
+        {/* Weekly Trends Chart */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.27 }}
+          className="relative p-6 rounded-3xl overflow-visible dark:bg-gradient-to-br dark:from-purple-500/5 dark:to-indigo-500/5 bg-gradient-to-br from-white/80 to-purple-50/80 backdrop-blur-xl dark:border-purple-500/20 border-purple-200"
+          style={{
+            boxShadow: document.documentElement.classList.contains('dark') 
+              ? '0 8px 32px rgba(139, 92, 246, 0.15)' 
+              : '0 10px 40px rgba(124, 58, 237, 0.15), 0 4px 12px rgba(139, 92, 246, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+          }}
+        >
+          <WeeklyTrendsChart 
+            title="Weekly Attendance Trends"
+            height={250}
+          />
+        </motion.div>
+      </div>
     </motion.div>
   );
 }

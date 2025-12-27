@@ -22,6 +22,9 @@ import { statsAPI, timetableAPI, zoneAPI } from '../api/api';
 import { zone1API } from '../api/zone1';
 import { format } from 'date-fns';
 import DailyDetectionChart from '../components/DailyDetectionChart';
+import ZoneDistributionPieChart from '../components/ZoneDistributionPieChart';
+import TopActiveStudentsChart from '../components/TopActiveStudentsChart';
+import WeeklyTrendsChart, { TrendSparkline } from '../components/WeeklyTrendsChart';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -638,7 +641,7 @@ const Dashboard = () => {
             }}
           >
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-display font-bold" style={{ color: 'var(--text-main)' }}>Zone Overview</h2>
+              <h2 className="text-lg font-display font-bold" style={{ color: 'var(--text-main)' }}>Zone Distribution</h2>
               <div className="flex items-center gap-1 text-indigo-400">
                 <motion.div
                   animate={{ scale: [1, 1.2, 1] }}
@@ -646,63 +649,26 @@ const Dashboard = () => {
                   className="w-2 h-2 bg-indigo-400 rounded-full"
                   style={{ boxShadow: '0 0 8px #6366f1' }}
                 />
-                <span className="text-xs font-bold uppercase">Active</span>
+                <span className="text-xs font-bold uppercase">Live</span>
               </div>
             </div>
             
-            <div className="space-y-2 overflow-y-auto max-h-[calc(100%-50px)] custom-scrollbar">
+            <div className="h-[calc(100%-50px)] flex items-center justify-center">
               {zoneOverview.length === 0 ? (
                 <div className="text-center py-8">
                   <FiMapPin size={32} className="mx-auto mb-2" style={{ color: 'var(--text-soft)' }} />
                   <p style={{ color: 'var(--text-soft)' }} className="text-sm font-medium">No zones configured</p>
                 </div>
               ) : (
-                zoneOverview.map((zone, index) => (
-                  <motion.div
-                    key={zone.Zone_id}
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    whileHover={{ scale: 1.02 }}
-                  >
-                    <Link
-                      to={zone.Zone_id === 1 ? '/zones/zone1-live' : `/zones/${zone.Zone_id}/live`}
-                      className="block p-3 rounded-xl transition-all duration-200"
-                      style={{
-                        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(79, 70, 229, 0.1))',
-                        border: '1px solid rgba(99, 102, 241, 0.2)'
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                            style={{
-                              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-                              boxShadow: '0 0 15px rgba(99, 102, 241, 0.4)'
-                            }}
-                          >
-                            <FiMapPin className="text-white" size={14} />
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold" style={{ color: 'var(--text-main)' }}>{zone.Zone_Name}</p>
-                            <p className="text-xs font-medium" style={{ color: 'var(--text-soft)' }}>Zone {zone.Zone_id}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <motion.p
-                            key={zone.personCount}
-                            initial={{ scale: 1.3, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="text-2xl font-black dark:text-[#6366f1] text-[#4338ca]"
-                          >
-                            {zone.personCount}
-                          </motion.p>
-                          <p className="text-xs font-bold uppercase" style={{ color: 'var(--text-soft)' }}>persons</p>
-                        </div>
-                      </div>
-                    </Link>
-                  </motion.div>
-                ))
+                <ZoneDistributionPieChart 
+                  data={zoneOverview.map(zone => ({
+                    name: zone.Zone_Name,
+                    value: zone.personCount || 0,
+                    capacity: zone.Capacity || 50
+                  }))}
+                  showLegend={true}
+                  height={180}
+                />
               )}
             </div>
           </motion.div>
