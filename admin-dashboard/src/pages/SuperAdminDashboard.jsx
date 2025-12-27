@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FaUsers, FaUserClock, FaUserCheck, FaUserShield, FaTrash, FaCheck, FaTimes, FaUserPlus, FaTimes as FaClose } from 'react-icons/fa';
+import { FaUsers, FaUserClock, FaUserCheck, FaUserShield, FaTrash, FaCheck, FaTimes, FaUserPlus, FaTimes as FaClose, FaSignOutAlt, FaMoon, FaSun, FaUserCircle, FaChevronDown } from 'react-icons/fa';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const SuperAdminDashboard = () => {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
+  const navigate = useNavigate();
   const [statistics, setStatistics] = useState({
     totalUsers: 0,
     pendingApprovals: 0,
@@ -23,10 +25,29 @@ const SuperAdminDashboard = () => {
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [newUser, setNewUser] = useState({ name: '', email: '' });
   const [isAddingUser, setIsAddingUser] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [adminToDelete, setAdminToDelete] = useState(null);
+  const [isLightMode, setIsLightMode] = useState(
+    window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+  );
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showProfileDropdown && !event.target.closest('.profile-dropdown-container')) {
+        setShowProfileDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showProfileDropdown]);
 
   const fetchData = async () => {
     try {
@@ -78,12 +99,19 @@ const SuperAdminDashboard = () => {
   };
 
   const handleDeleteAdmin = async (adminId) => {
-    if (!window.confirm('Are you sure you want to delete this admin?')) return;
+    setAdminToDelete(adminId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteAdmin = async () => {
+    if (!adminToDelete) return;
 
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.delete(`${API_URL}/auth/admin/${adminId}`, { headers });
+      await axios.delete(`${API_URL}/auth/admin/${adminToDelete}`, { headers });
       setSuccessMessage('Admin deleted successfully');
+      setShowDeleteConfirm(false);
+      setAdminToDelete(null);
       fetchData();
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
@@ -118,22 +146,89 @@ const SuperAdminDashboard = () => {
     }
   };
 
-  const StatCard = ({ icon: Icon, title, value, color, gradient }) => (
-    <motion.div
-      whileHover={{ scale: 1.02, y: -5 }}
-      className={`bg-gradient-to-br ${gradient} rounded-xl p-6 shadow-lg`}
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-white/80 text-sm font-medium mb-1">{title}</p>
-          <p className="text-white text-3xl font-bold">{value}</p>
+  const StatCard = ({ icon: Icon, title, value, color, gradient, glowColor, cardType }) => {
+    const [isHovered, setIsHovered] = useState(false);
+
+    // Light mode color schemes - ALL cards have LEFT borders
+    const lightModeStyles = {
+      pending: {
+        iconBg: 'rgba(251, 191, 36, 0.15)',
+        leftBorder: '#f59e0b',
+        iconColor: '#d97706'
+      },
+      signup: {
+        iconBg: 'rgba(59, 130, 246, 0.15)',
+        leftBorder: '#3b82f6',
+        iconColor: '#2563eb'
+      },
+      approved: {
+        iconBg: 'rgba(34, 197, 94, 0.15)',
+        leftBorder: '#16a34a',
+        iconColor: '#16a34a'
+      },
+      admins: {
+        iconBg: 'rgba(99, 102, 241, 0.15)',
+        leftBorder: '#6366f1',
+        iconColor: '#6366f1'
+      }
+    };
+
+    const lightStyle = lightModeStyles[cardType] || {};
+
+    return (
+      <motion.div
+        whileHover={{ scale: 1.02, y: -5 }}
+        transition={{ duration: 0.3 }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className="relative overflow-hidden rounded-2xl p-6"
+        style={{
+          background: isLightMode ? '#f9f9f9ff' : 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: isLightMode ? 'none' : 'blur(20px)',
+          border: isLightMode 
+            ? '1px solid #e2e8f0cc' 
+            : isHovered 
+              ? '1px solid rgba(255, 255, 255, 0.4)' 
+              : '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: isLightMode 
+            ? '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+            : '0 4px 16px 0 rgba(0, 0, 0, 0.3)',
+          borderLeft: isLightMode && lightStyle.leftBorder ? `4px solid ${lightStyle.leftBorder}` : undefined,
+          transition: 'border 0.3s ease, box-shadow 0.3s ease'
+        }}
+      >
+        {/* Dark mode effects only - reduced glow */}
+        {!isLightMode && (
+          <>
+            <div 
+              className="absolute top-0 left-0 right-0 h-1/3 rounded-t-2xl pointer-events-none"
+              style={{
+                background: 'linear-gradient(180deg, rgba(255,255,255,0.05) 0%, transparent 100%)'
+              }}
+            />
+          </>
+        )}
+
+        <div className="flex items-center justify-between relative z-10">
+          <div>
+            <p className="text-sm font-medium mb-2" style={{ color: isLightMode ? '#64748b' : 'rgba(255, 255, 255, 0.7)' }}>{title}</p>
+            <p className="text-4xl font-bold" style={{ color: isLightMode ? '#1e293b' : '#ffffff' }}>
+              {value}
+            </p>
+          </div>
+          <div 
+            className="p-4 rounded-xl"
+            style={{
+              background: isLightMode ? lightStyle.iconBg : 'rgba(255, 255, 255, 0.05)',
+              border: isLightMode ? 'none' : `1px solid ${glowColor}40`
+            }}
+          >
+            <Icon className="text-4xl" style={{ color: isLightMode ? lightStyle.iconColor : glowColor }} />
+          </div>
         </div>
-        <div className={`${color} bg-white/20 p-4 rounded-xl`}>
-          <Icon className="text-3xl text-white" />
-        </div>
-      </div>
-    </motion.div>
-  );
+      </motion.div>
+    );
+  };
 
   if (loading) {
     return (
@@ -144,19 +239,117 @@ const SuperAdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div 
+      className="min-h-screen p-6 relative overflow-hidden transition-colors duration-300"
+      style={{
+        background: isLightMode 
+          ? 'linear-gradient(180deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%)'
+          : 'linear-gradient(180deg, #0a0e27 0%, #1a1f3a 50%, #0f1729 100%)'
+      }}
+    >
+      {/* Animated Background Grid - Symmetrical Lines */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `
+            linear-gradient(rgba(0, 255, 255, 0.3) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 255, 255, 0.3) 1px, transparent 1px)
+          `,
+          backgroundSize: '40px 40px'
+        }} />
+      </div>
+
+      {/* Ambient Glow Effects */}
+      <div className="absolute top-20 left-20 w-96 h-96 rounded-full opacity-10"
+        style={{
+          background: 'radial-gradient(circle, #00ffff 0%, transparent 70%)',
+          filter: 'blur(60px)'
+        }}
+      />
+      <div className="absolute bottom-20 right-20 w-96 h-96 rounded-full opacity-10"
+        style={{
+          background: 'radial-gradient(circle, #ff00ff 0%, transparent 70%)',
+          filter: 'blur(60px)'
+        }}
+      />
+
+      <div className="max-w-7xl mx-auto relative z-10">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-8 flex items-start justify-between"
         >
-          <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
-            <FaUserShield className="text-yellow-400" />
-            Super Admin Dashboard
-          </h1>
-          <p className="text-blue-200">Manage users and view system statistics</p>
+          <div>
+            <h1 className="text-5xl font-black mb-2 tracking-tight" style={{ color: isLightMode ? '#0F172A' : '#E5E7EB' }}>
+              <FaUserShield className="inline-block mr-3" style={{ color: isLightMode ? '#0F172A' : '#E5E7EB' }} />
+              Super Admin Dashboard
+            </h1>
+          </div>
+          
+          {/* Profile Dropdown */}
+          <div className="relative mt-2 profile-dropdown-container">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl font-medium transition-all duration-300"
+              style={{
+                background: isLightMode ? 'rgba(15, 23, 42, 0.1)' : 'rgba(6, 182, 212, 0.1)',
+                border: isLightMode ? '1px solid rgba(15, 23, 42, 0.3)' : '1px solid rgba(6, 182, 212, 0.3)',
+                color: isLightMode ? '#0F172A' : '#06b6d4',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
+              }}
+            >
+              <FaUserCircle className="text-2xl" />
+              <FaChevronDown className="text-sm" />
+            </motion.button>
+
+            {/* Dropdown Menu */}
+            {showProfileDropdown && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="absolute right-0 mt-2 w-56 rounded-xl shadow-2xl overflow-hidden z-50"
+                style={{
+                  background: isLightMode ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 23, 42, 0.95)',
+                  backdropFilter: 'blur(20px)',
+                  border: isLightMode ? '1px solid rgba(71, 85, 105, 0.3)' : '1px solid rgba(6, 182, 212, 0.3)'
+                }}
+              >
+                {/* Theme Toggle */}
+                <button
+                  onClick={() => setIsLightMode(!isLightMode)}
+                  className="w-full px-5 py-3 flex items-center gap-3 transition-all duration-200"
+                  style={{
+                    color: isLightMode ? '#182440' : '#E5E7EB',
+                    borderBottom: isLightMode ? '1px solid rgba(71, 85, 105, 0.2)' : '1px solid rgba(6, 182, 212, 0.2)'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = isLightMode ? 'rgba(71, 85, 105, 0.1)' : 'rgba(6, 182, 212, 0.1)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  {isLightMode ? <FaMoon /> : <FaSun />}
+                  <span>{isLightMode ? 'Dark Mode' : 'Light Mode'}</span>
+                </button>
+
+                {/* Logout */}
+                <button
+                  onClick={() => {
+                    setShowProfileDropdown(false);
+                    setShowLogoutConfirm(true);
+                  }}
+                  className="w-full px-5 py-3 flex items-center gap-3 transition-all duration-200"
+                  style={{
+                    color: isLightMode ? '#991b1b' : '#fca5a5'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = isLightMode ? 'rgba(185, 28, 28, 0.1)' : 'rgba(239, 68, 68, 0.1)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <FaSignOutAlt />
+                  <span>Logout</span>
+                </button>
+              </motion.div>
+            )}
+          </div>
         </motion.div>
 
         {/* Messages */}
@@ -164,7 +357,13 @@ const SuperAdminDashboard = () => {
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-xl text-red-200"
+            className="mb-6 p-4 rounded-xl text-red-200"
+            style={{
+              background: 'rgba(239, 68, 68, 0.1)',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              boxShadow: '0 0 20px rgba(239, 68, 68, 0.2)'
+            }}
           >
             {error}
           </motion.div>
@@ -174,7 +373,13 @@ const SuperAdminDashboard = () => {
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="mb-6 p-4 bg-green-500/20 border border-green-500/50 rounded-xl text-green-200"
+            className="mb-6 p-4 rounded-xl text-green-200"
+            style={{
+              background: 'rgba(34, 197, 94, 0.1)',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(34, 197, 94, 0.3)',
+              boxShadow: '0 0 20px rgba(34, 197, 94, 0.2)'
+            }}
           >
             {successMessage}
           </motion.div>
@@ -183,102 +388,148 @@ const SuperAdminDashboard = () => {
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard
-            icon={FaUsers}
-            title="Total Users"
-            value={statistics.totalUsers}
-            color="text-blue-500"
-            gradient="from-blue-500 to-blue-600"
-          />
-          <StatCard
             icon={FaUserClock}
             title="Pending Approvals"
             value={statistics.pendingApprovals}
-            color="text-yellow-500"
-            gradient="from-yellow-500 to-yellow-600"
+            glowColor="#FACC15"
+            cardType="pending"
+          />
+          <StatCard
+            icon={FaUsers}
+            title="Signup Requests"
+            value={statistics.totalUsers}
+            glowColor="#0EA5E9"
+            cardType="signup"
           />
           <StatCard
             icon={FaUserCheck}
-            title="Approved Users"
+            title="Approved Accounts"
             value={statistics.approvedUsers}
-            color="text-green-500"
-            gradient="from-green-500 to-green-600"
+            glowColor="#D97706"
+            cardType="approved"
           />
           <StatCard
             icon={FaUserShield}
-            title="Admin Users"
+            title="Active Admins"
             value={statistics.adminUsers}
-            color="text-purple-500"
-            gradient="from-purple-500 to-purple-600"
+            glowColor="#AC80D7"
+            cardType="admins"
           />
         </div>
 
-        {/* Add User Button */}
-        <div className="mb-6 flex justify-end">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setShowAddUserModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition"
-          >
-            <FaUserPlus /> Add New User
-          </motion.button>
-        </div>
-
         {/* Tabs */}
-        <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 p-6">
-          <div className="flex gap-4 mb-6 border-b border-white/20 pb-4">
-            <button
-              onClick={() => setSelectedTab('pending')}
-              className={`px-6 py-2 rounded-lg font-medium transition ${
-                selectedTab === 'pending'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white/10 text-blue-200 hover:bg-white/20'
-              }`}
+        <div className="rounded-2xl overflow-hidden"
+          style={{
+            background: isLightMode ? 'rgba(255, 255, 255, 0.8)' : '#0f172a1a',
+            backdropFilter: 'blur(20px)',
+            border: isLightMode ? '1px solid rgba(15, 23, 42, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: isLightMode ? '0 1px 3px 0 rgba(0, 0, 0, 0.1)' : '0 4px 16px rgba(0, 0, 0, 0.3)'
+          }}
+        >
+          <div className="flex items-center justify-between gap-4 p-6" style={{ borderBottom: isLightMode ? '1px solid rgba(15, 23, 42, 0.2)' : '1px solid rgba(6, 182, 212, 0.2)' }}>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setSelectedTab('pending')}
+                className="px-6 py-3 rounded-xl font-medium transition-all duration-300"
+                style={
+                  selectedTab === 'pending'
+                    ? {
+                        background: isLightMode ? 'rgba(37, 99, 235, 0.15)' : 'rgba(6, 182, 212, 0.1)',
+                        border: isLightMode ? '1px solid rgba(37, 99, 235, 0.5)' : '1px solid rgba(6, 182, 212, 0.4)',
+                        color: isLightMode ? '#1e40af' : '#67e8f9'
+                      }
+                    : {
+                        background: 'rgba(229, 231, 235, 0.05)',
+                        border: isLightMode ? '1px solid rgba(71, 85, 105, 0.3)' : '1px solid rgba(6, 182, 212, 0.2)',
+                        color: isLightMode ? '#475569' : '#9ca3af'
+                      }
+                }
+              >
+                Pending Approvals ({statistics.pendingApprovals})
+              </button>
+              <button
+                onClick={() => setSelectedTab('admins')}
+                className="px-6 py-3 rounded-xl font-medium transition-all duration-300"
+                style={
+                  selectedTab === 'admins'
+                    ? {
+                        background: isLightMode ? 'rgba(37, 99, 235, 0.15)' : 'rgba(6, 182, 212, 0.1)',
+                        border: isLightMode ? '1px solid rgba(37, 99, 235, 0.5)' : '1px solid rgba(6, 182, 212, 0.4)',
+                        color: isLightMode ? '#1e40af' : '#67e8f9'
+                      }
+                    : {
+                        background: 'rgba(229, 231, 235, 0.05)',
+                        border: isLightMode ? '1px solid rgba(71, 85, 105, 0.3)' : '1px solid rgba(6, 182, 212, 0.2)',
+                        color: isLightMode ? '#475569' : '#9ca3af'
+                      }
+                }
+              >
+                All Admins ({statistics.totalUsers})
+              </button>
+            </div>
+            
+            {/* Add User Button */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowAddUserModal(true)}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl font-medium transition-all duration-300"
+              style={{
+                background: isLightMode ? 'rgba(37, 99, 235, 0.15)' : 'rgba(6, 182, 212, 0.1)',
+                border: isLightMode ? '1px solid rgba(37, 99, 235, 0.5)' : '1px solid rgba(6, 182, 212, 0.4)',
+                color: isLightMode ? '#1e40af' : '#67e8f9'
+              }}
             >
-              Pending Approvals ({statistics.pendingApprovals})
-            </button>
-            <button
-              onClick={() => setSelectedTab('admins')}
-              className={`px-6 py-2 rounded-lg font-medium transition ${
-                selectedTab === 'admins'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white/10 text-blue-200 hover:bg-white/20'
-              }`}
-            >
-              All Admins ({statistics.totalUsers})
-            </button>
+              <FaUserPlus /> Add New User
+            </motion.button>
           </div>
 
           {/* Pending Users Tab */}
           {selectedTab === 'pending' && (
             <div className="space-y-4">
               {pendingUsers.length === 0 ? (
-                <p className="text-blue-200 text-center py-8">No pending approvals</p>
+                <p className="text-center py-12 text-lg" style={{ color: isLightMode ? '#182440' : '#67e8f9' }}>No pending approvals</p>
               ) : (
                 pendingUsers.map((user) => (
                   <motion.div
                     key={user.Pending_ID}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-white/10 rounded-xl p-4 flex items-center justify-between"
+                    className="rounded-xl p-5 flex items-center justify-between mb-4"
+                    style={{
+                      background: 'rgba(229, 231, 235, 0.08)',
+                      backdropFilter: 'blur(15px)',
+                      border: '1px solid rgba(6, 182, 212, 0.25)',
+                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2), inset 0 0 10px rgba(6, 182, 212, 0.08)'
+                    }}
                   >
                     <div className="flex-1">
-                      <h3 className="text-white font-semibold">{user.Name}</h3>
-                      <p className="text-blue-200 text-sm">{user.Email}</p>
-                      <p className="text-blue-300 text-xs mt-1">
+                      <h3 className="font-semibold text-lg" style={{ color: isLightMode ? '#0F172A' : '#E5E7EB' }}>{user.Name}</h3>
+                      <p className="text-sm mt-1" style={{ color: isLightMode ? '#0F172A' : '#E5E7EB' }}>{user.Email}</p>
+                      <p className="text-xs mt-2" style={{ color: isLightMode ? '#64748b' : '#94a3b8' }}>
                         Requested: {new Date(user.RequestedAt).toLocaleDateString()}
                       </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-3">
                       <button
                         onClick={() => handleApprove(user.Pending_ID)}
-                        className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition flex items-center gap-2"
+                        className="px-5 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-green-300"
+                        style={{
+                          background: 'rgba(34, 197, 94, 0.1)',
+                          border: '1px solid rgba(34, 197, 94, 0.4)',
+                          boxShadow: '0 0 15px rgba(34, 197, 94, 0.2)'
+                        }}
                       >
                         <FaCheck /> Approve
                       </button>
                       <button
                         onClick={() => handleReject(user.Pending_ID)}
-                        className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition flex items-center gap-2"
+                        className="px-5 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-red-300"
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.1)',
+                          border: '1px solid rgba(239, 68, 68, 0.4)',
+                          boxShadow: '0 0 15px rgba(239, 68, 68, 0.2)'
+                        }}
                       >
                         <FaTimes /> Reject
                       </button>
@@ -291,41 +542,57 @@ const SuperAdminDashboard = () => {
 
           {/* All Admins Tab */}
           {selectedTab === 'admins' && (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto p-6">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-white/20">
-                    <th className="text-left text-blue-200 font-semibold py-3 px-4">Name</th>
-                    <th className="text-left text-blue-200 font-semibold py-3 px-4">Email</th>
-                    <th className="text-left text-blue-200 font-semibold py-3 px-4">Role</th>
-                    <th className="text-left text-blue-200 font-semibold py-3 px-4">ID</th>
-                    <th className="text-left text-blue-200 font-semibold py-3 px-4">Actions</th>
+                  <tr style={{ borderBottom: isLightMode ? '1px solid rgba(226, 232, 240, 0.8)' : '1px solid rgba(6, 182, 212, 0.3)' }}>
+                    <th className="text-left font-semibold py-4 px-4" style={{ color: isLightMode ? '#0F172A' : '#E5E7EB' }}>Name</th>
+                    <th className="text-left font-semibold py-4 px-4" style={{ color: isLightMode ? '#0F172A' : '#E5E7EB' }}>Email</th>
+                    <th className="text-left font-semibold py-4 px-4" style={{ color: isLightMode ? '#0F172A' : '#E5E7EB' }}>Role</th>
+                    <th className="text-left font-semibold py-4 px-4" style={{ color: isLightMode ? '#0F172A' : '#E5E7EB' }}>ID</th>
+                    <th className="text-left font-semibold py-4 px-4" style={{ color: isLightMode ? '#0F172A' : '#E5E7EB' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {allAdmins.map((admin) => (
-                    <tr key={admin.Admin_ID} className="border-b border-white/10 hover:bg-white/5">
-                      <td className="text-white py-3 px-4">{admin.Name}</td>
-                      <td className="text-blue-200 py-3 px-4">{admin.Email}</td>
-                      <td className="py-3 px-4">
+                    <tr key={admin.Admin_ID} className="transition-all duration-300" 
+                      style={{ 
+                        borderBottom: isLightMode ? '1px solid rgba(226, 232, 240, 0.6)' : '1px solid rgba(6, 182, 212, 0.1)'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = isLightMode ? 'rgba(241, 245, 249, 0.5)' : 'rgba(6, 182, 212, 0.05)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <td className="py-4 px-4" style={{ color: isLightMode ? '#0F172A' : '#E5E7EB' }}>{admin.Name}</td>
+                      <td className="py-4 px-4" style={{ color: isLightMode ? '#0F172A' : '#E5E7EB' }}>{admin.Email}</td>
+                      <td className="py-4 px-4">
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            admin.Role === 'Admin'
-                              ? 'bg-purple-500/20 text-purple-300'
-                              : 'bg-blue-500/20 text-blue-300'
-                          }`}
+                          className="px-3 py-1 rounded-lg text-xs font-medium"
+                          style={{
+                            color: isLightMode ? '#0F172A' : '#E5E7EB',
+                            background: admin.Role === 'Admin' 
+                              ? 'rgba(168, 85, 247, 0.1)'
+                              : 'rgba(6, 182, 212, 0.1)',
+                            border: admin.Role === 'Admin'
+                              ? '1px solid rgba(168, 85, 247, 0.4)'
+                              : '1px solid rgba(6, 182, 212, 0.4)'
+                          }}
                         >
                           {admin.Role}
                         </span>
                       </td>
-                      <td className="text-blue-200 py-3 px-4">
+                      <td className="py-4 px-4" style={{ color: isLightMode ? '#0F172A' : '#E5E7EB' }}>
                         #{admin.Admin_ID}
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-4">
                         <button
                           onClick={() => handleDeleteAdmin(admin.Admin_ID)}
-                          className="p-2 bg-red-500/20 hover:bg-red-500/40 text-red-300 rounded-lg transition"
+                          className="p-2 rounded-lg transition-all duration-300"
                           title="Delete Admin"
+                          style={{
+                            background: isLightMode ? 'rgba(185, 28, 28, 0.15)' : 'rgba(239, 68, 68, 0.1)',
+                            border: isLightMode ? '1px solid rgba(185, 28, 28, 0.4)' : '1px solid rgba(239, 68, 68, 0.3)',
+                            color: isLightMode ? '#991b1b' : '#fca5a5'
+                          }}
                         >
                           <FaTrash />
                         </button>
@@ -340,15 +607,26 @@ const SuperAdminDashboard = () => {
 
         {/* Add User Modal */}
         {showAddUserModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            style={{
+              background: isLightMode ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.7)',
+              backdropFilter: 'blur(10px)'
+            }}
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-8 max-w-md w-full border border-white/20 shadow-2xl"
+              className="rounded-2xl p-8 max-w-md w-full shadow-2xl"
+              style={{
+                background: isLightMode ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 23, 42, 0.95)',
+                backdropFilter: 'blur(20px)',
+                border: isLightMode ? '1px solid rgba(37, 99, 235, 0.3)' : '1px solid rgba(6, 182, 212, 0.3)',
+                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
+              }}
             >
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                  <FaUserPlus className="text-green-400" />
+                <h2 className="text-2xl font-bold flex items-center gap-2" style={{ color: isLightMode ? '#182440' : '#ffffff' }}>
+                  <FaUserPlus style={{ color: isLightMode ? '#182440' : '#ffffff' }} />
                   Add New User
                 </h2>
                 <button
@@ -356,44 +634,66 @@ const SuperAdminDashboard = () => {
                     setShowAddUserModal(false);
                     setNewUser({ name: '', email: '' });
                   }}
-                  className="text-gray-400 hover:text-white transition"
+                  className="transition-colors duration-300"
+                  style={{ color: isLightMode ? '#64748b' : '#9ca3af' }}
                 >
                   <FaClose size={24} />
                 </button>
               </div>
 
-              <form onSubmit={handleAddUser} className="space-y-4">
+              <form onSubmit={handleAddUser} className="space-y-5">
                 <div>
-                  <label className="block text-blue-200 text-sm font-medium mb-2">
+                  <label className="block text-sm font-medium mb-2" style={{ color: isLightMode ? '#182440' : '#d1d5db' }}>
                     Full Name
                   </label>
                   <input
                     type="text"
                     value={newUser.name}
                     onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                    className="w-full px-4 py-3 rounded-xl transition-all duration-200"
+                    style={{
+                      background: isLightMode ? 'rgba(241, 245, 249, 0.8)' : 'rgba(229, 231, 235, 0.08)',
+                      border: '1px solid rgba(107, 114, 128, 0.4)',
+                      outline: 'none',
+                      color: isLightMode ? '#182440' : '#ffffff'
+                    }}
+                    onFocus={(e) => e.target.style.border = isLightMode ? '1px solid rgba(37, 99, 235, 0.6)' : '1px solid rgba(6, 182, 212, 0.6)'}
+                    onBlur={(e) => e.target.style.border = '1px solid rgba(107, 114, 128, 0.4)'}
                     placeholder="Enter user's full name"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-blue-200 text-sm font-medium mb-2">
+                  <label className="block text-sm font-medium mb-2" style={{ color: isLightMode ? '#182440' : '#d1d5db' }}>
                     Email Address
                   </label>
                   <input
                     type="email"
                     value={newUser.email}
                     onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                    className="w-full px-4 py-3 rounded-xl transition-all duration-200"
+                    style={{
+                      background: isLightMode ? 'rgba(241, 245, 249, 0.8)' : 'rgba(229, 231, 235, 0.08)',
+                      border: '1px solid rgba(107, 114, 128, 0.4)',
+                      outline: 'none',
+                      color: isLightMode ? '#182440' : '#ffffff'
+                    }}
+                    onFocus={(e) => e.target.style.border = isLightMode ? '1px solid rgba(37, 99, 235, 0.6)' : '1px solid rgba(6, 182, 212, 0.6)'}
+                    onBlur={(e) => e.target.style.border = '1px solid rgba(107, 114, 128, 0.4)'}
                     placeholder="Enter user's email"
                     required
                   />
                 </div>
 
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mt-4">
-                  <p className="text-blue-200 text-sm">
-                    📧 A password reset email will be sent to the user automatically.
+                <div className="rounded-xl p-4 mt-4"
+                  style={{
+                    background: isLightMode ? 'rgba(37, 99, 235, 0.08)' : 'rgba(6, 182, 212, 0.05)',
+                    border: isLightMode ? '1px solid rgba(37, 99, 235, 0.2)' : '1px solid rgba(6, 182, 212, 0.2)'
+                  }}
+                >
+                  <p className="text-sm" style={{ color: isLightMode ? '#182440' : '#d1d5db' }}>
+                    A password reset email will be sent to the user automatically.
                   </p>
                 </div>
 
@@ -404,20 +704,163 @@ const SuperAdminDashboard = () => {
                       setShowAddUserModal(false);
                       setNewUser({ name: '', email: '' });
                     }}
-                    className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-medium transition"
+                    className="flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-300"
+                    style={{
+                      background: isLightMode ? 'rgba(71, 85, 105, 0.15)' : 'rgba(107, 114, 128, 0.2)',
+                      border: isLightMode ? '1px solid rgba(71, 85, 105, 0.4)' : '1px solid rgba(107, 114, 128, 0.4)',
+                      color: isLightMode ? '#334155' : '#d1d5db'
+                    }}
                     disabled={isAddingUser}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    style={{
+                      background: isLightMode ? 'rgba(37, 99, 235, 0.15)' : 'rgba(6, 182, 212, 0.15)',
+                      border: isLightMode ? '1px solid rgba(37, 99, 235, 0.5)' : '1px solid rgba(6, 182, 212, 0.4)',
+                      color: isLightMode ? '#1e40af' : '#67e8f9'
+                    }}
                     disabled={isAddingUser}
                   >
-                    {isAddingUser ? 'Adding...' : 'Add User'}
+                    {isAddingUser ? (
+                      'Adding...'
+                    ) : (
+                      <>
+                        <FaUserPlus />
+                        Add User
+                      </>
+                    )}
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Logout Confirmation Modal */}
+        {showLogoutConfirm && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            style={{
+              background: isLightMode ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.7)',
+              backdropFilter: 'blur(10px)'
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="rounded-2xl p-8 max-w-md w-full shadow-2xl"
+              style={{
+                background: isLightMode ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 23, 42, 0.95)',
+                backdropFilter: 'blur(20px)',
+                border: isLightMode ? '1px solid rgba(185, 28, 28, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)',
+                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
+              }}
+            >
+              <div className="text-center">
+                <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4"
+                  style={{
+                    background: isLightMode ? 'rgba(185, 28, 28, 0.15)' : 'rgba(239, 68, 68, 0.1)',
+                    border: isLightMode ? '1px solid rgba(185, 28, 28, 0.4)' : '1px solid rgba(239, 68, 68, 0.3)'
+                  }}
+                >
+                  <FaSignOutAlt className="text-3xl" style={{ color: isLightMode ? '#991b1b' : '#f87171' }} />
+                </div>
+                <h2 className="text-2xl font-bold mb-2" style={{ color: isLightMode ? '#182440' : '#ffffff' }}>Logout Confirmation</h2>
+                <p className="mb-6" style={{ color: isLightMode ? '#475569' : '#d1d5db' }}>Are you sure you want to logout?</p>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowLogoutConfirm(false)}
+                    className="flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-300"
+                    style={{
+                      background: isLightMode ? 'rgba(71, 85, 105, 0.15)' : 'rgba(107, 114, 128, 0.2)',
+                      border: isLightMode ? '1px solid rgba(71, 85, 105, 0.4)' : '1px solid rgba(107, 114, 128, 0.4)',
+                      color: isLightMode ? '#334155' : '#d1d5db'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      logout();
+                      navigate('/login');
+                    }}
+                    className="flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-300"
+                    style={{
+                      background: isLightMode ? 'rgba(185, 28, 28, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                      border: isLightMode ? '1px solid rgba(185, 28, 28, 0.5)' : '1px solid rgba(239, 68, 68, 0.4)',
+                      color: isLightMode ? '#991b1b' : '#fca5a5'
+                    }}
+                  >
+                    Logout
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Delete Admin Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            style={{
+              background: isLightMode ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.7)',
+              backdropFilter: 'blur(10px)'
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="rounded-2xl p-8 max-w-md w-full shadow-2xl"
+              style={{
+                background: isLightMode ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 23, 42, 0.95)',
+                backdropFilter: 'blur(20px)',
+                border: isLightMode ? '1px solid rgba(185, 28, 28, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)',
+                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
+              }}
+            >
+              <div className="text-center">
+                <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4"
+                  style={{
+                    background: isLightMode ? 'rgba(185, 28, 28, 0.15)' : 'rgba(239, 68, 68, 0.1)',
+                    border: isLightMode ? '1px solid rgba(185, 28, 28, 0.4)' : '1px solid rgba(239, 68, 68, 0.3)'
+                  }}
+                >
+                  <FaTrash className="text-3xl" style={{ color: isLightMode ? '#991b1b' : '#f87171' }} />
+                </div>
+                <h2 className="text-2xl font-bold mb-2" style={{ color: isLightMode ? '#182440' : '#ffffff' }}>Delete User</h2>
+                <p className="mb-6" style={{ color: isLightMode ? '#475569' : '#d1d5db' }}>Are you sure you want to delete this user? This action cannot be undone.</p>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowDeleteConfirm(false);
+                      setAdminToDelete(null);
+                    }}
+                    className="flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-300"
+                    style={{
+                      background: isLightMode ? 'rgba(71, 85, 105, 0.15)' : 'rgba(107, 114, 128, 0.2)',
+                      border: isLightMode ? '1px solid rgba(71, 85, 105, 0.4)' : '1px solid rgba(107, 114, 128, 0.4)',
+                      color: isLightMode ? '#334155' : '#d1d5db'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDeleteAdmin}
+                    className="flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-300"
+                    style={{
+                      background: isLightMode ? 'rgba(185, 28, 28, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                      border: isLightMode ? '1px solid rgba(185, 28, 28, 0.5)' : '1px solid rgba(239, 68, 68, 0.4)',
+                      color: isLightMode ? '#991b1b' : '#fca5a5'
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </div>
         )}

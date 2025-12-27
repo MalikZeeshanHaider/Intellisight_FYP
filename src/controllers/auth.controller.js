@@ -112,7 +112,7 @@ export const verifyUser = asyncHandler(async (req, res) => {
           <h1>User Approved Successfully!</h1>
           <p>The user has been approved and can now log in to IntelliSight.</p>
           <p>An approval email has been sent to the user.</p>
-          <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard" class="btn">Back to Dashboard</a>
+          <a href="${process.env.FRONTEND_URL || 'http://localhost:3001'}/dashboard" class="btn">Back to Dashboard</a>
         </div>
       </body>
       </html>
