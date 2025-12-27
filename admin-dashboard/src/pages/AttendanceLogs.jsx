@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiDownload, FiFilter, FiClock, FiMapPin, FiUsers, FiChevronRight } from 'react-icons/fi';
+import { FiDownload, FiFilter, FiClock, FiMapPin, FiUsers, FiChevronRight, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi';
 import { getAttendanceLogs } from '../api/faceRecognition';
 import { zoneAPI } from '../api/api';
@@ -14,6 +14,8 @@ export default function AttendanceLogs() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [pagination, setPagination] = useState({ total: 0, limit: 50, offset: 0 });
+  const [showAllLogs, setShowAllLogs] = useState(false);
+  const DISPLAY_LIMIT = 5;
   
   // Filters
   const [filters, setFilters] = useState({
@@ -413,6 +415,35 @@ export default function AttendanceLogs() {
             : '0 8px 32px rgba(124, 58, 237, 0.08), 0 4px 16px rgba(124, 58, 237, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
         }}
       >
+        {/* Table Header with Show All Button */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 sm:px-6 py-4 gap-3" style={{ 
+          background: document.documentElement.classList.contains('dark')
+            ? 'rgba(139, 92, 246, 0.1)'
+            : 'rgba(124, 58, 237, 0.05)'
+        }}>
+          <h3 className="text-base sm:text-lg font-semibold" style={{ color: 'var(--text-main)' }}>
+            Attendance Records ({logs.length})
+          </h3>
+          {logs.length > DISPLAY_LIMIT && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowAllLogs(!showAllLogs)}
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors"
+              style={{
+                background: document.documentElement.classList.contains('dark')
+                  ? 'rgba(139, 92, 246, 0.2)'
+                  : 'rgba(124, 58, 237, 0.1)',
+                color: '#8b5cf6',
+                border: '1px solid rgba(139, 92, 246, 0.3)'
+              }}
+            >
+              {showAllLogs ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
+              {showAllLogs ? 'Show Less' : `Show All (${logs.length})`}
+            </motion.button>
+          )}
+        </div>
+        
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead>
@@ -421,28 +452,28 @@ export default function AttendanceLogs() {
                   ? 'rgba(139, 92, 246, 0.1)'
                   : 'rgba(124, 58, 237, 0.05)'
               }}>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>
-                  <div className="flex items-center gap-2">
-                    <FiMapPin className="text-purple-400" size={14} />
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <FiMapPin className="text-purple-400 hidden sm:block" size={14} />
                     Zone
                   </div>
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>Name</th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>Type</th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>Department</th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>
-                  <div className="flex items-center gap-2">
-                    <FiClock className="text-purple-400" size={14} />
-                    Entry Time
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>Name</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider hidden md:table-cell" style={{ color: 'var(--text-soft)' }}>Type</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider hidden lg:table-cell" style={{ color: 'var(--text-soft)' }}>Department</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <FiClock className="text-purple-400 hidden sm:block" size={14} />
+                    Entry
                   </div>
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider hidden sm:table-cell" style={{ color: 'var(--text-soft)' }}>
                   <div className="flex items-center gap-2">
                     <FiClock className="text-purple-400" size={14} />
-                    Exit Time
+                    Exit
                   </div>
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>Duration</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider hidden sm:table-cell" style={{ color: 'var(--text-soft)' }}>Duration</th>
               </tr>
             </thead>
             <tbody>
@@ -513,7 +544,7 @@ export default function AttendanceLogs() {
                 </tr>
               ) : (
                 <AnimatePresence>
-                  {logs.map((log, index) => {
+                  {(showAllLogs ? logs : logs.slice(0, DISPLAY_LIMIT)).map((log, index) => {
                     const person = log.person;
                     const isStudent = log.personType === 'Student';
                     
@@ -541,7 +572,7 @@ export default function AttendanceLogs() {
                           e.currentTarget.style.transform = 'translateX(0)';
                         }}
                       >
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <motion.div
                               whileHover={{ scale: 1.1, rotate: 5 }}
@@ -562,7 +593,7 @@ export default function AttendanceLogs() {
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <div
                               className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-lg backdrop-blur-sm"
@@ -584,7 +615,7 @@ export default function AttendanceLogs() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                           <span
                             className="px-3 py-1.5 rounded-full text-xs font-bold backdrop-blur-sm"
                             style={{
@@ -602,16 +633,16 @@ export default function AttendanceLogs() {
                             {log.personType}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: 'var(--text-soft)' }}>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium hidden md:table-cell" style={{ color: 'var(--text-soft)' }}>
                           {person?.Department || '-'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold hidden lg:table-cell" style={{ color: 'var(--text-main)' }}>
                           {formatDateTime(log.entryTime)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold hidden lg:table-cell" style={{ color: 'var(--text-main)' }}>
                           {formatDateTime(log.exitTime)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                           <span className="text-sm font-bold px-3 py-1 rounded-lg backdrop-blur-sm" style={{ 
                             color: '#8b5cf6',
                             background: document.documentElement.classList.contains('dark')

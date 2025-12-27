@@ -24,7 +24,7 @@ import {
 import { GiTeacher } from 'react-icons/gi';
 import { HiSparkles } from 'react-icons/hi';
 
-const Sidebar = () => {
+const Sidebar = ({ onClose }) => {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -32,6 +32,13 @@ const Sidebar = () => {
   const handleLogout = async () => {
     await logout();
     navigate('/login');
+  };
+
+  const handleNavClick = () => {
+    // Close sidebar on mobile when nav item is clicked
+    if (onClose) {
+      onClose();
+    }
   };
 
   const navItems = [
@@ -206,6 +213,7 @@ const Sidebar = () => {
               <NavLink
                 to={item.path}
                 end={item.exact}
+                onClick={handleNavClick}
               >
                 {({ isActive }) => (
                   <div

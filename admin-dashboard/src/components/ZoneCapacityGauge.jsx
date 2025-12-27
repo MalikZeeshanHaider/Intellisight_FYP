@@ -196,4 +196,4 @@ export const MiniZoneGauge = ({ current = 0, capacity = 50 }) => {
   );
 };
 
-export default ZoneCapacityGauge;
+export { ZoneCapacityGauge };

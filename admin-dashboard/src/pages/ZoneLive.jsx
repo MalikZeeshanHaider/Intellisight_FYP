@@ -4,11 +4,13 @@
  * Supports IP camera configuration and real-time face recognition
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FiRefreshCw, FiAlertCircle, FiArrowLeft, FiCamera, FiPlus, FiX, FiVideo, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cameraAPI, zoneAPI } from '../api/api';
+import { RealtimeDetectionChart, LiveDetectionCounter } from '../components/RealtimeDetectionChart';
+import { RecognitionRateDonut, MiniRecognitionRate } from '../components/RecognitionRateDonut';
 
 const ZoneLive = () => {
   const { zoneId } = useParams();
@@ -427,6 +429,31 @@ const ZoneLive = () => {
           <p className="text-3xl font-bold text-blue-600">0</p>
         </div>
       </div>
+
+      {/* Live Detection Charts */}
+      {cameras.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+        >
+          <div className="lg:col-span-2">
+            <RealtimeDetectionChart 
+              title={`${zone?.Zone_Name || 'Zone'} - Live Detections`}
+              refreshInterval={2000}
+            />
+          </div>
+          <div className="space-y-6">
+            <RecognitionRateDonut 
+              known={45}
+              unknown={5}
+              title="Recognition Accuracy"
+            />
+            <LiveDetectionCounter />
+          </div>
+        </motion.div>
+      )}
 
       {/* Add Camera Modal */}
       <AnimatePresence>

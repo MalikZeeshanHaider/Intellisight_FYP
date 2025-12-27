@@ -3,7 +3,7 @@
  * Display and manage all teachers
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { FiRefreshCw, FiSearch, FiAlertCircle, FiPlus, FiEdit2, FiTrash2, FiUserCheck } from 'react-icons/fi';
 import { GiTeacher } from 'react-icons/gi';
 import { HiSparkles } from 'react-icons/hi';
@@ -12,6 +12,7 @@ import { teacherAPI } from '../api/api';
 import { enrollPerson } from '../api/faceRecognition';
 import AddTeacherModal from '../components/AddTeacherModal';
 import EditTeacherModal from '../components/EditTeacherModal';
+import { DepartmentDistributionChart, DepartmentBarChart } from '../components/DepartmentDistributionChart';
 
 const Teachers = () => {
   const [teachers, setTeachers] = useState([]);
@@ -24,6 +25,25 @@ const Teachers = () => {
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [enrollingIds, setEnrollingIds] = useState(new Set());
+  const [showAllTeachers, setShowAllTeachers] = useState(false);
+  const DISPLAY_LIMIT = 6;
+
+  // Calculate department data for charts
+  const departmentData = useMemo(() => {
+    if (!teachers || teachers.length === 0) return [];
+    
+    const deptCounts = teachers.reduce((acc, teacher) => {
+      const dept = teacher.Faculty_Type || 'Unassigned';
+      acc[dept] = (acc[dept] || 0) + 1;
+      return acc;
+    }, {});
+
+    return Object.entries(deptCounts).map(([name, count]) => ({
+      name,
+      count,
+      percentage: ((count / teachers.length) * 100).toFixed(1)
+    }));
+  }, [teachers]);
 
   // Fetch teachers
   const fetchTeachers = async () => {
@@ -358,6 +378,23 @@ const Teachers = () => {
         {/* Glass shimmer effect */}
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
         
+        {/* Table Header */}
+        <div className="flex items-center justify-between mb-4 relative z-10">
+          <h3 className="text-lg font-semibold text-green-700 dark:text-green-300">
+            Teacher Records ({filteredTeachers.length})
+          </h3>
+          {filteredTeachers.length > DISPLAY_LIMIT && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowAllTeachers(!showAllTeachers)}
+              className="px-4 py-2 text-sm font-medium text-green-600 dark:text-green-400 bg-green-500/10 hover:bg-green-500/20 rounded-lg border border-green-500/30 transition-colors"
+            >
+              {showAllTeachers ? 'Show Less' : `Show All (${filteredTeachers.length})`}
+            </motion.button>
+          )}
+        </div>
+        
         {filteredTeachers.length === 0 ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400 relative z-10">
             <motion.div
@@ -375,25 +412,25 @@ const Teachers = () => {
             <table className="min-w-full divide-y divide-green-500/10">
               <thead className="bg-gradient-to-r from-green-500/10 via-emerald-500/10 to-teal-500/10 dark:from-green-500/20 dark:via-emerald-500/20 dark:to-teal-500/20 backdrop-blur-sm">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wider hidden lg:table-cell">
                     ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wider">
                     Name
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wider hidden md:table-cell">
                     Faculty Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wider hidden sm:table-cell">
                     Gender
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-green-500/10">
-                {filteredTeachers.map((teacher) => (
+                {(showAllTeachers ? filteredTeachers : filteredTeachers.slice(0, DISPLAY_LIMIT)).map((teacher) => (
                   <motion.tr 
                     key={teacher.Teacher_ID} 
                     initial={{ opacity: 0 }}
@@ -401,10 +438,10 @@ const Teachers = () => {
                     whileHover={{ backgroundColor: 'rgba(34, 197, 94, 0.05)' }}
                     className="transition-colors"
                   >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-700 dark:text-green-300">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-green-700 dark:text-green-300 hidden lg:table-cell">
                       {teacher.Teacher_ID}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <motion.div 
                           whileHover={{ scale: 1.1 }}
@@ -421,7 +458,7 @@ const Teachers = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden md:table-cell">
                       <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${
                         teacher.Faculty_Type === 'Permanent' 
                           ? 'bg-green-500/10 dark:bg-green-500/20 text-green-700 dark:text-green-300 border-green-500/30' 
@@ -430,16 +467,16 @@ const Teachers = () => {
                         {teacher.Faculty_Type || 'N/A'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 hidden sm:table-cell">
                       {teacher.Gender || 'N/A'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => handleEnroll(teacher.Teacher_ID)}
                         disabled={enrollingIds.has(teacher.Teacher_ID)}
-                        className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 mr-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 mr-2 sm:mr-4 disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Enroll face embeddings"
                       >
                         {enrollingIds.has(teacher.Teacher_ID) ? (
@@ -452,7 +489,7 @@ const Teachers = () => {
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => handleEdit(teacher)}
-                        className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 mr-4"
+                        className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 mr-2 sm:mr-4"
                         title="Edit teacher"
                       >
                         <FiEdit2 size={18} />
@@ -478,6 +515,27 @@ const Teachers = () => {
           </div>
         )}
       </motion.div>
+
+      {/* Faculty Distribution Charts */}
+      {!loading && teachers.length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+        >
+          <DepartmentDistributionChart 
+            data={departmentData} 
+            title="Faculty by Type"
+            colorScheme="green"
+          />
+          <DepartmentBarChart 
+            data={departmentData} 
+            title="Faculty Distribution" 
+            colorScheme="green"
+          />
+        </motion.div>
+      )}
 
       {/* Add Teacher Modal */}
       <AddTeacherModal

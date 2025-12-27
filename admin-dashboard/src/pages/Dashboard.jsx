@@ -342,62 +342,65 @@ const Dashboard = () => {
           {/* Compact Stats Cards */}
           <motion.div variants={itemVariants} className="grid grid-cols-4 gap-3">
             {/* Students Card */}
-            <motion.div
-              whileHover={{ scale: 1.02, y: -2 }}
-              className="relative p-4 rounded-2xl overflow-hidden group cursor-pointer"
-              style={{
-                background: 'linear-gradient(135deg, rgba(0, 255, 255, 0.1), rgba(0, 128, 255, 0.1))',
-                border: '1px solid rgba(0, 255, 255, 0.3)',
-                boxShadow: '0 4px 16px rgba(0, 255, 255, 0.2)'
-              }}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-soft)' }}>
-                    Students
-                  </p>
-                  <motion.p
-                    key={stats.totalStudents}
-                    initial={{ scale: 1.3, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="text-3xl font-black dark:text-[#00ffff] text-[#0369a1]"
+            <Link to="/students">
+              <motion.div
+                whileHover={{ scale: 1.02, y: -2 }}
+                className="relative p-4 rounded-2xl overflow-hidden group cursor-pointer"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(0, 255, 255, 0.1), rgba(0, 128, 255, 0.1))',
+                  border: '1px solid rgba(0, 255, 255, 0.3)',
+                  boxShadow: '0 4px 16px rgba(0, 255, 255, 0.2)'
+                }}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-soft)' }}>
+                      Students
+                    </p>
+                    <motion.p
+                      key={stats.totalStudents}
+                      initial={{ scale: 1.3, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="text-3xl font-black dark:text-[#00ffff] text-[#0369a1]"
+                    >
+                      {stats.totalStudents}
+                    </motion.p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{
+                      background: 'linear-gradient(135deg, #00ffff, #0080ff)',
+                      boxShadow: '0 0 20px rgba(0, 255, 255, 0.4)'
+                    }}
                   >
-                    {stats.totalStudents}
-                  </motion.p>
+                    <FiUsers className="text-white" size={20} />
+                  </div>
                 </div>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{
-                    background: 'linear-gradient(135deg, #00ffff, #0080ff)',
-                    boxShadow: '0 0 20px rgba(0, 255, 255, 0.4)'
-                  }}
-                >
-                  <FiUsers className="text-white" size={20} />
-                </div>
-              </div>
-            </motion.div>
+              </motion.div>
+            </Link>
 
             {/* Teachers Card */}
-            <motion.div
-              whileHover={{ scale: 1.02, y: -2 }}
-              className="relative p-4 rounded-2xl overflow-hidden group cursor-pointer"
-              style={{
-                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1))',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                boxShadow: '0 4px 16px rgba(16, 185, 129, 0.2)'
-              }}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-soft)' }}>
-                    Teachers
-                  </p>
-                  <motion.p
-                    key={stats.totalTeachers}
-                    initial={{ scale: 1.3, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="text-3xl font-black dark:text-[#10b981] text-[#047857]"
-                  >
-                    {stats.totalTeachers}
+            <Link to="/teachers">
+              <motion.div
+                whileHover={{ scale: 1.02, y: -2 }}
+                className="relative p-4 rounded-2xl overflow-hidden group cursor-pointer"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1))',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  boxShadow: '0 4px 16px rgba(16, 185, 129, 0.2)'
+                }}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-soft)' }}>
+                      Teachers
+                    </p>
+                    <motion.p
+                      key={stats.totalTeachers}
+                      initial={{ scale: 1.3, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="text-3xl font-black dark:text-[#10b981] text-[#047857]"
+                    >
+                      {stats.totalTeachers}
                   </motion.p>
                 </div>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -410,76 +413,81 @@ const Dashboard = () => {
                 </div>
               </div>
             </motion.div>
+            </Link>
 
             {/* Active Persons Card */}
-            <motion.div
-              whileHover={{ scale: 1.02, y: -2 }}
-              className="relative p-4 rounded-2xl overflow-hidden group cursor-pointer"
-              style={{
-                background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(147, 51, 234, 0.1))',
-                border: '1px solid rgba(168, 85, 247, 0.3)',
-                boxShadow: '0 4px 16px rgba(168, 85, 247, 0.2)'
-              }}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-soft)' }}>
-                    In Building
-                  </p>
-                  <motion.p
-                    key={stats.activePersons}
-                    initial={{ scale: 1.3, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="text-3xl font-black dark:text-[#a855f7] text-[#7c3aed]"
+            <Link to="/active-presence">
+              <motion.div
+                whileHover={{ scale: 1.02, y: -2 }}
+                className="relative p-4 rounded-2xl overflow-hidden group cursor-pointer"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(147, 51, 234, 0.1))',
+                  border: '1px solid rgba(168, 85, 247, 0.3)',
+                  boxShadow: '0 4px 16px rgba(168, 85, 247, 0.2)'
+                }}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-soft)' }}>
+                      In Building
+                    </p>
+                    <motion.p
+                      key={stats.activePersons}
+                      initial={{ scale: 1.3, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="text-3xl font-black dark:text-[#a855f7] text-[#7c3aed]"
+                    >
+                      {stats.activePersons}
+                    </motion.p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{
+                      background: 'linear-gradient(135deg, #a855f7, #9333ea)',
+                      boxShadow: '0 0 20px rgba(168, 85, 247, 0.4)'
+                    }}
                   >
-                    {stats.activePersons}
-                  </motion.p>
+                    <FiActivity className="text-white" size={20} />
+                  </div>
                 </div>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{
-                    background: 'linear-gradient(135deg, #a855f7, #9333ea)',
-                    boxShadow: '0 0 20px rgba(168, 85, 247, 0.4)'
-                  }}
-                >
-                  <FiActivity className="text-white" size={20} />
-                </div>
-              </div>
-            </motion.div>
+              </motion.div>
+            </Link>
 
             {/* Zones Card */}
-            <motion.div
-              whileHover={{ scale: 1.02, y: -2 }}
-              className="relative p-4 rounded-2xl overflow-hidden group cursor-pointer"
-              style={{
-                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(79, 70, 229, 0.1))',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
-                boxShadow: '0 4px 16px rgba(99, 102, 241, 0.2)'
-              }}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-soft)' }}>
-                    Zones
-                  </p>
-                  <motion.p
-                    key={stats.totalZones}
-                    initial={{ scale: 1.3, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="text-3xl font-black dark:text-[#6366f1] text-[#4338ca]"
+            <Link to="/zones">
+              <motion.div
+                whileHover={{ scale: 1.02, y: -2 }}
+                className="relative p-4 rounded-2xl overflow-hidden group cursor-pointer"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(79, 70, 229, 0.1))',
+                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  boxShadow: '0 4px 16px rgba(99, 102, 241, 0.2)'
+                }}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-soft)' }}>
+                      Zones
+                    </p>
+                    <motion.p
+                      key={stats.totalZones}
+                      initial={{ scale: 1.3, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="text-3xl font-black dark:text-[#6366f1] text-[#4338ca]"
+                    >
+                      {stats.totalZones}
+                    </motion.p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{
+                      background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                      boxShadow: '0 0 20px rgba(99, 102, 241, 0.4)'
+                    }}
                   >
-                    {stats.totalZones}
-                  </motion.p>
+                    <FiMapPin className="text-white" size={20} />
+                  </div>
                 </div>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{
-                    background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-                    boxShadow: '0 0 20px rgba(99, 102, 241, 0.4)'
-                  }}
-                >
-                  <FiMapPin className="text-white" size={20} />
-                </div>
-              </div>
-            </motion.div>
+              </motion.div>
+            </Link>
           </motion.div>
 
           {/* Daily Detection Chart - Compact */}

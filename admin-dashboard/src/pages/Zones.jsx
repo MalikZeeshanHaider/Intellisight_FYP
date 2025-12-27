@@ -3,7 +3,7 @@
  * Display all zones with management options
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiMapPin, FiRefreshCw, FiPlus, FiAlertCircle, FiVideo, FiZap, FiX, FiEdit2, FiTrash2 } from 'react-icons/fi';

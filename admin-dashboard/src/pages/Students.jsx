@@ -3,7 +3,7 @@
  * Display and manage all students
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { FiUsers, FiRefreshCw, FiSearch, FiAlertCircle, FiPlus, FiEdit2, FiTrash2, FiUserCheck } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi';
 import { motion } from 'framer-motion';
@@ -11,6 +11,7 @@ import { studentAPI } from '../api/api';
 import { enrollPerson } from '../api/faceRecognition';
 import AddStudentModal from '../components/AddStudentModal';
 import EditStudentModal from '../components/EditStudentModal';
+import { DepartmentDistributionChart, DepartmentBarChart } from '../components/DepartmentDistributionChart';
 
 const Students = () => {
   const [students, setStudents] = useState([]);
@@ -23,6 +24,8 @@ const Students = () => {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [enrollingIds, setEnrollingIds] = useState(new Set());
+  const [showAllStudents, setShowAllStudents] = useState(false);
+  const DISPLAY_LIMIT = 6;
 
   // Fetch students
   const fetchStudents = async () => {
@@ -246,6 +249,23 @@ const Students = () => {
         {/* Glass shimmer effect */}
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
         
+        {/* Table Header */}
+        <div className="flex items-center justify-between mb-4 relative z-10">
+          <h3 className="text-lg font-semibold text-cyan-700 dark:text-cyan-300">
+            Student Records ({filteredStudents.length})
+          </h3>
+          {filteredStudents.length > DISPLAY_LIMIT && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowAllStudents(!showAllStudents)}
+              className="px-4 py-2 text-sm font-medium text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 rounded-lg border border-cyan-500/30 transition-colors"
+            >
+              {showAllStudents ? 'Show Less' : `Show All (${filteredStudents.length})`}
+            </motion.button>
+          )}
+        </div>
+        
         {filteredStudents.length === 0 ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400 relative z-10">
             <motion.div
@@ -263,25 +283,25 @@ const Students = () => {
             <table className="min-w-full divide-y divide-cyan-500/10">
               <thead className="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10 dark:from-cyan-500/20 dark:via-blue-500/20 dark:to-purple-500/20 backdrop-blur-sm">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider hidden lg:table-cell">
                     ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider">
                     Name
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider hidden md:table-cell">
                     Department
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider hidden sm:table-cell">
                     Gender
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-cyan-500/10">
-                {filteredStudents.map((student) => (
+                {(showAllStudents ? filteredStudents : filteredStudents.slice(0, DISPLAY_LIMIT)).map((student) => (
                   <motion.tr 
                     key={student.Student_ID} 
                     initial={{ opacity: 0 }}
@@ -289,10 +309,10 @@ const Students = () => {
                     whileHover={{ backgroundColor: 'rgba(6, 182, 212, 0.05)' }}
                     className="transition-colors"
                   >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-cyan-700 dark:text-cyan-300">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-cyan-700 dark:text-cyan-300 hidden lg:table-cell">
                       {student.Student_ID}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <motion.div 
                           whileHover={{ scale: 1.1 }}
@@ -309,19 +329,19 @@ const Students = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 hidden md:table-cell">
                       {student.Department || 'N/A'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 hidden sm:table-cell">
                       {student.Gender || 'N/A'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => handleEnroll(student.Student_ID)}
                         disabled={enrollingIds.has(student.Student_ID)}
-                        className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 mr-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 mr-2 sm:mr-4 disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Enroll face embeddings"
                       >
                         {enrollingIds.has(student.Student_ID) ? (
@@ -334,7 +354,7 @@ const Students = () => {
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => handleEdit(student)}
-                        className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 mr-4"
+                        className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 mr-2 sm:mr-4"
                         title="Edit student"
                       >
                         <FiEdit2 size={18} />
@@ -360,6 +380,61 @@ const Students = () => {
           </div>
         )}
       </motion.div>
+
+      {/* Department Distribution Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="relative p-6 rounded-3xl overflow-hidden dark:bg-gradient-to-br dark:from-cyan-500/5 dark:to-blue-500/5 bg-gradient-to-br from-white/80 to-indigo-50/80 backdrop-blur-xl dark:border-cyan-500/20 border-indigo-200"
+          style={{
+            boxShadow: document.documentElement.classList.contains('dark') 
+              ? '0 8px 32px rgba(0, 255, 255, 0.1)' 
+              : '0 10px 40px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(79, 70, 229, 0.1)'
+          }}
+        >
+          <DepartmentDistributionChart 
+            data={(() => {
+              const deptCounts = {};
+              students.forEach(s => {
+                const dept = s.Department || 'Unknown';
+                deptCounts[dept] = (deptCounts[dept] || 0) + 1;
+              });
+              return Object.entries(deptCounts).map(([department, count]) => ({ department, count }));
+            })()}
+            title="Students by Department"
+            type="students"
+            height={250}
+            colorScheme="cyan"
+          />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="relative p-6 rounded-3xl overflow-hidden dark:bg-gradient-to-br dark:from-cyan-500/5 dark:to-blue-500/5 bg-gradient-to-br from-white/80 to-indigo-50/80 backdrop-blur-xl dark:border-cyan-500/20 border-indigo-200"
+          style={{
+            boxShadow: document.documentElement.classList.contains('dark') 
+              ? '0 8px 32px rgba(0, 255, 255, 0.1)' 
+              : '0 10px 40px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(79, 70, 229, 0.1)'
+          }}
+        >
+          <DepartmentBarChart 
+            data={(() => {
+              const deptCounts = {};
+              students.forEach(s => {
+                const dept = s.Department || 'Unknown';
+                deptCounts[dept] = (deptCounts[dept] || 0) + 1;
+              });
+              return Object.entries(deptCounts).map(([department, count]) => ({ department, count }));
+            })()}
+            title="Department Breakdown"
+            colorScheme="cyan"
+          />
+        </motion.div>
+      </div>
 
       {/* Add Student Modal */}
       <AddStudentModal
