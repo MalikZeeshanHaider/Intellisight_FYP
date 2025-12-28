@@ -15,7 +15,7 @@ export default function AttendanceLogs() {
   const [error, setError] = useState(null);
   const [pagination, setPagination] = useState({ total: 0, limit: 50, offset: 0 });
   const [showAllLogs, setShowAllLogs] = useState(false);
-  const DISPLAY_LIMIT = 5;
+  const DISPLAY_LIMIT = 4;
   
   // Filters
   const [filters, setFilters] = useState({
@@ -111,55 +111,10 @@ export default function AttendanceLogs() {
       {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden" style={{ zIndex: -1, pointerEvents: 'none' }}>
         {/* Gradient Orbs */}
-        <div className="absolute top-20 right-20 w-96 h-96 rounded-full opacity-20 blur-3xl dark:opacity-30"
-          style={{ background: 'radial-gradient(circle, #8b5cf6 0%, transparent 70%)' }} />
-        <div className="absolute bottom-20 left-20 w-96 h-96 rounded-full opacity-20 blur-3xl dark:opacity-30"
-          style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)' }} />
-        
-        {/* Scan Lines Effect */}
-        <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="log-line-gradient-1" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="rgb(139, 92, 246)" stopOpacity="0" />
-              <stop offset="50%" stopColor="rgb(139, 92, 246)" stopOpacity="0.12" />
-              <stop offset="100%" stopColor="rgb(139, 92, 246)" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="log-line-gradient-2" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="rgb(99, 102, 241)" stopOpacity="0" />
-              <stop offset="50%" stopColor="rgb(99, 102, 241)" stopOpacity="0.12" />
-              <stop offset="100%" stopColor="rgb(99, 102, 241)" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          
-          {/* Diagonal scan lines */}
-          <motion.line 
-            x1="-10%" y1="20%" x2="110%" y2="25%" 
-            stroke="url(#log-line-gradient-1)" 
-            strokeWidth="1.5"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ 
-              pathLength: [0, 1, 0],
-              opacity: [0, 0.5, 0],
-              x1: ["-10%", "10%", "30%"],
-              x2: ["110%", "130%", "150%"]
-            }}
-            transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
-          />
-          
-          <motion.line 
-            x1="-10%" y1="60%" x2="110%" y2="55%" 
-            stroke="url(#log-line-gradient-2)" 
-            strokeWidth="1.5"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ 
-              pathLength: [0, 1, 0],
-              opacity: [0, 0.5, 0],
-              x1: ["-10%", "10%", "30%"],
-              x2: ["110%", "130%", "150%"]
-            }}
-            transition={{ duration: 22, repeat: Infinity, ease: "linear", delay: 5 }}
-          />
-        </svg>
+        <div className="absolute top-20 right-20 w-96 h-96 rounded-full opacity-10 blur-3xl dark:opacity-20"
+          style={{ background: 'radial-gradient(circle, #003d82 0%, transparent 70%)' }} />
+        <div className="absolute bottom-20 left-20 w-96 h-96 rounded-full opacity-10 blur-3xl dark:opacity-20"
+          style={{ background: 'radial-gradient(circle, #305796 0%, transparent 70%)' }} />
       </div>
 
       {/* Header */}
@@ -168,56 +123,43 @@ export default function AttendanceLogs() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
         className="flex justify-between items-start relative mb-8"
-        style={{ zIndex: 20 }}
+        style={{ zIndex: 1 }}
       >
         <div>
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-5xl font-display font-bold mb-2 relative"
+            className="text-4xl font-display font-black relative"
+            style={{
+              color: '#003d82'
+            }}
           >
-            <span
-              style={{
-                background: document.documentElement.classList.contains('dark')
-                  ? 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)'
-                  : 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                textShadow: document.documentElement.classList.contains('dark')
-                  ? '0 0 40px rgba(139, 92, 246, 0.4), 0 0 20px rgba(139, 92, 246, 0.3)'
-                  : '0 0 30px rgba(124, 58, 237, 0.2), 0 0 15px rgba(124, 58, 237, 0.15)'
-              }}
-            >
-              Attendance Logs
-            </span>
+            Attendance Logs
           </motion.h1>
-          <p className="flex items-center gap-2" style={{ color: 'var(--text-soft)' }}>
-            <HiSparkles className="text-purple-400" />
-            View entry and exit history for all zones
-          </p>
         </div>
         
         <motion.button
-          whileHover={{ 
-            scale: 1.05,
-            boxShadow: document.documentElement.classList.contains('dark')
-              ? '0 0 40px rgba(139, 92, 246, 0.6), 0 8px 32px rgba(139, 92, 246, 0.4)'
-              : '0 0 30px rgba(124, 58, 237, 0.4), 0 8px 24px rgba(124, 58, 237, 0.3)'
-          }}
+          whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={exportToCSV}
           disabled={logs.length === 0}
-          className="px-6 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all duration-300 backdrop-blur-xl cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
-            background: document.documentElement.classList.contains('dark')
-              ? 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)'
-              : 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
+            backgroundColor: '#003d82',
             color: '#fff',
-            border: '1px solid rgba(139, 92, 246, 0.3)',
-            boxShadow: document.documentElement.classList.contains('dark')
-              ? '0 8px 32px rgba(139, 92, 246, 0.4)'
-              : '0 8px 16px rgba(124, 58, 237, 0.15), 0 4px 8px rgba(124, 58, 237, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+            boxShadow: '0 4px 12px rgba(0, 61, 130, 0.3)'
+          }}
+          onMouseEnter={(e) => {
+            if (logs.length > 0) {
+              e.currentTarget.style.backgroundColor = '#305796';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(48, 87, 150, 0.4)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (logs.length > 0) {
+              e.currentTarget.style.backgroundColor = '#003d82';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 61, 130, 0.3)';
+            }
           }}
         >
           <FiDownload size={18} />
@@ -230,40 +172,40 @@ export default function AttendanceLogs() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="relative p-6 rounded-3xl overflow-visible dark:bg-gradient-to-br dark:from-purple-500/5 dark:to-indigo-500/5 bg-gradient-to-br from-white/80 to-purple-50/80 backdrop-blur-xl dark:border-purple-500/20 border-purple-200 mt-8"
+        className="relative p-6 rounded-2xl overflow-visible border mt-8"
         style={{
-          boxShadow: document.documentElement.classList.contains('dark') 
-            ? '0 8px 32px rgba(139, 92, 246, 0.15)' 
-            : '0 10px 40px rgba(124, 58, 237, 0.15), 0 4px 12px rgba(139, 92, 246, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+          zIndex: 50,
+          background: document.documentElement.classList.contains('dark')
+            ? 'rgba(13, 27, 36, 0.6)'
+            : 'rgba(255, 255, 255, 0.95)',
+          borderColor: document.documentElement.classList.contains('dark')
+            ? 'rgba(48, 87, 150, 0.2)'
+            : 'rgba(0, 61, 130, 0.15)',
+          boxShadow: document.documentElement.classList.contains('dark')
+            ? '0 4px 16px rgba(0, 0, 0, 0.2)'
+            : '0 2px 8px rgba(0, 61, 130, 0.08)'
         }}
       >
-        {/* Glass shimmer effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
-        
         <div className="flex items-center gap-3 mb-6 relative z-10">
           <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center"
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
             style={{
-              background: document.documentElement.classList.contains('dark')
-                ? 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)'
-                : 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
-              boxShadow: document.documentElement.classList.contains('dark')
-                ? '0 0 24px rgba(139, 92, 246, 0.5)'
-                : '0 8px 16px rgba(124, 58, 237, 0.25)'
+              backgroundColor: '#003d82',
+              boxShadow: '0 4px 12px rgba(0, 61, 130, 0.25)'
             }}
           >
-            <FiFilter className="text-white" size={20} />
+            <FiFilter className="text-white" size={18} />
           </div>
-          <h3 className="text-2xl font-display font-bold" style={{ color: 'var(--text-main)' }}>
+          <h3 className="text-xl font-display font-bold" style={{ color: 'var(--text-main)' }}>
             Filter Logs
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative z-10">
-          <div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative z-50">
+          <div className="relative" style={{ zIndex: 54 }}>
             <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-soft)' }}>
               <div className="flex items-center gap-2">
-                <FiMapPin size={14} className="text-purple-400" />
+                <FiMapPin size={14} style={{ color: '#305796' }} />
                 Zone
               </div>
             </label>
@@ -281,10 +223,10 @@ export default function AttendanceLogs() {
             />
           </div>
 
-          <div>
+          <div className="relative" style={{ zIndex: 53 }}>
             <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-soft)' }}>
               <div className="flex items-center gap-2">
-                <FiUsers size={14} className="text-purple-400" />
+                <FiUsers size={14} style={{ color: '#305796' }} />
                 Person Type
               </div>
             </label>
@@ -299,11 +241,10 @@ export default function AttendanceLogs() {
               ]}
             />
           </div>
-
-          <div>
+          <div className="relative" style={{ zIndex: 52 }}>
             <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-soft)' }}>
               <div className="flex items-center gap-2">
-                <FiClock size={14} className="text-purple-400" />
+                <FiClock size={14} style={{ color: '#003d82' }} />
                 Start Date
               </div>
             </label>
@@ -311,34 +252,28 @@ export default function AttendanceLogs() {
               type="date"
               value={filters.startDate}
               onChange={(e) => handleFilterChange('startDate', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl transition-all duration-300 focus:outline-none"
+              className="w-full px-4 py-3 rounded-xl transition-all duration-300 focus:outline-none font-medium"
               style={{
                 background: 'transparent',
-                border: '2px solid rgba(139, 92, 246, 0.3)',
+                border: '2px solid rgba(0, 61, 130, 0.2)',
                 color: 'var(--text-main)',
-                boxShadow: document.documentElement.classList.contains('dark')
-                  ? '0 0 10px rgba(139, 92, 246, 0.3)'
-                  : '0 0 8px rgba(124, 58, 237, 0.2)'
+                boxShadow: '0 2px 4px rgba(0, 61, 130, 0.05)'
               }}
               onFocus={(e) => {
-                e.target.style.borderColor = '#8b5cf6';
-                e.target.style.boxShadow = document.documentElement.classList.contains('dark')
-                  ? '0 0 20px rgba(139, 92, 246, 0.6), 0 0 40px rgba(139, 92, 246, 0.3)'
-                  : '0 0 15px rgba(124, 58, 237, 0.5), 0 0 30px rgba(124, 58, 237, 0.2)';
+                e.target.style.borderColor = '#003d82';
+                e.target.style.boxShadow = '0 0 0 3px rgba(0, 61, 130, 0.1)';
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = 'rgba(139, 92, 246, 0.3)';
-                e.target.style.boxShadow = document.documentElement.classList.contains('dark')
-                  ? '0 0 10px rgba(139, 92, 246, 0.3)'
-                  : '0 0 8px rgba(124, 58, 237, 0.2)';
+                e.target.style.borderColor = 'rgba(0, 61, 130, 0.2)';
+                e.target.style.boxShadow = '0 2px 4px rgba(0, 61, 130, 0.05)';
               }}
             />
           </div>
 
-          <div>
+          <div className="relative" style={{ zIndex: 51 }}>
             <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-soft)' }}>
               <div className="flex items-center gap-2">
-                <FiClock size={14} className="text-purple-400" />
+                <FiClock size={14} style={{ color: '#003d82' }} />
                 End Date
               </div>
             </label>
@@ -346,26 +281,20 @@ export default function AttendanceLogs() {
               type="date"
               value={filters.endDate}
               onChange={(e) => handleFilterChange('endDate', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl transition-all duration-300 focus:outline-none"
+              className="w-full px-4 py-3 rounded-xl transition-all duration-300 focus:outline-none font-medium"
               style={{
                 background: 'transparent',
-                border: '2px solid rgba(139, 92, 246, 0.3)',
+                border: '2px solid rgba(0, 61, 130, 0.2)',
                 color: 'var(--text-main)',
-                boxShadow: document.documentElement.classList.contains('dark')
-                  ? '0 0 10px rgba(139, 92, 246, 0.3)'
-                  : '0 0 8px rgba(124, 58, 237, 0.2)'
+                boxShadow: '0 2px 4px rgba(0, 61, 130, 0.05)'
               }}
               onFocus={(e) => {
-                e.target.style.borderColor = '#8b5cf6';
-                e.target.style.boxShadow = document.documentElement.classList.contains('dark')
-                  ? '0 0 20px rgba(139, 92, 246, 0.6), 0 0 40px rgba(139, 92, 246, 0.3)'
-                  : '0 0 15px rgba(124, 58, 237, 0.5), 0 0 30px rgba(124, 58, 237, 0.2)';
+                e.target.style.borderColor = '#003d82';
+                e.target.style.boxShadow = '0 0 0 3px rgba(0, 61, 130, 0.1)';
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = 'rgba(139, 92, 246, 0.3)';
-                e.target.style.boxShadow = document.documentElement.classList.contains('dark')
-                  ? '0 0 10px rgba(139, 92, 246, 0.3)'
-                  : '0 0 8px rgba(124, 58, 237, 0.2)';
+                e.target.style.borderColor = 'rgba(0, 61, 130, 0.2)';
+                e.target.style.boxShadow = '0 2px 4px rgba(0, 61, 130, 0.05)';
               }}
             />
           </div>
@@ -402,27 +331,28 @@ export default function AttendanceLogs() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="rounded-3xl overflow-hidden backdrop-blur-xl relative z-10 dark:bg-gradient-to-br dark:from-purple-500/5 dark:via-transparent dark:to-indigo-500/5 mt-8"
+        className="rounded-2xl overflow-hidden border relative mt-8"
         style={{
+          zIndex: 10,
           background: document.documentElement.classList.contains('dark')
             ? 'rgba(13, 27, 36, 0.6)'
-            : 'rgba(255, 255, 255, 0.8)',
-          border: document.documentElement.classList.contains('dark')
-            ? '1px solid rgba(139, 92, 246, 0.2)'
-            : '1px solid rgba(124, 58, 237, 0.15)',
+            : 'rgba(255, 255, 255, 0.95)',
+          borderColor: document.documentElement.classList.contains('dark')
+            ? 'rgba(48, 87, 150, 0.2)'
+            : 'rgba(0, 61, 130, 0.15)',
           boxShadow: document.documentElement.classList.contains('dark')
-            ? '0 8px 32px rgba(0, 0, 0, 0.3)'
-            : '0 8px 32px rgba(124, 58, 237, 0.08), 0 4px 16px rgba(124, 58, 237, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+            ? '0 4px 16px rgba(0, 0, 0, 0.2)'
+            : '0 2px 8px rgba(0, 61, 130, 0.08)'
         }}
       >
         {/* Table Header with Show All Button */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 sm:px-6 py-4 gap-3" style={{ 
           background: document.documentElement.classList.contains('dark')
-            ? 'rgba(139, 92, 246, 0.1)'
-            : 'rgba(124, 58, 237, 0.05)'
+            ? 'rgba(48, 87, 150, 0.1)'
+            : 'rgba(0, 61, 130, 0.05)'
         }}>
           <h3 className="text-base sm:text-lg font-semibold" style={{ color: 'var(--text-main)' }}>
-            Attendance Records ({logs.length})
+            Attendance Records
           </h3>
           {logs.length > DISPLAY_LIMIT && (
             <motion.button
@@ -431,30 +361,30 @@ export default function AttendanceLogs() {
               onClick={() => setShowAllLogs(!showAllLogs)}
               className="flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors"
               style={{
-                background: document.documentElement.classList.contains('dark')
-                  ? 'rgba(139, 92, 246, 0.2)'
-                  : 'rgba(124, 58, 237, 0.1)',
-                color: '#8b5cf6',
-                border: '1px solid rgba(139, 92, 246, 0.3)'
+                backgroundColor: document.documentElement.classList.contains('dark')
+                  ? 'rgba(48, 87, 150, 0.2)'
+                  : 'rgba(0, 61, 130, 0.08)',
+                color: '#003d82',
+                border: '1px solid rgba(0, 61, 130, 0.2)'
               }}
             >
               {showAllLogs ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
-              {showAllLogs ? 'Show Less' : `Show All (${logs.length})`}
+              {showAllLogs ? 'Show Less' : 'Show All'}
             </motion.button>
           )}
         </div>
         
-        <div className="overflow-x-auto">
+        <div className="overflow-y-auto" style={{ maxHeight: '400px' }}>
           <table className="min-w-full">
             <thead>
-              <tr className="backdrop-blur-sm" style={{ 
+              <tr style={{ 
                 background: document.documentElement.classList.contains('dark')
-                  ? 'rgba(139, 92, 246, 0.1)'
-                  : 'rgba(124, 58, 237, 0.05)'
+                  ? 'rgba(48, 87, 150, 0.1)'
+                  : 'rgba(0, 61, 130, 0.05)'
               }}>
                 <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>
                   <div className="flex items-center gap-1 sm:gap-2">
-                    <FiMapPin className="text-purple-400 hidden sm:block" size={14} />
+                    <FiMapPin style={{ color: '#305796' }} className="hidden sm:block" size={14} />
                     Zone
                   </div>
                 </th>
@@ -463,13 +393,13 @@ export default function AttendanceLogs() {
                 <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider hidden lg:table-cell" style={{ color: 'var(--text-soft)' }}>Department</th>
                 <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>
                   <div className="flex items-center gap-1 sm:gap-2">
-                    <FiClock className="text-purple-400 hidden sm:block" size={14} />
+                    <FiClock style={{ color: '#305796' }} className="hidden sm:block" size={14} />
                     Entry
                   </div>
                 </th>
                 <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider hidden sm:table-cell" style={{ color: 'var(--text-soft)' }}>
                   <div className="flex items-center gap-2">
-                    <FiClock className="text-purple-400" size={14} />
+                    <FiClock style={{ color: '#305796' }} size={14} />
                     Exit
                   </div>
                 </th>
@@ -484,14 +414,10 @@ export default function AttendanceLogs() {
                       <motion.div
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                        className="w-16 h-16 rounded-xl flex items-center justify-center"
                         style={{
-                          background: document.documentElement.classList.contains('dark')
-                            ? 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)'
-                            : 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
-                          boxShadow: document.documentElement.classList.contains('dark')
-                            ? '0 0 40px rgba(139, 92, 246, 0.5)'
-                            : '0 8px 32px rgba(124, 58, 237, 0.3)'
+                          backgroundColor: '#003d82',
+                          boxShadow: '0 4px 16px rgba(0, 61, 130, 0.3)'
                         }}
                       >
                         <FiClock className="text-white" size={28} />
@@ -519,17 +445,17 @@ export default function AttendanceLogs() {
                       <motion.div
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
-                        className="w-20 h-20 rounded-2xl flex items-center justify-center backdrop-blur-sm"
+                        className="w-20 h-20 rounded-xl flex items-center justify-center"
                         style={{
                           background: document.documentElement.classList.contains('dark')
-                            ? 'rgba(139, 92, 246, 0.1)'
-                            : 'rgba(124, 58, 237, 0.05)',
+                            ? 'rgba(48, 87, 150, 0.1)'
+                            : 'rgba(0, 61, 130, 0.05)',
                           border: document.documentElement.classList.contains('dark')
-                            ? '2px solid rgba(139, 92, 246, 0.3)'
-                            : '2px solid rgba(124, 58, 237, 0.2)'
+                            ? '2px solid rgba(48, 87, 150, 0.3)'
+                            : '2px solid rgba(0, 61, 130, 0.2)'
                         }}
                       >
-                        <FiClock size={40} className="text-purple-400 opacity-50" />
+                        <FiClock size={40} style={{ color: '#305796', opacity: 0.5 }} />
                       </motion.div>
                       <div>
                         <p className="font-bold text-xl mb-2" style={{ color: 'var(--text-main)' }}>
@@ -558,13 +484,13 @@ export default function AttendanceLogs() {
                         className="transition-all duration-300 cursor-pointer"
                         style={{ 
                           borderBottom: document.documentElement.classList.contains('dark')
-                            ? '1px solid rgba(139, 92, 246, 0.1)'
-                            : '1px solid rgba(124, 58, 237, 0.08)'
+                            ? '1px solid rgba(48, 87, 150, 0.1)'
+                            : '1px solid rgba(0, 61, 130, 0.08)'
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = document.documentElement.classList.contains('dark')
-                            ? 'rgba(139, 92, 246, 0.08)'
-                            : 'rgba(124, 58, 237, 0.03)';
+                            ? 'rgba(48, 87, 150, 0.08)'
+                            : 'rgba(0, 61, 130, 0.03)';
                           e.currentTarget.style.transform = 'translateX(4px)';
                         }}
                         onMouseLeave={(e) => {
@@ -578,12 +504,8 @@ export default function AttendanceLogs() {
                               whileHover={{ scale: 1.1, rotate: 5 }}
                               className="w-10 h-10 rounded-xl flex items-center justify-center"
                               style={{
-                                background: document.documentElement.classList.contains('dark')
-                                  ? 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)'
-                                  : 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
-                                boxShadow: document.documentElement.classList.contains('dark')
-                                  ? '0 0 20px rgba(139, 92, 246, 0.4)'
-                                  : '0 4px 12px rgba(124, 58, 237, 0.3)'
+                                backgroundColor: '#003d82',
+                                boxShadow: '0 4px 12px rgba(0, 61, 130, 0.25)'
                               }}
                             >
                               <FiMapPin className="text-white" size={16} />
@@ -596,14 +518,14 @@ export default function AttendanceLogs() {
                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <div
-                              className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-lg backdrop-blur-sm"
+                              className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-lg"
                               style={{
                                 background: isStudent 
                                   ? 'linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%)'
                                   : 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
                                 boxShadow: isStudent
-                                  ? '0 0 20px rgba(6, 182, 212, 0.4)'
-                                  : '0 0 20px rgba(16, 185, 129, 0.4)'
+                                  ? '0 4px 12px rgba(6, 182, 212, 0.3)'
+                                  : '0 4px 12px rgba(16, 185, 129, 0.3)'
                               }}
                             >
                               {person?.Name?.charAt(0) || '?'}
@@ -615,9 +537,9 @@ export default function AttendanceLogs() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden md:table-cell">
                           <span
-                            className="px-3 py-1.5 rounded-full text-xs font-bold backdrop-blur-sm"
+                            className="px-3 py-1.5 rounded-full text-xs font-bold"
                             style={{
                               background: isStudent 
                                 ? (document.documentElement.classList.contains('dark')
@@ -633,21 +555,21 @@ export default function AttendanceLogs() {
                             {log.personType}
                           </span>
                         </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium hidden md:table-cell" style={{ color: 'var(--text-soft)' }}>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium hidden lg:table-cell" style={{ color: 'var(--text-soft)' }}>
                           {person?.Department || '-'}
                         </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold hidden lg:table-cell" style={{ color: 'var(--text-main)' }}>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
                           {formatDateTime(log.entryTime)}
                         </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold hidden lg:table-cell" style={{ color: 'var(--text-main)' }}>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold hidden sm:table-cell" style={{ color: 'var(--text-main)' }}>
                           {formatDateTime(log.exitTime)}
                         </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-bold px-3 py-1 rounded-lg backdrop-blur-sm" style={{ 
-                            color: '#8b5cf6',
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                          <span className="text-sm font-bold px-3 py-1 rounded-lg" style={{ 
+                            color: '#003d82',
                             background: document.documentElement.classList.contains('dark')
-                              ? 'rgba(139, 92, 246, 0.15)'
-                              : 'rgba(124, 58, 237, 0.08)'
+                              ? 'rgba(48, 87, 150, 0.15)'
+                              : 'rgba(0, 61, 130, 0.08)'
                           }}>
                             {formatDuration(log.duration)}
                           </span>
@@ -664,20 +586,20 @@ export default function AttendanceLogs() {
         {/* Pagination */}
         {pagination.total > pagination.limit && (
           <div
-            className="px-6 py-5 flex items-center justify-between backdrop-blur-sm"
+            className="px-6 py-5 flex items-center justify-between"
             style={{
               background: document.documentElement.classList.contains('dark')
-                ? 'rgba(139, 92, 246, 0.05)'
-                : 'rgba(124, 58, 237, 0.03)',
+                ? 'rgba(48, 87, 150, 0.05)'
+                : 'rgba(0, 61, 130, 0.03)',
               borderTop: document.documentElement.classList.contains('dark')
-                ? '1px solid rgba(139, 92, 246, 0.2)'
-                : '1px solid rgba(124, 58, 237, 0.15)'
+                ? '1px solid rgba(48, 87, 150, 0.2)'
+                : '1px solid rgba(0, 61, 130, 0.15)'
             }}
           >
             <div className="text-sm font-semibold" style={{ color: 'var(--text-soft)' }}>
-              Showing <span className="text-purple-500 font-bold">{pagination.offset + 1}</span> to{' '}
-              <span className="text-purple-500 font-bold">{Math.min(pagination.offset + pagination.limit, pagination.total)}</span> of{' '}
-              <span className="text-purple-500 font-bold">{pagination.total}</span> results
+              Showing <span style={{ color: '#003d82' }} className="font-bold">{pagination.offset + 1}</span> to{' '}
+              <span style={{ color: '#003d82' }} className="font-bold">{Math.min(pagination.offset + pagination.limit, pagination.total)}</span> of{' '}
+              <span style={{ color: '#003d82' }} className="font-bold">{pagination.total}</span> results
             </div>
             <div className="flex gap-3">
               <motion.button
@@ -685,14 +607,14 @@ export default function AttendanceLogs() {
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setPagination(prev => ({ ...prev, offset: Math.max(0, prev.offset - prev.limit) }))}
                 disabled={pagination.offset === 0}
-                className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed backdrop-blur-sm"
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
                   background: document.documentElement.classList.contains('dark')
                     ? 'rgba(13, 27, 36, 0.8)'
-                    : 'rgba(255, 255, 255, 0.8)',
+                    : 'rgba(255, 255, 255, 0.9)',
                   border: document.documentElement.classList.contains('dark')
-                    ? '1px solid rgba(139, 92, 246, 0.3)'
-                    : '1px solid rgba(124, 58, 237, 0.2)',
+                    ? '1px solid rgba(48, 87, 150, 0.3)'
+                    : '1px solid rgba(0, 61, 130, 0.2)',
                   color: 'var(--text-main)',
                   boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
                 }}
@@ -704,16 +626,12 @@ export default function AttendanceLogs() {
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setPagination(prev => ({ ...prev, offset: prev.offset + prev.limit }))}
                 disabled={pagination.offset + pagination.limit >= pagination.total}
-                className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed backdrop-blur-sm"
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
-                  background: document.documentElement.classList.contains('dark')
-                    ? 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)'
-                    : 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
+                  backgroundColor: '#003d82',
                   color: '#fff',
-                  border: '1px solid rgba(139, 92, 246, 0.3)',
-                  boxShadow: document.documentElement.classList.contains('dark')
-                    ? '0 4px 16px rgba(139, 92, 246, 0.4)'
-                    : '0 4px 12px rgba(124, 58, 237, 0.3)'
+                  border: '1px solid rgba(0, 61, 130, 0.3)',
+                  boxShadow: '0 4px 12px rgba(0, 61, 130, 0.3)'
                 }}
               >
                 Next
@@ -730,16 +648,22 @@ export default function AttendanceLogs() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
-          className="relative p-6 rounded-3xl overflow-visible dark:bg-gradient-to-br dark:from-purple-500/5 dark:to-indigo-500/5 bg-gradient-to-br from-white/80 to-purple-50/80 backdrop-blur-xl dark:border-purple-500/20 border-purple-200"
+          className="relative p-6 rounded-2xl overflow-visible border"
           style={{
-            boxShadow: document.documentElement.classList.contains('dark') 
-              ? '0 8px 32px rgba(139, 92, 246, 0.15)' 
-              : '0 10px 40px rgba(124, 58, 237, 0.15), 0 4px 12px rgba(139, 92, 246, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+            background: document.documentElement.classList.contains('dark')
+              ? 'rgba(13, 27, 36, 0.6)'
+              : 'rgba(255, 255, 255, 0.95)',
+            borderColor: document.documentElement.classList.contains('dark')
+              ? 'rgba(48, 87, 150, 0.2)'
+              : 'rgba(0, 61, 130, 0.15)',
+            boxShadow: document.documentElement.classList.contains('dark')
+              ? '0 4px 16px rgba(0, 0, 0, 0.2)'
+              : '0 2px 8px rgba(0, 61, 130, 0.08)'
           }}
         >
           <PeakHoursHeatmap 
             title="Peak Activity Hours"
-            colorScheme="purple"
+            colorScheme="blue"
           />
         </motion.div>
 
@@ -748,11 +672,17 @@ export default function AttendanceLogs() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.27 }}
-          className="relative p-6 rounded-3xl overflow-visible dark:bg-gradient-to-br dark:from-purple-500/5 dark:to-indigo-500/5 bg-gradient-to-br from-white/80 to-purple-50/80 backdrop-blur-xl dark:border-purple-500/20 border-purple-200"
+          className="relative p-6 rounded-2xl overflow-visible border"
           style={{
-            boxShadow: document.documentElement.classList.contains('dark') 
-              ? '0 8px 32px rgba(139, 92, 246, 0.15)' 
-              : '0 10px 40px rgba(124, 58, 237, 0.15), 0 4px 12px rgba(139, 92, 246, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+            background: document.documentElement.classList.contains('dark')
+              ? 'rgba(13, 27, 36, 0.6)'
+              : 'rgba(255, 255, 255, 0.95)',
+            borderColor: document.documentElement.classList.contains('dark')
+              ? 'rgba(48, 87, 150, 0.2)'
+              : 'rgba(0, 61, 130, 0.15)',
+            boxShadow: document.documentElement.classList.contains('dark')
+              ? '0 4px 16px rgba(0, 0, 0, 0.2)'
+              : '0 2px 8px rgba(0, 61, 130, 0.08)'
           }}
         >
           <WeeklyTrendsChart 

@@ -558,71 +558,60 @@ If models are missing, run: npm run download-models`);
 
   return (
     <div className="space-y-6 pb-20 relative">
-      {/* Animated Background */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute inset-0 bg-gradient-radial from-cyan-500/5 via-transparent to-transparent dark:from-cyan-500/10"></div>
-        <div className="absolute inset-0 bg-gradient-radial from-purple-500/5 via-transparent to-transparent dark:from-purple-500/10" style={{ transform: 'translate(50%, 50%)' }}></div>
-      </div>
 
       {/* Header */}
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative bg-white/80 dark:bg-surface/80 backdrop-blur-xl rounded-xl shadow-2xl p-6 border border-cyan-500/20"
+        className="relative bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700"
       >
-        {/* Scan Line Effect */}
-        <div className="absolute inset-0 overflow-hidden rounded-xl pointer-events-none">
-          <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/10 via-transparent to-transparent animate-scan"></div>
-        </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-display font-black mb-2" style={{ color: '#003d82' }}>
+              Zone 1 Live Tracking
+            </h1>
+          </div>
 
-        <div className="flex items-center justify-between relative z-10">
-        <div>
-          <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent dark:from-cyan-300 dark:via-blue-400 dark:to-purple-500">
-            Zone 1 Live Tracking
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300 flex items-center space-x-2">
-            <HiSparkles className="text-cyan-500 dark:text-cyan-400" />
-            <span>Real-time face recognition and tracking</span>
-          </p>
-        </div>
-
-        <div className="flex items-center space-x-3">{/* Database Stats Display */}
-          <div className="bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-lg px-5 py-2.5 shadow-lg">
-            <div className="flex items-center space-x-4">
-              <div className="text-center">
-                <p className="text-xs font-medium opacity-90">Students</p>
-                <p className="text-xl font-bold">{faceDatabase.students?.length || 0}</p>
+          <div className="flex items-center space-x-3">            {/* Database Stats Display */}
+            <div className="rounded-xl px-5 py-2.5 shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <div className="flex items-center space-x-4">
+                <div className="text-center">
+                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Students</p>
+                  <p className="text-xl font-bold" style={{ color: '#003d82' }}>{faceDatabase.students?.length || 0}</p>
+                </div>
+                <div className="w-px h-8 bg-gray-300 dark:bg-gray-600"></div>
+                <div className="text-center">
+                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Teachers</p>
+                  <p className="text-xl font-bold" style={{ color: '#003d82' }}>{faceDatabase.teachers?.length || 0}</p>
+                </div>
+                <div className="w-px h-8 bg-gray-300 dark:bg-gray-600"></div>
+                <div className="text-center">
+                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Total</p>
+                  <p className="text-xl font-bold" style={{ color: '#003d82' }}>{(faceDatabase.students?.length || 0) + (faceDatabase.teachers?.length || 0)}</p>
+                </div>
               </div>
-              <div className="w-px h-8 bg-white opacity-30"></div>
-              <div className="text-center">
-                <p className="text-xs font-medium opacity-90">Teachers</p>
-                <p className="text-xl font-bold">{faceDatabase.teachers?.length || 0}</p>
-              </div>
-              <div className="w-px h-8 bg-white opacity-30"></div>
-              <div className="text-center">
-                <p className="text-xs font-medium opacity-90">Total</p>
-                <p className="text-xl font-bold">{(faceDatabase.students?.length || 0) + (faceDatabase.teachers?.length || 0)}</p>
-              </div>
+              <p className="text-[10px] text-center mt-1 text-gray-500 dark:text-gray-400">📸 Images Loaded for Matching</p>
             </div>
-            <p className="text-[10px] text-center mt-1 opacity-75">📸 Images Loaded for Matching</p>
-          </div>
           
-          <div className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-500/20 to-emerald-500/20 dark:from-green-500/30 dark:to-emerald-500/30 backdrop-blur-sm rounded-full border border-green-500/30 shadow-lg shadow-green-500/20">
-            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-lg shadow-green-500/50"></div>
-            <span className="text-green-700 dark:text-green-300 font-semibold">Auto Detection Active</span>
-          </div>
+            <div className="flex items-center space-x-2 px-4 py-2 rounded-xl border" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)', color: '#10b981' }}>
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="font-semibold">Auto Detection Active</span>
+            </div>
           
-          <motion.button
-            whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleReEnroll}
-            disabled={isReEnrolling}
-            className={`flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 dark:from-cyan-600 dark:to-blue-700 text-white rounded-lg shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-shadow ${isReEnrolling ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            <FiRefreshCw size={16} className={isReEnrolling ? 'animate-spin' : ''} />
-            <span>{isReEnrolling ? 'Re-enrolling...' : 'Restart & Re-enroll'}</span>
-          </motion.button>
-        </div>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleReEnroll}
+              disabled={isReEnrolling}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-xl font-semibold transition ${isReEnrolling ? 'opacity-50 cursor-not-allowed' : ''}`}
+              style={{ backgroundColor: '#003d82', color: '#fff' }}
+              onMouseEnter={(e) => { if (!isReEnrolling) e.currentTarget.style.backgroundColor = '#305796'; }}
+              onMouseLeave={(e) => { if (!isReEnrolling) e.currentTarget.style.backgroundColor = '#003d82'; }}
+            >
+              <FiRefreshCw size={16} className={isReEnrolling ? 'animate-spin' : ''} />
+              <span>{isReEnrolling ? 'Re-enrolling...' : 'Restart & Re-enroll'}</span>
+            </motion.button>
+          </div>
         </div>
       </motion.div>
 
@@ -631,7 +620,7 @@ If models are missing, run: npm run download-models`);
         <motion.div 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-red-500/10 dark:bg-red-500/20 backdrop-blur-xl border border-red-500/30 rounded-lg p-4 flex items-start justify-between shadow-lg shadow-red-500/20"
+          className="rounded-xl p-4 flex items-start justify-between border" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)' }}
         >
           <div className="flex items-start">
             <FiAlertCircle className="text-red-500 dark:text-red-400 mt-0.5 mr-3 flex-shrink-0" size={20} />
@@ -651,7 +640,7 @@ If models are missing, run: npm run download-models`);
         <motion.div 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-green-500/10 dark:bg-green-500/20 backdrop-blur-xl border border-green-500/30 rounded-lg p-4 flex items-start justify-between shadow-lg shadow-green-500/20"
+          className="rounded-xl p-4 flex items-start justify-between border" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}
         >
           <div className="flex items-start">
             <FiCheckCircle className="text-green-500 dark:text-green-400 mt-0.5 mr-3 flex-shrink-0" size={20} />
@@ -670,90 +659,62 @@ If models are missing, run: npm run download-models`);
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <motion.div 
-          whileHover={{ scale: 1.02, y: -4 }}
-          className="relative bg-white/80 dark:bg-surface/80 backdrop-blur-xl rounded-xl shadow-lg p-4 border border-green-500/20 overflow-hidden group"
+          whileHover={{ scale: 1.02 }}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700"
         >
-          {/* Scan Line */}
-          <div className="absolute inset-0 bg-gradient-to-b from-green-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          
-          <div className="flex items-center justify-between relative z-10">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Known in Zone</p>
-              <p className="text-3xl font-bold text-[#047857] dark:text-[#10b981]">{stats.knownInZone}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">Known in Zone</p>
+              <p className="text-3xl font-bold text-green-600">{stats.knownInZone}</p>
             </div>
-            <motion.div 
-              whileHover={{ scale: 1.1, rotate: 360 }}
-              transition={{ duration: 0.5 }}
-              className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/20 dark:from-green-500/30 dark:to-emerald-500/30 rounded-full flex items-center justify-center shadow-lg shadow-green-500/20"
-            >
+            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
               <FiCheckCircle className="text-green-600 dark:text-green-400" size={24} />
-            </motion.div>
+            </div>
           </div>
         </motion.div>
 
         <motion.div 
-          whileHover={{ scale: 1.02, y: -4 }}
-          className="relative bg-white/80 dark:bg-surface/80 backdrop-blur-xl rounded-xl shadow-lg p-4 border border-red-500/20 overflow-hidden group"
+          whileHover={{ scale: 1.02 }}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700"
         >
-          {/* Scan Line */}
-          <div className="absolute inset-0 bg-gradient-to-b from-red-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          
-          <div className="flex items-center justify-between relative z-10">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Unknown in Zone</p>
-              <p className="text-3xl font-bold text-[#b91c1c] dark:text-[#ef4444]">{stats.unknownInZone}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">Unknown in Zone</p>
+              <p className="text-3xl font-bold" style={{ color: '#d97706' }}>{stats.unknownInZone}</p>
             </div>
-            <motion.div 
-              whileHover={{ scale: 1.1, rotate: 360 }}
-              transition={{ duration: 0.5 }}
-              className="w-12 h-12 bg-gradient-to-br from-red-500/20 to-rose-500/20 dark:from-red-500/30 dark:to-rose-500/30 rounded-full flex items-center justify-center shadow-lg shadow-red-500/20"
-            >
-              <FiAlertCircle className="text-red-600 dark:text-red-400" size={24} />
-            </motion.div>
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(217, 119, 6, 0.1)' }}>
+              <FiAlertCircle style={{ color: '#d97706' }} size={24} />
+            </div>
           </div>
         </motion.div>
 
         <motion.div 
-          whileHover={{ scale: 1.02, y: -4 }}
-          className="relative bg-white/80 dark:bg-surface/80 backdrop-blur-xl rounded-xl shadow-lg p-4 border border-cyan-500/20 overflow-hidden group"
+          whileHover={{ scale: 1.02 }}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700"
         >
-          {/* Scan Line */}
-          <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          
-          <div className="flex items-center justify-between relative z-10">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Total Recognized</p>
-              <p className="text-3xl font-bold text-[#0369a1] dark:text-[#00ffff]">{stats.knownInZone + stats.unknownInZone}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">Total Recognized</p>
+              <p className="text-3xl font-bold" style={{ color: '#003d82' }}>{stats.knownInZone + stats.unknownInZone}</p>
             </div>
-            <motion.div 
-              whileHover={{ scale: 1.1, rotate: 360 }}
-              transition={{ duration: 0.5 }}
-              className="w-12 h-12 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 dark:from-cyan-500/30 dark:to-blue-500/30 rounded-full flex items-center justify-center shadow-lg shadow-cyan-500/20"
-            >
-              <FiCheckCircle className="text-cyan-600 dark:text-cyan-400" size={24} />
-            </motion.div>
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(0, 61, 130, 0.1)' }}>
+              <FiCheckCircle style={{ color: '#003d82' }} size={24} />
+            </div>
           </div>
         </motion.div>
 
         <motion.div 
-          whileHover={{ scale: 1.02, y: -4 }}
-          className="relative bg-white/80 dark:bg-surface/80 backdrop-blur-xl rounded-xl shadow-lg p-4 border border-orange-500/20 overflow-hidden group"
+          whileHover={{ scale: 1.02 }}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700"
         >
-          {/* Scan Line */}
-          <div className="absolute inset-0 bg-gradient-to-b from-orange-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          
-          <div className="flex items-center justify-between relative z-10">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Total Unknown</p>
-              <p className="text-3xl font-bold text-[#c2410c] dark:text-[#fb923c]">{stats.totalUnknown}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">Total Unknown</p>
+              <p className="text-3xl font-bold" style={{ color: '#6b9bd1' }}>{stats.totalUnknown}</p>
             </div>
-            <motion.div 
-              whileHover={{ scale: 1.1, rotate: 360 }}
-              transition={{ duration: 0.5 }}
-              className="w-12 h-12 bg-gradient-to-br from-orange-500/20 to-amber-500/20 dark:from-orange-500/30 dark:to-amber-500/30 rounded-full flex items-center justify-center shadow-lg shadow-orange-500/20"
-            >
-              <FiAlertCircle className="text-orange-600 dark:text-orange-400" size={24} />
-            </motion.div>
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(107, 155, 209, 0.1)' }}>
+              <FiAlertCircle style={{ color: '#6b9bd1' }} size={24} />
+            </div>
           </div>
         </motion.div>
       </div>
@@ -764,35 +725,28 @@ If models are missing, run: npm run download-models`);
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="relative bg-gradient-to-r from-green-500/10 via-emerald-500/10 to-cyan-500/10 dark:from-green-500/20 dark:via-emerald-500/20 dark:to-cyan-500/20 backdrop-blur-xl border border-green-500/30 rounded-lg p-4 overflow-hidden shadow-lg shadow-green-500/10"
+          className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm"
         >
-          {/* Animated Glow */}
-          <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 via-emerald-500/5 to-transparent animate-pulse pointer-events-none"></div>
-          
-          <div className="flex items-start space-x-3 relative z-10">
+          <div className="flex items-start space-x-3">
             <div className="flex-shrink-0">
-              <motion.div 
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/50"
-              >
-                <FiCheckCircle className="text-white" size={20} />
-              </motion.div>
+              <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
+                <FiCheckCircle className="text-green-600" size={20} />
+              </div>
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">🎥 Automatic Face Recognition Active</h3>
+              <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-2">🎥 Automatic Face Recognition Active</h3>
               <p className="text-gray-700 dark:text-gray-300 text-sm mb-2">
                 The system is continuously monitoring all cameras. When someone stands in front of a camera, 
                 their face will be automatically detected and recognized within 3 seconds.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
                 <div className="flex items-center space-x-2 text-sm">
-                  <div className="w-2 h-2 bg-green-500 rounded-full shadow-lg shadow-green-500/50"></div>
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <span className="text-gray-600 dark:text-gray-400"><strong className="text-green-600 dark:text-green-400">Entry Camera:</strong> Adds to Active Presence</span>
                 </div>
                 <div className="flex items-center space-x-2 text-sm">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full shadow-lg shadow-orange-500/50"></div>
-                  <span className="text-gray-600 dark:text-gray-400"><strong className="text-orange-600 dark:text-orange-400">Exit Camera:</strong> Logs Attendance & Duration</span>
+                  <div className="w-2 h-2" style={{ backgroundColor: '#d97706' }} className="rounded-full"></div>
+                  <span className="text-gray-600 dark:text-gray-400"><strong style={{ color: '#d97706' }}>Exit Camera:</strong> Logs Attendance & Duration</span>
                 </div>
               </div>
             </div>
@@ -802,10 +756,13 @@ If models are missing, run: npm run download-models`);
         {/* Add Camera Button */}
         <div className="flex justify-end">
           <motion.button
-            whileHover={{ scale: 1.05, y: -2 }}
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setShowAddCameraModal(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 dark:from-cyan-600 dark:to-blue-700 text-white rounded-lg shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-shadow"
+            className="flex items-center space-x-2 px-4 py-2 rounded-xl font-semibold transition"
+            style={{ backgroundColor: '#003d82', color: '#fff' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#305796'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#003d82'}
           >
             <FiCheckCircle size={16} />
             <span>Add Camera</span>
@@ -830,11 +787,11 @@ If models are missing, run: npm run download-models`);
               >
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center">
-                    <span className={`w-3 h-3 ${cameraColorBg} rounded-full mr-2 animate-pulse shadow-lg ${cameraColorShadow}`}></span>
+                    <span className={`w-3 h-3 ${cameraColorBg} rounded-full mr-2 animate-pulse`}></span>
                     {camera.label}
                   </h3>
                   <div className="flex items-center space-x-3">
-                    <span className="text-sm px-3 py-1 rounded-full bg-cyan-500/10 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30">
+                    <span className="text-sm px-3 py-1 rounded-xl font-medium" style={{ backgroundColor: 'rgba(0, 61, 130, 0.1)', color: '#003d82' }}>
                       {detections.length} face(s)
                     </span>
                     {cameras.filter(c => c.enabled).length > 1 && (
@@ -868,7 +825,7 @@ If models are missing, run: npm run download-models`);
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white/80 dark:bg-surface/80 backdrop-blur-xl rounded-xl shadow-lg border border-purple-500/20"
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700"
         >
           <ZoneLogs 
             knownLogs={logs} 
@@ -883,24 +840,19 @@ If models are missing, run: npm run download-models`);
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
         >
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="relative bg-white/90 dark:bg-surface/90 backdrop-blur-xl rounded-xl p-6 max-w-md w-full mx-4 border border-cyan-500/30 shadow-2xl shadow-cyan-500/20"
+            className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200 dark:border-gray-700 shadow-xl"
           >
-            {/* Scan Line Effect */}
-            <div className="absolute inset-0 overflow-hidden rounded-xl pointer-events-none">
-              <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/10 via-transparent to-transparent animate-scan"></div>
-            </div>
-
-            <div className="flex items-center justify-between mb-4 relative z-10">
-              <h3 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-600 bg-clip-text text-transparent dark:from-cyan-300 dark:to-blue-500">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold" style={{ color: '#003d82' }}>
                 Add New Camera
               </h3>
               <motion.button 
-                whileHover={{ scale: 1.1, rotate: 90 }}
+                whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={() => setShowAddCameraModal(false)}
               >
@@ -908,7 +860,7 @@ If models are missing, run: npm run download-models`);
               </motion.button>
             </div>
 
-            <div className="space-y-4 relative z-10">
+            <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Camera Label
@@ -918,7 +870,8 @@ If models are missing, run: npm run download-models`);
                   value={newCamera.label}
                   onChange={(e) => setNewCamera({ ...newCamera, label: e.target.value })}
                   placeholder="e.g., Entry Camera, Exit Camera"
-                  className="w-full px-3 py-2 border border-cyan-500/30 dark:border-cyan-500/20 bg-white/50 dark:bg-surface/50 backdrop-blur-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 focus:border-transparent text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-xl focus:outline-none text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400"
+                  style={{ focusRingColor: '#003d82' }}
                 />
               </div>
 
@@ -929,27 +882,28 @@ If models are missing, run: npm run download-models`);
                 <select
                   value={newCamera.type}
                   onChange={(e) => setNewCamera({ ...newCamera, type: e.target.value })}
-                  className="w-full px-3 py-2 border border-cyan-500/30 dark:border-cyan-500/20 bg-white/50 dark:bg-surface/50 backdrop-blur-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 focus:border-transparent text-gray-800 dark:text-gray-200"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-xl focus:outline-none text-gray-800 dark:text-gray-200"
+                  style={{ focusRingColor: '#003d82' }}
                 >
                   <option value="Entry">Entry (Adds to Active Presence)</option>
                   <option value="Exit">Exit (Logs to Attendance)</option>
                 </select>
               </div>
 
-              <div className="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10 dark:from-cyan-500/20 dark:via-blue-500/20 dark:to-purple-500/20 backdrop-blur-sm border border-cyan-500/30 rounded-lg p-3">
+              <div className="rounded-xl p-3 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                  <strong className="text-cyan-600 dark:text-cyan-400">Entry Camera:</strong> Detects people entering and adds them to active presence.<br />
-                  <strong className="text-purple-600 dark:text-purple-400">Exit Camera:</strong> Detects people leaving and logs their attendance.
+                  <strong style={{ color: '#003d82' }}>Entry Camera:</strong> Detects people entering and adds them to active presence.<br />
+                  <strong style={{ color: '#6b9bd1' }}>Exit Camera:</strong> Detects people leaving and logs their attendance.
                 </p>
               </div>
             </div>
 
-            <div className="flex justify-end space-x-3 mt-6 relative z-10">
+            <div className="flex justify-end space-x-3 mt-6">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setShowAddCameraModal(false)}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                className="px-4 py-2 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 font-semibold transition"
               >
                 Cancel
               </motion.button>
@@ -957,7 +911,10 @@ If models are missing, run: npm run download-models`);
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={addCamera}
-                className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 dark:from-cyan-600 dark:to-blue-700 text-white rounded-lg shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-shadow"
+                className="px-4 py-2 rounded-xl font-semibold transition"
+                style={{ backgroundColor: '#003d82', color: '#fff' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#305796'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#003d82'}
               >
                 Add Camera
               </motion.button>
@@ -967,32 +924,32 @@ If models are missing, run: npm run download-models`);
       )}
 
       {/* Bottom: Live Detection Info */}
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">Live Detection Status</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Live Detection Status</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+          <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
             <div className="flex items-center space-x-3 mb-2">
               <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-              <h3 className="font-semibold text-green-800">Known Persons Detected</h3>
+              <h3 className="font-semibold text-green-800 dark:text-green-300">Known Persons Detected</h3>
             </div>
             <p className="text-3xl font-bold text-green-600">{stats.knownInZone}</p>
-            <p className="text-sm text-gray-600 mt-1">People recognized from database</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">People recognized from database</p>
           </div>
           
-          <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+          <div className="p-4 rounded-xl border" style={{ backgroundColor: 'rgba(217, 119, 6, 0.1)', borderColor: 'rgba(217, 119, 6, 0.3)' }}>
             <div className="flex items-center space-x-3 mb-2">
-              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-              <h3 className="font-semibold text-red-800">Unknown Persons Detected</h3>
+              <div className="w-3 h-3 rounded-full animate-pulse" style={{ backgroundColor: '#d97706' }}></div>
+              <h3 className="font-semibold" style={{ color: '#d97706' }}>Unknown Persons Detected</h3>
             </div>
-            <p className="text-3xl font-bold text-red-600">{stats.unknownInZone}</p>
-            <p className="text-sm text-gray-600 mt-1">Faces not in database</p>
+            <p className="text-3xl font-bold" style={{ color: '#d97706' }}>{stats.unknownInZone}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Faces not in database</p>
           </div>
         </div>
         
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <p className="text-sm text-blue-800">
+        <div className="mt-4 p-3 rounded-xl border" style={{ backgroundColor: 'rgba(0, 61, 130, 0.05)', borderColor: 'rgba(0, 61, 130, 0.2)' }}>
+          <p className="text-sm" style={{ color: '#003d82' }}>
             <strong>Note:</strong> Counts update in real-time based on current camera detections.
-            Green boxes = Known persons | Red boxes = Unknown persons
+            Green boxes = Known persons | Orange boxes = Unknown persons
           </p>
         </div>
       </div>

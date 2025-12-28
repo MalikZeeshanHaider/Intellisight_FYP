@@ -208,9 +208,13 @@ const ZoneLive = () => {
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            className="inline-block w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full mb-4"
+            className="inline-block w-16 h-16 rounded-full mb-4"
+            style={{
+              border: '4px solid rgba(0, 61, 130, 0.2)',
+              borderTopColor: '#003d82'
+            }}
           />
-          <p className="text-gray-600 dark:text-gray-400">Loading zone...</p>
+          <p className="text-gray-600 dark:text-gray-400 font-medium">Loading zone...</p>
         </div>
       </div>
     );
@@ -227,43 +231,46 @@ const ZoneLive = () => {
         <div className="flex items-center space-x-4">
           <button
             onClick={() => navigate('/zones')}
-            className="flex items-center justify-center w-10 h-10 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition"
+            className="flex items-center justify-center w-10 h-10 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition"
           >
-            <FiArrowLeft size={20} />
+            <FiArrowLeft size={20} style={{ color: '#003d82' }} />
           </button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-800 dark:text-white">
+            <h1 className="text-4xl font-display font-black" style={{ color: '#003d82' }}>
               {zone?.Zone_Name} - Live Tracking
             </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Real-time face recognition and monitoring
-            </p>
           </div>
         </div>
 
         <div className="flex gap-3">
           {!serviceOnline && (
-            <div className="flex items-center space-x-2 px-4 py-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-lg">
+            <div className="flex items-center space-x-2 px-4 py-2 rounded-xl border" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.3)', color: '#d97706' }}>
               <FiAlertCircle size={18} />
-              <span className="text-sm font-medium">Service Offline</span>
+              <span className="text-sm font-semibold">Service Offline</span>
             </div>
           )}
           {serviceOnline && (
-            <div className="flex items-center space-x-2 px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg">
+            <div className="flex items-center space-x-2 px-4 py-2 rounded-xl border" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)', color: '#10b981' }}>
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-sm font-medium">Service Running</span>
+              <span className="text-sm font-semibold">Service Running</span>
             </div>
           )}
           <button
             onClick={handleRefresh}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            className="flex items-center space-x-2 px-4 py-2 rounded-xl font-semibold transition"
+            style={{ backgroundColor: '#003d82', color: '#fff' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#305796'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#003d82'}
           >
             <FiRefreshCw size={18} className={loading ? 'animate-spin' : ''} />
             <span>Refresh</span>
           </button>
           <button
             onClick={() => setShowAddCameraModal(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+            className="flex items-center space-x-2 px-4 py-2 rounded-xl font-semibold transition"
+            style={{ backgroundColor: '#10b981', color: '#fff' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#059669'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
           >
             <FiPlus size={18} />
             <span>Add Camera</span>
@@ -292,18 +299,21 @@ const ZoneLive = () => {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="col-span-full bg-white dark:bg-gray-800 rounded-xl p-12 text-center border-2 border-dashed border-gray-300 dark:border-gray-700"
+            className="col-span-full bg-white dark:bg-gray-800 rounded-xl p-12 text-center border-2 border-dashed" style={{ borderColor: 'rgba(0, 61, 130, 0.2)' }}
           >
-            <FiVideo size={48} className="mx-auto mb-4 text-gray-400" />
-            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">
+            <FiVideo size={48} className="mx-auto mb-4" style={{ color: '#003d82', opacity: 0.5 }} />
+            <h3 className="text-xl font-bold mb-2" style={{ color: '#003d82' }}>
               No Cameras Configured
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Add IP cameras to start live face recognition for this zone
+              Add IP cameras to start live face recognition
             </p>
             <button
               onClick={() => setShowAddCameraModal(true)}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+              className="px-6 py-2 rounded-xl font-semibold transition"
+              style={{ backgroundColor: '#003d82', color: '#fff' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#305796'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#003d82'}
             >
               Configure First Camera
             </button>
@@ -314,7 +324,7 @@ const ZoneLive = () => {
               key={camera.Camara_Id}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-lg"
+              className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700"
             >
               {/* Camera Header */}
               <div className="flex items-start justify-between p-4 border-b dark:border-gray-700">
@@ -416,17 +426,17 @@ const ZoneLive = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow">
-          <h3 className="text-sm text-gray-600 dark:text-gray-400 mb-2">Known in Zone</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <h3 className="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">Known in Zone</h3>
           <p className="text-3xl font-bold text-green-600">0</p>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow">
-          <h3 className="text-sm text-gray-600 dark:text-gray-400 mb-2">Unknown in Zone</h3>
-          <p className="text-3xl font-bold text-red-600">0</p>
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <h3 className="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">Unknown in Zone</h3>
+          <p className="text-3xl font-bold" style={{ color: '#d97706' }}>0</p>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow">
-          <h3 className="text-sm text-gray-600 dark:text-gray-400 mb-2">Total Recognized</h3>
-          <p className="text-3xl font-bold text-blue-600">0</p>
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <h3 className="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">Total Recognized</h3>
+          <p className="text-3xl font-bold" style={{ color: '#003d82' }}>0</p>
         </div>
       </div>
 
@@ -538,14 +548,17 @@ const ZoneLive = () => {
                 <button
                   onClick={() => setShowAddCameraModal(false)}
                   disabled={isSubmitting}
-                  className="flex-1 px-4 py-3 rounded-lg font-bold border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition disabled:opacity-50"
+                  className="flex-1 px-4 py-3 rounded-xl font-semibold border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddCamera}
                   disabled={!newCamera.Camera_URL.trim() || isSubmitting}
-                  className="flex-1 px-4 py-3 rounded-lg font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  className="flex-1 px-4 py-3 rounded-xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: '#003d82', color: '#fff' }}
+                  onMouseEnter={(e) => { if (!isSubmitting && newCamera.Camera_URL.trim()) e.currentTarget.style.backgroundColor = '#305796'; }}
+                  onMouseLeave={(e) => { if (!isSubmitting) e.currentTarget.style.backgroundColor = '#003d82'; }}
                 >
                   {isSubmitting ? 'Adding...' : 'Add Camera'}
                 </button>
@@ -630,14 +643,17 @@ const ZoneLive = () => {
                 <button
                   onClick={() => setShowEditCameraModal(false)}
                   disabled={isSubmitting}
-                  className="flex-1 px-4 py-3 rounded-lg font-bold border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition disabled:opacity-50"
+                  className="flex-1 px-4 py-3 rounded-xl font-semibold border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleEditCamera}
                   disabled={!editingCamera.Camera_URL.trim() || isSubmitting}
-                  className="flex-1 px-4 py-3 rounded-lg font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  className="flex-1 px-4 py-3 rounded-xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: '#003d82', color: '#fff' }}
+                  onMouseEnter={(e) => { if (!isSubmitting && editingCamera.Camera_URL.trim()) e.currentTarget.style.backgroundColor = '#305796'; }}
+                  onMouseLeave={(e) => { if (!isSubmitting) e.currentTarget.style.backgroundColor = '#003d82'; }}
                 >
                   {isSubmitting ? 'Updating...' : 'Update Camera'}
                 </button>

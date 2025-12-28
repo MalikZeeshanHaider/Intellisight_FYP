@@ -81,7 +81,6 @@ const WeeklyTrendsChart = ({
               className="w-3 h-3 rounded-full"
               style={{ 
                 backgroundColor: entry.color,
-                boxShadow: `0 0 6px ${entry.color}`,
               }}
             />
             <span className="text-xs" style={{ color: 'var(--text-soft)' }}>
@@ -101,24 +100,6 @@ const WeeklyTrendsChart = ({
       
       <ResponsiveContainer width="100%" height={height}>
         <ComposedChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-          <defs>
-            <linearGradient id="detectedGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#00ffff" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#00ffff" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="recognizedGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
-            </linearGradient>
-            <filter id="lineGlow">
-              <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-              <feMerge>
-                <feMergeNode in="coloredBlur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-          
           <CartesianGrid 
             strokeDasharray="3 3" 
             stroke="var(--border-light)"
@@ -154,26 +135,16 @@ const WeeklyTrendsChart = ({
           <Tooltip content={<CustomTooltip />} />
           <Legend content={<CustomLegend />} />
 
-          {/* Area under detected line */}
-          <Area
-            yAxisId="left"
-            type="monotone"
-            dataKey="detected"
-            fill="url(#detectedGradient)"
-            stroke="transparent"
-          />
-
           {/* Detected line */}
           <Line
             yAxisId="left"
             type="monotone"
             dataKey="detected"
             name="Total Detected"
-            stroke="#00ffff"
+            stroke="#003d82"
             strokeWidth={3}
-            dot={{ fill: '#00ffff', strokeWidth: 2, r: 4 }}
-            activeDot={{ r: 6, stroke: '#00ffff', strokeWidth: 2, fill: 'var(--bg-card)' }}
-            filter="url(#lineGlow)"
+            dot={{ fill: '#003d82', strokeWidth: 2, r: 4 }}
+            activeDot={{ r: 6, stroke: '#003d82', strokeWidth: 2, fill: 'var(--bg-card)' }}
           />
 
           {/* Recognized line */}
@@ -182,10 +153,10 @@ const WeeklyTrendsChart = ({
             type="monotone"
             dataKey="recognized"
             name="Recognized"
-            stroke="#a855f7"
+            stroke="#6b9bd1"
             strokeWidth={3}
-            dot={{ fill: '#a855f7', strokeWidth: 2, r: 4 }}
-            activeDot={{ r: 6, stroke: '#a855f7', strokeWidth: 2, fill: 'var(--bg-card)' }}
+            dot={{ fill: '#6b9bd1', strokeWidth: 2, r: 4 }}
+            activeDot={{ r: 6, stroke: '#6b9bd1', strokeWidth: 2, fill: 'var(--bg-card)' }}
           />
 
           {/* Unknown line */}

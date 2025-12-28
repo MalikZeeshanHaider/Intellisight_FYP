@@ -55,6 +55,12 @@ const PeakHoursHeatmap = ({
 
   // Color schemes
   const colorSchemes = {
+    blue: {
+      low: 'rgba(0, 61, 130, 0.15)',
+      mid: 'rgba(0, 61, 130, 0.5)',
+      high: 'rgba(0, 61, 130, 1)',
+      glow: 'rgba(0, 61, 130, 0.3)',
+    },
     cyan: {
       low: 'rgba(0, 255, 255, 0.1)',
       mid: 'rgba(0, 255, 255, 0.5)',
@@ -75,7 +81,7 @@ const PeakHoursHeatmap = ({
     },
   };
 
-  const colors = colorSchemes[colorScheme] || colorSchemes.cyan;
+  const colors = colorSchemes[colorScheme] || colorSchemes.blue;
 
   // Get color based on normalized value
   const getColor = (value) => {
@@ -184,13 +190,12 @@ const PeakHoursHeatmap = ({
           <div className="flex items-center justify-end mt-4 gap-2">
             <span className="text-xs" style={{ color: 'var(--text-soft)' }}>Less</span>
             <div className="flex gap-1">
-              {[0.1, 0.3, 0.5, 0.7, 1].map((opacity, idx) => (
+              {[0.15, 0.35, 0.55, 0.75, 1].map((opacity, idx) => (
                 <div
                   key={idx}
                   className="w-4 h-4 rounded-sm"
                   style={{
-                    backgroundColor: `rgba(0, 255, 255, ${opacity})`,
-                    boxShadow: opacity > 0.5 ? `0 0 6px ${colors.glow}` : 'none',
+                    backgroundColor: `rgba(0, 61, 130, ${opacity})`,
                   }}
                 />
               ))}

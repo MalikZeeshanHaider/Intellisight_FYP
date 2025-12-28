@@ -93,16 +93,25 @@ const UnknownFaces = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Unknown Faces Log</h1>
-          <p className="text-gray-600 mt-1">
-            All unrecognized persons detected in Zone 1
-          </p>
+          <h1 className="text-4xl font-display font-black" style={{ color: '#003d82' }}>
+            Unknown Faces Log
+          </h1>
         </div>
 
         <button
           onClick={() => fetchUnknownFaces()}
           disabled={loading}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+          className="flex items-center space-x-2 px-4 py-2 rounded-lg transition disabled:opacity-50"
+          style={{
+            backgroundColor: loading ? '#e5e7eb' : '#003d82',
+            color: '#fff'
+          }}
+          onMouseEnter={(e) => {
+            if (!loading) e.currentTarget.style.backgroundColor = '#305796';
+          }}
+          onMouseLeave={(e) => {
+            if (!loading) e.currentTarget.style.backgroundColor = '#003d82';
+          }}
         >
           <FiRefreshCw className={loading ? 'animate-spin' : ''} size={16} />
           <span>Refresh</span>
@@ -136,22 +145,22 @@ const UnknownFaces = () => {
 
       {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-md p-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Unknown</p>
-              <p className="text-3xl font-bold text-red-600">{unknownFaces.length}</p>
+              <p className="text-sm text-gray-600 font-medium">Total Unknown</p>
+              <p className="text-3xl font-bold" style={{ color: '#003d82' }}>{unknownFaces.length}</p>
             </div>
-            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-              <FiAlertCircle className="text-red-600" size={24} />
+            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(0, 61, 130, 0.1)' }}>
+              <FiAlertCircle style={{ color: '#003d82' }} size={24} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md p-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Pending</p>
+              <p className="text-sm text-gray-600 font-medium">Pending</p>
               <p className="text-3xl font-bold text-yellow-600">
                 {unknownFaces.filter(f => f.Status === 'PENDING').length}
               </p>
@@ -162,10 +171,10 @@ const UnknownFaces = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md p-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Identified</p>
+              <p className="text-sm text-gray-600 font-medium">Identified</p>
               <p className="text-3xl font-bold text-green-600">
                 {unknownFaces.filter(f => f.Status === 'IDENTIFIED').length}
               </p>
@@ -176,10 +185,10 @@ const UnknownFaces = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md p-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Ignored</p>
+              <p className="text-sm text-gray-600 font-medium">Ignored</p>
               <p className="text-3xl font-bold text-gray-600">
                 {unknownFaces.filter(f => f.Status === 'IGNORED').length}
               </p>
@@ -192,16 +201,22 @@ const UnknownFaces = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-md p-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         <div className="flex items-center space-x-2">
-          <span className="text-sm font-medium text-gray-700">Filter:</span>
+          <span className="text-sm font-semibold text-gray-700">Filter:</span>
           <button
             onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              filter === 'all'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition`}
+            style={{
+              backgroundColor: filter === 'all' ? '#003d82' : '#f3f4f6',
+              color: filter === 'all' ? '#fff' : '#374151'
+            }}
+            onMouseEnter={(e) => {
+              if (filter !== 'all') e.currentTarget.style.backgroundColor = '#e5e7eb';
+            }}
+            onMouseLeave={(e) => {
+              if (filter !== 'all') e.currentTarget.style.backgroundColor = '#f3f4f6';
+            }}
           >
             All
           </button>
@@ -239,13 +254,13 @@ const UnknownFaces = () => {
       </div>
 
       {/* Unknown Faces Grid */}
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">Detected Faces</h2>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h2 className="text-xl font-bold mb-4" style={{ color: '#003d82' }}>Detected Faces</h2>
 
         {loading && unknownFaces.length === 0 ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 mb-4" style={{ borderColor: '#003d82' }}></div>
               <p className="text-gray-600">Loading unknown faces...</p>
             </div>
           </div>
@@ -342,9 +357,9 @@ const UnknownFaces = () => {
       </div>
 
       {/* Auto-refresh indicator */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-center">
-        <div className="flex items-center text-sm text-blue-700">
-          <div className="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-pulse"></div>
+      <div className="rounded-lg p-3 flex items-center justify-center" style={{ backgroundColor: 'rgba(0, 61, 130, 0.05)', border: '1px solid rgba(0, 61, 130, 0.2)' }}>
+        <div className="flex items-center text-sm" style={{ color: '#003d82' }}>
+          <div className="w-2 h-2 rounded-full mr-2 animate-pulse" style={{ backgroundColor: '#003d82' }}></div>
           <span>Auto-refreshing every 5 seconds</span>
         </div>
       </div>
