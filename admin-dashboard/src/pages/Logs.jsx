@@ -4,9 +4,10 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { FiFileText, FiRefreshCw, FiAlertCircle, FiFilter, FiClock, FiLogIn, FiLogOut } from 'react-icons/fi';
+import { FiFileText, FiRefreshCw, FiAlertCircle, FiFilter, FiClock, FiLogIn, FiLogOut, FiChevronDown } from 'react-icons/fi';
 import { zone1API } from '../api/zone1';
 import { format } from 'date-fns';
+import { motion } from 'framer-motion';
 
 const Logs = () => {
   const [logs, setLogs] = useState([]);
@@ -84,7 +85,7 @@ const Logs = () => {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: '#305796' }}></div>
           <p className="text-gray-600">Loading logs...</p>
         </div>
       </div>
@@ -94,28 +95,71 @@ const Logs = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">Activity Logs</h1>
-          <div className="flex items-center space-x-2 mt-1">
-            <p className="text-gray-600">Zone tracking history with Entry/Exit times</p>
-            <span className="text-xs text-gray-400">
-              • Last updated: {format(lastUpdate, 'HH:mm:ss')}
-            </span>
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative p-6 rounded-2xl bg-white"
+        style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)' }}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2" style={{ color: '#305796' }}>
+              Activity Logs
+            </h1>
+            <p className="text-sm font-medium" style={{ color: '#6b7280' }}>
+              Zone tracking history • {logs.length} total entries
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            {/* Auto-update indicator */}
             {isRefreshing && (
-              <span className="flex items-center text-xs text-blue-600">
-                <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse mr-1"></div>
+              <div className="flex items-center gap-2 text-sm font-medium" style={{ color: '#305796' }}>
+                <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: '#305796' }}></div>
                 Auto-updating...
-              </span>
+              </div>
             )}
+            
+            {/* Last update time */}
+            <div className="text-xs font-medium text-gray-500">
+              Last updated: {format(lastUpdate, 'HH:mm:ss')}
+            </div>
           </div>
         </div>
-        
-        <div className="flex items-center space-x-4">
+      </motion.div>
+
+      {/* Filters */}
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="relative p-4 rounded-2xl bg-white flex items-center justify-between"
+        style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)' }}
+      >
+        <div className="flex items-center gap-3">
+          <style>{`
+            .custom-logs-dropdown {
+              appearance: none;
+              background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23305796' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+              background-repeat: no-repeat;
+              background-position: right 0.75rem center;
+              background-size: 1.125em;
+              padding-right: 2.5rem;
+            }
+          `}</style>
+          
           <select
             value={personTypeFilter}
             onChange={(e) => setPersonTypeFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="custom-logs-dropdown px-4 py-2 rounded-xl font-medium text-sm transition-all cursor-pointer"
+            style={{ backgroundColor: '#f3f4f6', color: '#6b7280', border: 'none', outline: 'none' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(48, 87, 150, 0.1)';
+              e.currentTarget.style.color = '#305796';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6';
+              e.currentTarget.style.color = '#6b7280';
+            }}
           >
             <option value="">All Types</option>
             <option value="Student">Students Only</option>
@@ -125,73 +169,106 @@ const Logs = () => {
           <select
             value={limit}
             onChange={(e) => setLimit(Number(e.target.value))}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="custom-logs-dropdown px-4 py-2 rounded-xl font-medium text-sm transition-all cursor-pointer"
+            style={{ backgroundColor: '#f3f4f6', color: '#6b7280', border: 'none', outline: 'none' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(48, 87, 150, 0.1)';
+              e.currentTarget.style.color = '#305796';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6';
+              e.currentTarget.style.color = '#6b7280';
+            }}
           >
             <option value={25}>Last 25 entries</option>
             <option value={50}>Last 50 entries</option>
             <option value={100}>Last 100 entries</option>
             <option value={200}>Last 200 entries</option>
           </select>
-          
-          <button
-            onClick={() => fetchLogs(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-          >
-            <FiRefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            <span>Refresh</span>
-          </button>
         </div>
-      </div>
+        
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => fetchLogs(true)}
+          className="flex items-center gap-2 px-4 py-2 text-white rounded-xl font-semibold text-sm transition-all"
+          style={{ backgroundColor: '#305796', boxShadow: '0 2px 8px rgba(48, 87, 150, 0.25)' }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#274370'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#305796'}
+        >
+          <FiRefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          <span>Refresh</span>
+        </motion.button>
+      </motion.div>
 
       {/* Error Alert */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start">
-          <FiAlertCircle className="text-red-500 mt-0.5 mr-3 flex-shrink-0" size={20} />
-          <p className="text-red-600">{error}</p>
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 rounded-xl border flex items-start"
+          style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+        >
+          <FiAlertCircle className="mt-0.5 mr-3 flex-shrink-0" style={{ color: '#ef4444' }} size={20} />
+          <p className="text-sm font-medium" style={{ color: '#ef4444' }}>{error}</p>
+        </motion.div>
       )}
 
       {/* Logs Table */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-2xl overflow-hidden"
+        style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)' }}
+      >
         {logs.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <FiFileText size={64} className="mx-auto mb-4 opacity-30" />
-            <p className="text-lg">No activity logs found</p>
+          <div className="text-center py-16">
+            <div className="w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: 'rgba(48, 87, 150, 0.1)' }}>
+              <FiFileText style={{ color: '#305796' }} size={40} />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Activity Logs</h3>
+            <p className="text-gray-600">No logs found for the selected filters</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 400px)', overflowX: 'hidden' }}>
+            <table className="w-full divide-y" style={{ borderColor: 'rgba(48, 87, 150, 0.1)' }}>
+              <thead style={{ backgroundColor: 'rgba(48, 87, 150, 0.05)' }}>
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#305796' }}>
                     Person
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#305796' }}>
                     Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#305796' }}>
                     Zone
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#305796' }}>
                     Entry Time
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#305796' }}>
                     Exit Time
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#305796' }}>
                     Duration
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#305796' }}>
                     Status
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y" style={{ borderColor: 'rgba(48, 87, 150, 0.05)' }}>
                 {logs.map((log) => (
-                  <tr key={log.TimeTable_ID} className="hover:bg-gray-50">
+                  <tr 
+                    key={log.TimeTable_ID} 
+                    className="transition-all duration-200"
+                    style={{ cursor: 'default' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(48, 87, 150, 0.05)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
+                        <div className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #305796 0%, #4a7cb8 100%)' }}>
                           <span className="text-white font-semibold text-sm">
                             {log.Name?.[0] || '?'}
                           </span>
@@ -263,7 +340,7 @@ const Logs = () => {
             </table>
           </div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 };

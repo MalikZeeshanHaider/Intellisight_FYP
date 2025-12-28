@@ -19,7 +19,9 @@ import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import Students from './pages/Students';
+import StudentDetail from './pages/StudentDetail';
 import Teachers from './pages/Teachers';
+import TeacherDetail from './pages/TeacherDetail';
 import Zones from './pages/Zones';
 import ZoneDetail from './pages/ZoneDetail';
 import Zone1 from './pages/Zone1';
@@ -87,12 +89,38 @@ function App() {
             />
 
             <Route
+              path="/students/:id"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ErrorBoundary>
+                      <StudentDetail />
+                    </ErrorBoundary>
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
               path="/teachers"
               element={
                 <ProtectedRoute>
                   <Layout>
                     <ErrorBoundary>
                       <Teachers />
+                    </ErrorBoundary>
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/teachers/:id"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ErrorBoundary>
+                      <TeacherDetail />
                     </ErrorBoundary>
                   </Layout>
                 </ProtectedRoute>

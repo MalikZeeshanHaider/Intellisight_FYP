@@ -475,3 +475,103 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   scrollbar-width: thin;
   scrollbar-color: #305796 #f3f4f6;
 }
+
+/* Custom Scrollbar for Student Modal */
+.custom-student-modal-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-student-modal-scrollbar::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 10px;
+}
+
+.custom-student-modal-scrollbar::-webkit-scrollbar-thumb {
+  background: #6365baff;
+  border-radius: 10px;
+}
+
+.custom-student-modal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #5558a8;
+}
+
+/* Firefox scrollbar */
+.custom-student-modal-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #6365baff #f3f4f6;
+}
+
+/* Custom Scrollbar for Student Table - Blue/Purple */
+.custom-student-table-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-student-table-scrollbar::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 10px;
+}
+
+.custom-student-table-scrollbar::-webkit-scrollbar-thumb {
+  background: #6365baff;
+  border-radius: 10px;
+}
+
+.custom-student-table-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #5558a8;
+}
+
+/* Firefox scrollbar */
+.custom-student-table-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #6365baff #f3f4f6;
+}
+
+/* Custom Scrollbar for Teacher Modal */
+.custom-teacher-modal-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-teacher-modal-scrollbar::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 10px;
+}
+
+.custom-teacher-modal-scrollbar::-webkit-scrollbar-thumb {
+  background: #247e5bff;
+  border-radius: 10px;
+}
+
+.custom-teacher-modal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #1d6549;
+}
+
+/* Firefox scrollbar */
+.custom-teacher-modal-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #247e5bff #f3f4f6;
+}
+
+/* Custom Scrollbar for Teacher Table - Green */
+.custom-teacher-table-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-teacher-table-scrollbar::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 10px;
+}
+
+.custom-teacher-table-scrollbar::-webkit-scrollbar-thumb {
+  background: #247e5bff;
+  border-radius: 10px;
+}
+
+.custom-teacher-table-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #1d6549;
+}
+
+/* Firefox scrollbar */
+.custom-teacher-table-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #247e5bff #f3f4f6;
+}

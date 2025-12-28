@@ -4,17 +4,20 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { FiRefreshCw, FiSearch, FiAlertCircle, FiPlus, FiEdit2, FiTrash2, FiUserCheck } from 'react-icons/fi';
+import { FiRefreshCw, FiSearch, FiAlertCircle, FiPlus, FiEdit2, FiTrash2, FiUserCheck, FiEye } from 'react-icons/fi';
 import { GiTeacher } from 'react-icons/gi';
 import { HiSparkles } from 'react-icons/hi';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { teacherAPI } from '../api/api';
 import { enrollPerson } from '../api/faceRecognition';
 import AddTeacherModal from '../components/AddTeacherModal';
 import EditTeacherModal from '../components/EditTeacherModal';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import { DepartmentDistributionChart, DepartmentBarChart } from '../components/DepartmentDistributionChart';
 
 const Teachers = () => {
+  const navigate = useNavigate();
   const [teachers, setTeachers] = useState([]);
   const [filteredTeachers, setFilteredTeachers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -23,7 +26,8 @@ const Teachers = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [teacherToDelete, setTeacherToDelete] = useState(null);
   const [enrollingIds, setEnrollingIds] = useState(new Set());
   const [showAllTeachers, setShowAllTeachers] = useState(false);
   const DISPLAY_LIMIT = 6;
@@ -91,22 +95,28 @@ const Teachers = () => {
   };
 
   // Handle delete
-  const handleDelete = async (teacherId) => {
-    if (deleteConfirm !== teacherId) {
-      setDeleteConfirm(teacherId);
-      setTimeout(() => setDeleteConfirm(null), 3000);
-      return;
-    }
+  const handleDelete = (teacherId) => {
+    setTeacherToDelete(teacherId);
+    setShowDeleteModal(true);
+  };
 
+  const confirmDelete = async () => {
     try {
-      await teacherAPI.deleteTeacher(teacherId);
+      await teacherAPI.deleteTeacher(teacherToDelete);
       await fetchTeachers();
-      setDeleteConfirm(null);
+      setShowDeleteModal(false);
+      setTeacherToDelete(null);
     } catch (err) {
       console.error('Error deleting teacher:', err);
       alert('Failed to delete teacher');
-      setDeleteConfirm(null);
+      setShowDeleteModal(false);
+      setTeacherToDelete(null);
     }
+  };
+
+  // Handle view details
+  const handleViewDetails = (teacherId) => {
+    navigate(`/teachers/${teacherId}`);
   };
 
   // Handle enroll
@@ -144,183 +154,58 @@ const Teachers = () => {
 
   return (
     <div className="space-y-6 relative">
-      {/* Animated Background */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-radial from-green-500/5 via-transparent to-transparent dark:from-green-500/10"></div>
-        <div className="absolute inset-0 bg-gradient-radial from-purple-500/5 via-transparent to-transparent dark:from-purple-500/10" style={{ transform: 'translate(50%, 50%)' }}></div>
-        
-        {/* Network Lines Effect */}
-        <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="line-gradient-1" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="rgb(34, 197, 94)" stopOpacity="0" />
-              <stop offset="50%" stopColor="rgb(34, 197, 94)" stopOpacity="0.15" />
-              <stop offset="100%" stopColor="rgb(34, 197, 94)" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="line-gradient-2" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="rgb(16, 185, 129)" stopOpacity="0" />
-              <stop offset="50%" stopColor="rgb(16, 185, 129)" stopOpacity="0.15" />
-              <stop offset="100%" stopColor="rgb(16, 185, 129)" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="line-gradient-3" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="rgb(168, 85, 247)" stopOpacity="0" />
-              <stop offset="50%" stopColor="rgb(168, 85, 247)" stopOpacity="0.15" />
-              <stop offset="100%" stopColor="rgb(168, 85, 247)" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          
-          {/* Horizontal network lines */}
-          <motion.line 
-            x1="-20%" y1="15%" x2="120%" y2="18%" 
-            stroke="url(#line-gradient-1)" 
-            strokeWidth="2"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ 
-              pathLength: [0, 1, 0],
-              opacity: [0, 0.6, 0],
-              x1: ["-20%", "0%", "20%"],
-              x2: ["120%", "140%", "160%"]
-            }}
-            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          />
-          
-          <motion.line 
-            x1="-20%" y1="45%" x2="120%" y2="42%" 
-            stroke="url(#line-gradient-2)" 
-            strokeWidth="2"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ 
-              pathLength: [0, 1, 0],
-              opacity: [0, 0.6, 0],
-              x1: ["-20%", "0%", "20%"],
-              x2: ["120%", "140%", "160%"]
-            }}
-            transition={{ duration: 25, repeat: Infinity, ease: "linear", delay: 4 }}
-          />
-          
-          <motion.line 
-            x1="-20%" y1="75%" x2="120%" y2="78%" 
-            stroke="url(#line-gradient-1)" 
-            strokeWidth="2"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ 
-              pathLength: [0, 1, 0],
-              opacity: [0, 0.6, 0],
-              x1: ["-20%", "0%", "20%"],
-              x2: ["120%", "140%", "160%"]
-            }}
-            transition={{ duration: 22, repeat: Infinity, ease: "linear", delay: 8 }}
-          />
-          
-          {/* Vertical network lines */}
-          <motion.line 
-            x1="25%" y1="-20%" x2="28%" y2="120%" 
-            stroke="url(#line-gradient-3)" 
-            strokeWidth="2"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ 
-              pathLength: [0, 1, 0],
-              opacity: [0, 0.6, 0],
-              y1: ["-20%", "0%", "20%"],
-              y2: ["120%", "140%", "160%"]
-            }}
-            transition={{ duration: 26, repeat: Infinity, ease: "linear", delay: 2 }}
-          />
-          
-          <motion.line 
-            x1="65%" y1="-20%" x2="62%" y2="120%" 
-            stroke="url(#line-gradient-2)" 
-            strokeWidth="2"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ 
-              pathLength: [0, 1, 0],
-              opacity: [0, 0.6, 0],
-              y1: ["-20%", "0%", "20%"],
-              y2: ["120%", "140%", "160%"]
-            }}
-            transition={{ duration: 21, repeat: Infinity, ease: "linear", delay: 6 }}
-          />
-          
-          {/* Connection nodes */}
-          <motion.circle 
-            cx="25%" cy="15%" r="3" 
-            fill="rgb(34, 197, 94)" 
-            opacity="0"
-            animate={{ 
-              opacity: [0, 0.4, 0],
-              r: [3, 5, 3]
-            }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <motion.circle 
-            cx="65%" cy="45%" r="3" 
-            fill="rgb(16, 185, 129)" 
-            opacity="0"
-            animate={{ 
-              opacity: [0, 0.4, 0],
-              r: [3, 5, 3]
-            }}
-            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
-          />
-          <motion.circle 
-            cx="28%" cy="75%" r="3" 
-            fill="rgb(168, 85, 247)" 
-            opacity="0"
-            animate={{ 
-              opacity: [0, 0.4, 0],
-              r: [3, 5, 3]
-            }}
-            transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 3 }}
-          />
-        </svg>
-      </div>
-
       {/* Header */}
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative p-6 rounded-3xl overflow-hidden dark:bg-gradient-to-br dark:from-green-500/5 dark:to-emerald-500/5 bg-gradient-to-br from-white/80 to-green-50/80 backdrop-blur-xl dark:border-green-500/20 border-green-200"
+        className="relative p-6 rounded-2xl bg-white"
         style={{
-          boxShadow: document.documentElement.classList.contains('dark') 
-            ? '0 8px 32px rgba(34, 197, 94, 0.1)' 
-            : '0 10px 40px rgba(34, 197, 94, 0.15), 0 4px 12px rgba(16, 185, 129, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
         }}
       >
-        {/* Glass shimmer effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
-
-      <div className="flex items-center justify-between relative z-10">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-green-400 via-emerald-500 to-teal-600 bg-clip-text text-transparent dark:from-green-300 dark:via-emerald-400 dark:to-teal-500 flex items-center space-x-2">
-            <HiSparkles className="text-green-500 dark:text-green-400" />
-            <span>Teachers</span>
+          <h1 className="text-3xl font-bold mb-2" style={{ color: '#247e5bff' }}>
+            Teachers
           </h1>
-          <p className="text-gray-600 dark:text-gray-300 mt-1">{teachers.length} teachers registered</p>
+          <p className="text-sm font-medium" style={{ color: '#6b7280' }}>{teachers.length} teachers registered</p>
         </div>
 
         <div className="flex items-center space-x-3">
           <motion.button
-            whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 dark:from-green-600 dark:to-emerald-700 text-white rounded-lg shadow-lg shadow-green-500/30 hover:shadow-green-500/50 transition-shadow"
+            className="flex items-center space-x-2 px-4 py-2 text-white rounded-xl font-semibold text-sm transition-all"
+            style={{
+              backgroundColor: '#247e5bff',
+              boxShadow: '0 2px 8px rgba(36, 126, 91, 0.25)'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1d6549'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#247e5bff'}
           >
             <FiPlus size={16} />
             <span>Add Teacher</span>
           </motion.button>
           <motion.button
-            whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.95, rotate: 180 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={fetchTeachers}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-500/10 to-emerald-500/10 dark:from-green-500/20 dark:to-emerald-500/20 backdrop-blur-sm text-green-700 dark:text-green-300 rounded-lg border border-green-500/30 hover:border-green-500/60 hover:shadow-lg hover:shadow-green-500/20 transition-all"
+            className="flex items-center space-x-2 px-4 py-2 rounded-xl font-medium text-sm transition-all"
+            style={{
+              backgroundColor: '#f3f4f6',
+              color: '#6b7280'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e5e7eb'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
           >
             <motion.div
               animate={loading ? { rotate: 360 } : {}}
               transition={{ duration: 1, repeat: loading ? Infinity : 0, ease: "linear" }}
             >
-              <FiRefreshCw size={16} className="text-green-500 dark:text-green-400" />
+              <FiRefreshCw size={16} style={{ color: '#247e5bff' }} />
             </motion.div>
-            <span className="font-semibold">Refresh</span>
+            <span>Refresh</span>
           </motion.button>
         </div>
       </div>
@@ -331,10 +216,10 @@ const Teachers = () => {
         <motion.div 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-red-500/10 dark:bg-red-500/20 backdrop-blur-xl border border-red-500/30 rounded-lg p-4 flex items-start shadow-lg shadow-red-500/20 relative z-10"
+          className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start"
         >
-          <FiAlertCircle className="text-red-500 dark:text-red-400 mt-0.5 mr-3 flex-shrink-0" size={20} />
-          <p className="text-red-700 dark:text-red-300">{error}</p>
+          <FiAlertCircle className="text-red-500 mt-0.5 mr-3 flex-shrink-0" size={20} />
+          <p className="text-red-700 text-sm font-medium">{error}</p>
         </motion.div>
       )}
 
@@ -342,24 +227,19 @@ const Teachers = () => {
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="relative p-4 rounded-3xl overflow-hidden dark:bg-gradient-to-br dark:from-green-500/5 dark:to-emerald-500/5 bg-gradient-to-br from-white/80 to-green-50/80 backdrop-blur-xl dark:border-green-500/20 border-green-200"
+        className="relative p-4 rounded-2xl bg-white"
         style={{
-          boxShadow: document.documentElement.classList.contains('dark') 
-            ? '0 8px 32px rgba(34, 197, 94, 0.1)' 
-            : '0 10px 40px rgba(34, 197, 94, 0.15), 0 4px 12px rgba(16, 185, 129, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
         }}
       >
-        {/* Glass shimmer effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
-        
         <div className="relative">
-          <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-500 dark:text-green-400" size={20} />
+          <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2" style={{ color: '#247e5bff' }} size={20} />
           <input
             type="text"
             placeholder="Search by name, email, or designation..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-transparent border-none rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/50 dark:focus:ring-green-400/50 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 font-medium"
+            className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#247e5bff] text-gray-800 placeholder-gray-500 font-medium transition-colors"
           />
         </div>
       </motion.div>
@@ -368,27 +248,29 @@ const Teachers = () => {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative p-6 rounded-3xl overflow-hidden dark:bg-gradient-to-br dark:from-green-500/5 dark:to-emerald-500/5 bg-gradient-to-br from-white/80 to-green-50/80 backdrop-blur-xl dark:border-green-500/20 border-green-200"
+        className="relative p-6 rounded-2xl bg-white"
         style={{
-          boxShadow: document.documentElement.classList.contains('dark') 
-            ? '0 8px 32px rgba(34, 197, 94, 0.1)' 
-            : '0 10px 40px rgba(34, 197, 94, 0.15), 0 4px 12px rgba(16, 185, 129, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
         }}
       >
-        {/* Glass shimmer effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
-        
         {/* Table Header */}
-        <div className="flex items-center justify-between mb-4 relative z-10">
-          <h3 className="text-lg font-semibold text-green-700 dark:text-green-300">
-            Teacher Records ({filteredTeachers.length})
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold" style={{ color: '#6b7280' }}>
+            Teacher Records
           </h3>
           {filteredTeachers.length > DISPLAY_LIMIT && (
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setShowAllTeachers(!showAllTeachers)}
-              className="px-4 py-2 text-sm font-medium text-green-600 dark:text-green-400 bg-green-500/10 hover:bg-green-500/20 rounded-lg border border-green-500/30 transition-colors"
+              className="px-4 py-2 text-sm font-semibold rounded-xl transition-all"
+              style={{
+                color: '#247e5bff',
+                backgroundColor: 'rgba(36, 126, 91, 0.1)',
+                border: '2px solid rgba(36, 126, 91, 0.3)'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(36, 126, 91, 0.2)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(36, 126, 91, 0.1)'}
             >
               {showAllTeachers ? 'Show Less' : `Show All (${filteredTeachers.length})`}
             </motion.button>
@@ -396,91 +278,111 @@ const Teachers = () => {
         </div>
         
         {filteredTeachers.length === 0 ? (
-          <div className="text-center py-12 text-gray-500 dark:text-gray-400 relative z-10">
+          <div className="text-center py-12" style={{ color: '#6b7280' }}>
             <motion.div
               animate={{ scale: [1, 1.1, 1] }}
               transition={{ duration: 2, repeat: Infinity }}
             >
-              <GiTeacher size={64} className="mx-auto mb-4 opacity-30 text-green-500" />
+              <GiTeacher size={64} className="mx-auto mb-4 opacity-30" style={{ color: '#247e5bff' }} />
             </motion.div>
-            <p className="text-lg">
+            <p className="text-lg font-medium">
               {searchQuery ? 'No teachers found matching your search' : 'No teachers registered'}
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto relative z-10">
-            <table className="min-w-full divide-y divide-green-500/10">
-              <thead className="bg-gradient-to-r from-green-500/10 via-emerald-500/10 to-teal-500/10 dark:from-green-500/20 dark:via-emerald-500/20 dark:to-teal-500/20 backdrop-blur-sm">
+          <div className="overflow-x-auto">
+            <div className="max-h-[400px] overflow-y-auto custom-teacher-table-scrollbar">
+            <table className="min-w-full">
+              <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wider hidden lg:table-cell">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: '#6b7280' }}>
                     ID
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: '#6b7280' }}>
                     Name
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wider hidden md:table-cell">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell" style={{ color: '#6b7280' }}>
                     Faculty Type
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wider hidden sm:table-cell">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden sm:table-cell" style={{ color: '#6b7280' }}>
                     Gender
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: '#6b7280' }}>
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-green-500/10">
+              <tbody className="bg-white divide-y divide-gray-200">
                 {(showAllTeachers ? filteredTeachers : filteredTeachers.slice(0, DISPLAY_LIMIT)).map((teacher) => (
                   <motion.tr 
                     key={teacher.Teacher_ID} 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    whileHover={{ backgroundColor: 'rgba(34, 197, 94, 0.05)' }}
-                    className="transition-colors"
+                    className="hover:bg-gray-50 transition-colors"
                   >
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-green-700 dark:text-green-300 hidden lg:table-cell">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold hidden lg:table-cell" style={{ color: '#247e5bff' }}>
                       {teacher.Teacher_ID}
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <motion.div 
                           whileHover={{ scale: 1.1 }}
-                          className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-green-500/20 to-emerald-500/20 dark:from-green-500/30 dark:to-emerald-500/30 rounded-full flex items-center justify-center border border-green-500/30 shadow-lg shadow-green-500/20"
+                          className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center border-2 shadow-sm"
+                          style={{ 
+                            borderColor: '#247e5bff',
+                            backgroundColor: 'rgba(36, 126, 91, 0.1)'
+                          }}
                         >
-                          <span className="text-green-600 dark:text-green-400 font-semibold">
+                          <span className="font-semibold" style={{ color: '#247e5bff' }}>
                             {teacher.Name?.[0] || '?'}
                           </span>
                         </motion.div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          <div className="text-sm font-medium" style={{ color: '#1f2937' }}>
                             {teacher.Name}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden md:table-cell">
-                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${
+                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         teacher.Faculty_Type === 'Permanent' 
-                          ? 'bg-green-500/10 dark:bg-green-500/20 text-green-700 dark:text-green-300 border-green-500/30' 
-                          : 'bg-blue-500/10 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30'
-                      }`}>
+                          ? 'border-2' 
+                          : 'border-2'
+                      }`}
+                      style={{
+                        backgroundColor: teacher.Faculty_Type === 'Permanent' ? 'rgba(36, 126, 91, 0.15)' : 'rgba(36, 126, 91, 0.08)',
+                        color: teacher.Faculty_Type === 'Permanent' ? '#1d6549' : '#247e5bff',
+                        borderColor: teacher.Faculty_Type === 'Permanent' ? '#247e5bff' : 'rgba(36, 126, 91, 0.3)'
+                      }}>
                         {teacher.Faculty_Type || 'N/A'}
                       </span>
                     </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 hidden sm:table-cell">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm hidden sm:table-cell" style={{ color: '#6b7280' }}>
                       {teacher.Gender || 'N/A'}
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
+                        onClick={() => handleViewDetails(teacher.Teacher_ID)}
+                        className="mr-2 sm:mr-4"
+                        style={{ color: '#247e5bff' }}
+                        title="View details"
+                      >
+                        <FiEye size={18} />
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
                         onClick={() => handleEnroll(teacher.Teacher_ID)}
                         disabled={enrollingIds.has(teacher.Teacher_ID)}
-                        className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 mr-2 sm:mr-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="mr-2 sm:mr-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{ color: '#6b7280' }}
                         title="Enroll face embeddings"
                       >
                         {enrollingIds.has(teacher.Teacher_ID) ? (
-                          <div className="animate-spin h-5 w-5 border-2 border-purple-600 dark:border-purple-400 border-t-transparent rounded-full" />
+                          <div className="animate-spin h-5 w-5 border-2 border-t-transparent rounded-full" style={{ borderColor: '#6b7280' }} />
                         ) : (
                           <FiUserCheck size={18} />
                         )}
@@ -489,7 +391,8 @@ const Teachers = () => {
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => handleEdit(teacher)}
-                        className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 mr-2 sm:mr-4"
+                        className="mr-2 sm:mr-4"
+                        style={{ color: '#247e5bff' }}
                         title="Edit teacher"
                       >
                         <FiEdit2 size={18} />
@@ -498,12 +401,8 @@ const Teachers = () => {
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => handleDelete(teacher.Teacher_ID)}
-                        className={`${
-                          deleteConfirm === teacher.Teacher_ID
-                            ? 'text-red-700 dark:text-red-500 font-bold'
-                            : 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300'
-                        }`}
-                        title={deleteConfirm === teacher.Teacher_ID ? 'Click again to confirm' : 'Delete teacher'}
+                        style={{ color: '#ef4444' }}
+                        title="Delete teacher"
                       >
                         <FiTrash2 size={18} />
                       </motion.button>
@@ -512,30 +411,47 @@ const Teachers = () => {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </motion.div>
 
       {/* Faculty Distribution Charts */}
-      {!loading && teachers.length > 0 && (
-        <motion.div 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          transition={{ delay: 0.1 }}
+          className="relative p-6 rounded-2xl bg-white"
+          style={{
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+          }}
         >
           <DepartmentDistributionChart 
             data={departmentData} 
-            title="Faculty by Type"
-            colorScheme="green"
-          />
-          <DepartmentBarChart 
-            data={departmentData} 
-            title="Faculty Distribution" 
+            title="Teachers by Type"
+            type="teachers"
+            height={250}
             colorScheme="green"
           />
         </motion.div>
-      )}
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="relative p-6 rounded-2xl bg-white"
+          style={{
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+          }}
+        >
+          <DepartmentBarChart 
+            data={departmentData} 
+            title="Faculty Breakdown" 
+            colorScheme="green"
+          />
+        </motion.div>
+      </div>
 
       {/* Add Teacher Modal */}
       <AddTeacherModal
@@ -553,6 +469,18 @@ const Teachers = () => {
         }}
         onSuccess={fetchTeachers}
         teacher={selectedTeacher}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setTeacherToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        title="Delete Teacher"
+        message="Are you sure you want to delete this teacher? This action cannot be undone."
       />
     </div>
   );

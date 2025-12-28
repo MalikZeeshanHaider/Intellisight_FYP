@@ -139,10 +139,10 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-student-modal-scrollbar">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h2 className="text-2xl font-bold text-gray-800">Edit Student</h2>
+                    <h2 className="text-2xl font-bold" style={{ color: '#6365baff' }}>Edit Student</h2>
                     <button
                         onClick={onClose}
                         className="text-gray-500 hover:text-gray-700 transition"
@@ -155,7 +155,7 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     {/* Name */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
                             Name <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -164,14 +164,22 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
                             value={formData.Name}
                             onChange={handleInputChange}
                             required
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.8)',
+                                border: '2px solid rgba(148, 163, 184, 0.3)',
+                                color: '#0F172A',
+                                transition: 'border-color 0.15s ease'
+                            }}
                             placeholder="Enter student name"
+                            onFocus={(e) => e.target.style.borderColor = '#6365baff'}
+                            onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
                         />
                     </div>
 
                     {/* Roll Number */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
                             Roll Number <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -180,14 +188,22 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
                             value={formData.RollNumber}
                             onChange={handleInputChange}
                             required
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.8)',
+                                border: '2px solid rgba(148, 163, 184, 0.3)',
+                                color: '#0F172A',
+                                transition: 'border-color 0.15s ease'
+                            }}
                             placeholder="Enter roll number"
+                            onFocus={(e) => e.target.style.borderColor = '#6365baff'}
+                            onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
                         />
                     </div>
 
                     {/* Email */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
                             Email <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -196,21 +212,37 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
                             value={formData.Email}
                             onChange={handleInputChange}
                             required
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.8)',
+                                border: '2px solid rgba(148, 163, 184, 0.3)',
+                                color: '#0F172A',
+                                transition: 'border-color 0.15s ease'
+                            }}
                             placeholder="student@example.com"
+                            onFocus={(e) => e.target.style.borderColor = '#6365baff'}
+                            onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
                         />
                     </div>
 
                     {/* Gender */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
                             Gender
                         </label>
                         <select
                             name="Gender"
                             value={formData.Gender}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.8)',
+                                border: '2px solid rgba(148, 163, 184, 0.3)',
+                                color: '#0F172A',
+                                transition: 'border-color 0.15s ease'
+                            }}
+                            onFocus={(e) => e.target.style.borderColor = '#6365baff'}
+                            onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
                         >
                             <option value="">Select gender</option>
                             <option value="Male">Male</option>
@@ -221,7 +253,7 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
 
                     {/* Department */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
                             Department
                         </label>
                         <input
@@ -229,14 +261,22 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
                             name="Department"
                             value={formData.Department}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.8)',
+                                border: '2px solid rgba(148, 163, 184, 0.3)',
+                                color: '#0F172A',
+                                transition: 'border-color 0.15s ease'
+                            }}
                             placeholder="Enter department"
+                            onFocus={(e) => e.target.style.borderColor = '#6365baff'}
+                            onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
                         />
                     </div>
 
                     {/* Face Pictures Upload */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
                             Face Pictures (1-5 images)
                         </label>
                         <p className="text-xs text-gray-500 mb-3">
@@ -307,16 +347,30 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+                            className="px-6 py-2 rounded-xl text-sm font-semibold transition-all"
+                            style={{
+                                border: '2px solid #e5e7eb',
+                                color: '#6b7280',
+                                background: '#ffffff'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
-                            className={`px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition ${
+                            className={`px-6 py-2 text-white rounded-xl text-sm font-semibold transition-all ${
                                 loading ? 'opacity-50 cursor-not-allowed' : ''
                             }`}
+                            style={{ backgroundColor: '#6365baff' }}
+                            onMouseEnter={(e) => {
+                                if (!loading) {
+                                    e.currentTarget.style.backgroundColor = '#5558a8';
+                                }
+                            }}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#6365baff'}
                         >
                             {loading ? 'Updating...' : 'Update Student'}
                         </button>

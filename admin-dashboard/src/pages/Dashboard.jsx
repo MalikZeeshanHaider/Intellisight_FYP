@@ -356,11 +356,13 @@ const Dashboard = () => {
           <motion.div variants={itemVariants} className="grid grid-cols-4 gap-3">
             {/* Students Card */}
             <motion.div
-              whileHover={{ scale: 1.03 }}
-              className="relative p-5 rounded-2xl overflow-hidden bg-white transition-all duration-200 h-28 border-2 border-transparent hover:border-[#305796]"
+              className="relative p-5 rounded-2xl overflow-hidden transition-all duration-200 h-28"
                 style={{
+                  backgroundColor: '#ffffff',
                   boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
               >
                 <div className="flex items-start justify-between">
                   <div>
@@ -390,11 +392,13 @@ const Dashboard = () => {
 
             {/* Teachers Card */}
             <motion.div
-              whileHover={{ scale: 1.03 }}
-              className="relative p-5 rounded-2xl overflow-hidden bg-white transition-all duration-200 h-28 border-2 border-transparent hover:border-[#305796]"
+              className="relative p-5 rounded-2xl overflow-hidden transition-all duration-200 h-28"
                 style={{
+                  backgroundColor: '#ffffff',
                   boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
               >
                 <div className="flex items-start justify-between">
                   <div>
@@ -423,11 +427,13 @@ const Dashboard = () => {
 
             {/* Active Presence Card */}
             <motion.div
-              whileHover={{ scale: 1.03 }}
-              className="relative p-5 rounded-2xl overflow-hidden bg-white transition-all duration-200 h-28 border-2 border-transparent hover:border-[#305796]"
+              className="relative p-5 rounded-2xl overflow-hidden transition-all duration-200 h-28"
                 style={{
+                  backgroundColor: '#ffffff',
                   boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
               >
                 <div className="flex items-start justify-between">
                   <div>
@@ -457,11 +463,13 @@ const Dashboard = () => {
 
             {/* Zones Card */}
             <motion.div
-              whileHover={{ scale: 1.03 }}
-              className="relative p-5 rounded-2xl overflow-hidden bg-white transition-all duration-200 h-28 border-2 border-transparent hover:border-[#305796]"
+              className="relative p-5 rounded-2xl overflow-hidden transition-all duration-200 h-28"
                 style={{
+                  backgroundColor: '#ffffff',
                   boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
               >
                 <div className="flex items-start justify-between">
                   <div>
@@ -585,7 +593,7 @@ const Dashboard = () => {
               <h2 className="text-lg font-bold" style={{ color: '#6b7280' }}>Recent Activity</h2>
             </div>
             
-            <div className="space-y-2 overflow-y-auto max-h-[calc(100%-50px)] custom-activity-scrollbar">
+            <div className="space-y-2 overflow-y-auto overflow-x-hidden max-h-[calc(100%-50px)] custom-activity-scrollbar">
               {recentActivity.length === 0 ? (
                 <div className="text-center py-8">
                   <FiClock size={32} className="mx-auto mb-2" style={{ color: 'var(--text-soft)' }} />
@@ -599,9 +607,8 @@ const Dashboard = () => {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
                     whileHover={{
-                      scale: 1.02,
-                      background: 'rgba(48, 87, 150, 0.15)',
-                      borderColor: 'rgba(48, 87, 150, 0.4)'
+                      background: 'rgba(48, 87, 150, 0.12)',
+                      borderColor: 'rgba(48, 87, 150, 0.3)'
                     }}
                     className="p-3 rounded-xl transition-all duration-150"
                     style={{

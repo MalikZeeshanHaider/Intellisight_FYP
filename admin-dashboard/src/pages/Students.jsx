@@ -4,16 +4,18 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { FiUsers, FiRefreshCw, FiSearch, FiAlertCircle, FiPlus, FiEdit2, FiTrash2, FiUserCheck } from 'react-icons/fi';
-import { HiSparkles } from 'react-icons/hi';
+import { FiUsers, FiRefreshCw, FiSearch, FiAlertCircle, FiPlus, FiEdit2, FiTrash2, FiUserCheck, FiEye } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { studentAPI } from '../api/api';
 import { enrollPerson } from '../api/faceRecognition';
 import AddStudentModal from '../components/AddStudentModal';
 import EditStudentModal from '../components/EditStudentModal';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import { DepartmentDistributionChart, DepartmentBarChart } from '../components/DepartmentDistributionChart';
 
 const Students = () => {
+  const navigate = useNavigate();
   const [students, setStudents] = useState([]);
   const [filteredStudents, setFilteredStudents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,7 +24,8 @@ const Students = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState(null);
   const [enrollingIds, setEnrollingIds] = useState(new Set());
   const [showAllStudents, setShowAllStudents] = useState(false);
   const DISPLAY_LIMIT = 6;
@@ -72,22 +75,28 @@ const Students = () => {
     setIsEditModalOpen(true);
   };
   // Handle delete
-  const handleDelete = async (studentId) => {
-    if (deleteConfirm !== studentId) {
-      setDeleteConfirm(studentId);
-      setTimeout(() => setDeleteConfirm(null), 3000);
-      return;
-    }
+  const handleDelete = (studentId) => {
+    setStudentToDelete(studentId);
+    setShowDeleteModal(true);
+  };
 
+  const confirmDelete = async () => {
     try {
-      await studentAPI.deleteStudent(studentId);
+      await studentAPI.deleteStudent(studentToDelete);
       await fetchStudents();
-      setDeleteConfirm(null);
+      setShowDeleteModal(false);
+      setStudentToDelete(null);
     } catch (err) {
       console.error('Error deleting student:', err);
       alert('Failed to delete student');
-      setDeleteConfirm(null);
+      setShowDeleteModal(false);
+      setStudentToDelete(null);
     }
+  };
+
+  // Handle view details
+  const handleViewDetails = (studentId) => {
+    navigate(`/students/${studentId}`);
   };
 
   // Handle enroll
@@ -125,73 +134,58 @@ const Students = () => {
 
   return (
     <div className="space-y-6 relative">
-      {/* Animated Background */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute inset-0 bg-gradient-radial from-cyan-500/5 via-transparent to-transparent dark:from-cyan-500/10"></div>
-        <div className="absolute inset-0 bg-gradient-radial from-blue-500/5 via-transparent to-transparent dark:from-blue-500/10" style={{ transform: 'translate(50%, 50%)' }}></div>
-        
-        {/* Asymmetrical Lines Effect */}
-        <svg className="absolute inset-0 w-full h-full opacity-[0.03] dark:opacity-[0.05]" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="asymmetric-lines" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
-              <line x1="0" y1="20" x2="100" y2="25" stroke="currentColor" strokeWidth="0.5" className="text-cyan-500" />
-              <line x1="0" y1="45" x2="100" y2="40" stroke="currentColor" strokeWidth="0.5" className="text-blue-500" />
-              <line x1="0" y1="70" x2="100" y2="75" stroke="currentColor" strokeWidth="0.5" className="text-purple-500" />
-              <line x1="20" y1="0" x2="25" y2="100" stroke="currentColor" strokeWidth="0.5" className="text-cyan-400" />
-              <line x1="60" y1="0" x2="55" y2="100" stroke="currentColor" strokeWidth="0.5" className="text-blue-400" />
-              <line x1="85" y1="0" x2="90" y2="100" stroke="currentColor" strokeWidth="0.5" className="text-indigo-400" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#asymmetric-lines)" />
-        </svg>
-      </div>
-
       {/* Header */}
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative p-6 rounded-3xl overflow-hidden dark:bg-gradient-to-br dark:from-cyan-500/5 dark:to-blue-500/5 bg-gradient-to-br from-white/80 to-indigo-50/80 backdrop-blur-xl dark:border-cyan-500/20 border-indigo-200"
+        className="relative p-6 rounded-2xl bg-white"
         style={{
-          boxShadow: document.documentElement.classList.contains('dark') 
-            ? '0 8px 32px rgba(0, 255, 255, 0.1)' 
-            : '0 10px 40px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(79, 70, 229, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
         }}
       >
-        {/* Glass shimmer effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
-
-      <div className="flex items-center justify-between relative z-10">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent dark:from-cyan-300 dark:via-blue-400 dark:to-purple-500 flex items-center space-x-2">
-            <HiSparkles className="text-cyan-500 dark:text-cyan-400" />
-            <span>Students</span>
+          <h1 className="text-3xl font-bold mb-2" style={{ color: '#6365baff' }}>
+            Students
           </h1>
-          <p className="text-gray-600 dark:text-gray-300 mt-1">{students.length} students registered</p>
+          <p className="text-sm font-medium" style={{ color: '#6b7280' }}>{students.length} students registered</p>
         </div>
 
         <div className="flex items-center space-x-3">
           <motion.button
-            whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 dark:from-cyan-600 dark:to-blue-700 text-white rounded-lg shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-shadow"
+            className="flex items-center space-x-2 px-4 py-2 text-white rounded-xl font-semibold text-sm transition-all"
+            style={{
+              backgroundColor: '#6365baff',
+              boxShadow: '0 2px 8px rgba(99, 101, 186, 0.25)'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#5558a8'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#6365baff'}
           >
             <FiPlus size={16} />
             <span>Add Student</span>
           </motion.button>
           <motion.button
-            whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.95, rotate: 180 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={fetchStudents}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/20 dark:to-blue-500/20 backdrop-blur-sm text-cyan-700 dark:text-cyan-300 rounded-lg border border-cyan-500/30 hover:border-cyan-500/60 hover:shadow-lg hover:shadow-cyan-500/20 transition-all"
+            className="flex items-center space-x-2 px-4 py-2 rounded-xl font-medium text-sm transition-all"
+            style={{
+              backgroundColor: '#f3f4f6',
+              color: '#6b7280'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e5e7eb'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
           >
             <motion.div
               animate={loading ? { rotate: 360 } : {}}
               transition={{ duration: 1, repeat: loading ? Infinity : 0, ease: "linear" }}
             >
-              <FiRefreshCw size={16} className="text-cyan-500 dark:text-cyan-400" />
+              <FiRefreshCw size={16} style={{ color: '#6365baff' }} />
             </motion.div>
-            <span className="font-semibold">Refresh</span>
+            <span>Refresh</span>
           </motion.button>
         </div>
       </div>
@@ -202,10 +196,10 @@ const Students = () => {
         <motion.div 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-red-500/10 dark:bg-red-500/20 backdrop-blur-xl border border-red-500/30 rounded-lg p-4 flex items-start shadow-lg shadow-red-500/20 relative z-10"
+          className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start"
         >
-          <FiAlertCircle className="text-red-500 dark:text-red-400 mt-0.5 mr-3 flex-shrink-0" size={20} />
-          <p className="text-red-700 dark:text-red-300">{error}</p>
+          <FiAlertCircle className="text-red-500 mt-0.5 mr-3 flex-shrink-0" size={20} />
+          <p className="text-red-700 text-sm font-medium">{error}</p>
         </motion.div>
       )}
 
@@ -213,24 +207,19 @@ const Students = () => {
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="relative p-4 rounded-3xl overflow-hidden dark:bg-gradient-to-br dark:from-cyan-500/5 dark:to-blue-500/5 bg-gradient-to-br from-white/80 to-indigo-50/80 backdrop-blur-xl dark:border-cyan-500/20 border-indigo-200"
+        className="relative p-4 rounded-2xl bg-white"
         style={{
-          boxShadow: document.documentElement.classList.contains('dark') 
-            ? '0 8px 32px rgba(0, 255, 255, 0.1)' 
-            : '0 10px 40px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(79, 70, 229, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
         }}
       >
-        {/* Glass shimmer effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
-        
         <div className="relative">
-          <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-cyan-500 dark:text-cyan-400" size={20} />
+          <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2" style={{ color: '#305796' }} size={20} />
           <input
             type="text"
             placeholder="Search by name, email, or roll number..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-transparent border-none rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500/50 dark:focus:ring-cyan-400/50 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 font-medium"
+            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-2 border-transparent rounded-xl focus:outline-none focus:border-[#305796] text-gray-800 placeholder-gray-400 font-medium transition-all"
           />
         </div>
       </motion.div>
@@ -239,27 +228,26 @@ const Students = () => {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative p-6 rounded-3xl overflow-hidden dark:bg-gradient-to-br dark:from-cyan-500/5 dark:to-blue-500/5 bg-gradient-to-br from-white/80 to-indigo-50/80 backdrop-blur-xl dark:border-cyan-500/20 border-indigo-200"
+        className="relative p-6 rounded-2xl bg-white"
         style={{
-          boxShadow: document.documentElement.classList.contains('dark') 
-            ? '0 8px 32px rgba(0, 255, 255, 0.1)' 
-            : '0 10px 40px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(79, 70, 229, 0.1), inset 0 -2px 8px rgba(255, 255, 255, 0.8)'
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
         }}
       >
-        {/* Glass shimmer effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
-        
         {/* Table Header */}
-        <div className="flex items-center justify-between mb-4 relative z-10">
-          <h3 className="text-lg font-semibold text-cyan-700 dark:text-cyan-300">
-            Student Records ({filteredStudents.length})
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold" style={{ color: '#6b7280' }}>
+            Student Records
           </h3>
           {filteredStudents.length > DISPLAY_LIMIT && (
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setShowAllStudents(!showAllStudents)}
-              className="px-4 py-2 text-sm font-medium text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 rounded-lg border border-cyan-500/30 transition-colors"
+              className="px-4 py-2 text-sm font-semibold rounded-xl transition-all"
+              style={{
+                backgroundColor: '#f3f4f6',
+                color: '#305796'
+              }}
             >
               {showAllStudents ? 'Show Less' : `Show All (${filteredStudents.length})`}
             </motion.button>
@@ -267,85 +255,94 @@ const Students = () => {
         </div>
         
         {filteredStudents.length === 0 ? (
-          <div className="text-center py-12 text-gray-500 dark:text-gray-400 relative z-10">
-            <motion.div
-              animate={{ scale: [1, 1.1, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              <FiUsers size={64} className="mx-auto mb-4 opacity-30 text-cyan-500" />
-            </motion.div>
-            <p className="text-lg">
+          <div className="text-center py-12">
+            <FiUsers size={64} className="mx-auto mb-4" style={{ color: '#d1d5db', opacity: 0.5 }} />
+            <p className="text-lg font-medium" style={{ color: '#6b7280' }}>
               {searchQuery ? 'No students found matching your search' : 'No students registered'}
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto relative z-10">
-            <table className="min-w-full divide-y divide-cyan-500/10">
-              <thead className="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10 dark:from-cyan-500/20 dark:via-blue-500/20 dark:to-purple-500/20 backdrop-blur-sm">
+          <div className="overflow-x-auto">
+            <div className="max-h-[400px] overflow-y-auto custom-student-table-scrollbar">
+            <table className="min-w-full">
+              <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider hidden lg:table-cell">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-bold uppercase tracking-wider hidden lg:table-cell" style={{ color: '#6b7280' }}>
                     ID
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#6b7280' }}>
                     Name
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider hidden md:table-cell">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-bold uppercase tracking-wider hidden md:table-cell" style={{ color: '#6b7280' }}>
                     Department
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider hidden sm:table-cell">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-bold uppercase tracking-wider hidden sm:table-cell" style={{ color: '#6b7280' }}>
                     Gender
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-right text-xs font-bold uppercase tracking-wider" style={{ color: '#6b7280' }}>
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-cyan-500/10">
+              <tbody className="divide-y divide-gray-100">
                 {(showAllStudents ? filteredStudents : filteredStudents.slice(0, DISPLAY_LIMIT)).map((student) => (
                   <motion.tr 
                     key={student.Student_ID} 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    whileHover={{ backgroundColor: 'rgba(6, 182, 212, 0.05)' }}
-                    className="transition-colors"
+                    className="transition-colors hover:bg-gray-50"
                   >
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-cyan-700 dark:text-cyan-300 hidden lg:table-cell">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold hidden lg:table-cell" style={{ color: '#305796' }}>
                       {student.Student_ID}
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <motion.div 
-                          whileHover={{ scale: 1.1 }}
-                          className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 dark:from-cyan-500/30 dark:to-blue-500/30 rounded-full flex items-center justify-center border border-cyan-500/30 shadow-lg shadow-cyan-500/20"
+                        <div 
+                          className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center"
+                          style={{
+                            backgroundColor: '#f3f4f6',
+                            border: '2px solid #e5e7eb'
+                          }}
                         >
-                          <span className="text-cyan-600 dark:text-cyan-400 font-semibold">
+                          <span className="font-bold" style={{ color: '#305796' }}>
                             {student.Name?.[0] || '?'}
                           </span>
-                        </motion.div>
+                        </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          <div className="text-sm font-semibold text-gray-900">
                             {student.Name}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 hidden md:table-cell">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-600 hidden md:table-cell">
                       {student.Department || 'N/A'}
                     </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 hidden sm:table-cell">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-600 hidden sm:table-cell">
                       {student.Gender || 'N/A'}
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
+                        onClick={() => handleViewDetails(student.Student_ID)}
+                        className="mr-2 sm:mr-4"
+                        style={{ color: '#6365baff' }}
+                        title="View details"
+                      >
+                        <FiEye size={18} />
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
                         onClick={() => handleEnroll(student.Student_ID)}
                         disabled={enrollingIds.has(student.Student_ID)}
-                        className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 mr-2 sm:mr-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="mr-2 sm:mr-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{ color: '#6b7280' }}
                         title="Enroll face embeddings"
                       >
                         {enrollingIds.has(student.Student_ID) ? (
-                          <div className="animate-spin h-5 w-5 border-2 border-green-600 dark:border-green-400 border-t-transparent rounded-full" />
+                          <div className="animate-spin h-5 w-5 border-2 border-t-transparent rounded-full" style={{ borderColor: '#6b7280' }} />
                         ) : (
                           <FiUserCheck size={18} />
                         )}
@@ -354,7 +351,8 @@ const Students = () => {
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => handleEdit(student)}
-                        className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 mr-2 sm:mr-4"
+                        className="mr-2 sm:mr-4"
+                        style={{ color: '#6365baff' }}
                         title="Edit student"
                       >
                         <FiEdit2 size={18} />
@@ -363,12 +361,8 @@ const Students = () => {
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => handleDelete(student.Student_ID)}
-                        className={`${
-                          deleteConfirm === student.Student_ID
-                            ? 'text-red-700 dark:text-red-500 font-bold'
-                            : 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300'
-                        }`}
-                        title={deleteConfirm === student.Student_ID ? 'Click again to confirm' : 'Delete student'}
+                        style={{ color: '#ef4444' }}
+                        title="Delete student"
                       >
                         <FiTrash2 size={18} />
                       </motion.button>
@@ -377,6 +371,7 @@ const Students = () => {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </motion.div>
@@ -387,11 +382,9 @@ const Students = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="relative p-6 rounded-3xl overflow-hidden dark:bg-gradient-to-br dark:from-cyan-500/5 dark:to-blue-500/5 bg-gradient-to-br from-white/80 to-indigo-50/80 backdrop-blur-xl dark:border-cyan-500/20 border-indigo-200"
+          className="relative p-6 rounded-2xl bg-white"
           style={{
-            boxShadow: document.documentElement.classList.contains('dark') 
-              ? '0 8px 32px rgba(0, 255, 255, 0.1)' 
-              : '0 10px 40px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(79, 70, 229, 0.1)'
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
           }}
         >
           <DepartmentDistributionChart 
@@ -414,11 +407,9 @@ const Students = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="relative p-6 rounded-3xl overflow-hidden dark:bg-gradient-to-br dark:from-cyan-500/5 dark:to-blue-500/5 bg-gradient-to-br from-white/80 to-indigo-50/80 backdrop-blur-xl dark:border-cyan-500/20 border-indigo-200"
+          className="relative p-6 rounded-2xl bg-white"
           style={{
-            boxShadow: document.documentElement.classList.contains('dark') 
-              ? '0 8px 32px rgba(0, 255, 255, 0.1)' 
-              : '0 10px 40px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(79, 70, 229, 0.1)'
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
           }}
         >
           <DepartmentBarChart 
@@ -452,6 +443,18 @@ const Students = () => {
         }}
         onSuccess={fetchStudents}
         student={selectedStudent}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setStudentToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        title="Delete Student"
+        message="Are you sure you want to delete this student? This action cannot be undone."
       />
     </div>
   );

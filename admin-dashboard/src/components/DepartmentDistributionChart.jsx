@@ -7,34 +7,35 @@ import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { motion } from 'framer-motion';
 
-// Color schemes for different pages
-const COLOR_SCHEMES = {
-  cyan: ['#06b6d4', '#0ea5e9', '#3b82f6', '#8b5cf6', '#a855f7', '#ec4899', '#22d3ee', '#38bdf8'],
-  green: ['#06b6d4', '#10b981', '#8b5cf6', '#34d399', '#a855f7', '#6ee7b7', '#c084fc', '#22c55e'],
-  purple: ['#8b5cf6', '#a855f7', '#c084fc', '#d946ef', '#6366f1', '#818cf8', '#e879f9', '#f0abfc'],
+// Helper function to generate gradient shades based on values
+const generateGradientColors = (data, baseColor) => {
+  // Sort data by value to assign darkest to highest, lightest to lowest
+  const sorted = [...data].sort((a, b) => b.value - a.value);
+  const maxValue = sorted[0]?.value || 1;
+  const minValue = sorted[sorted.length - 1]?.value || 0;
+  
+  return data.map(item => {
+    const ratio = (item.value - minValue) / (maxValue - minValue || 1);
+    // Generate opacity based on ratio (0.5 to 1.0)
+    const opacity = 0.5 + (ratio * 0.5);
+    return {
+      ...item,
+      color: baseColor + Math.round(opacity * 255).toString(16).padStart(2, '0')
+    };
+  });
 };
 
-// Department colors - themed
-const DEPARTMENT_COLORS = {
-  'CS': '#06b6d4',
-  'IT': '#8b5cf6',
-  'SE': '#10b981',
-  'EE': '#f59e0b',
-  'ME': '#ef4444',
-  'CE': '#6366f1',
-  'BBA': '#ec4899',
-  'MBA': '#14b8a6',
-  'BSIT': '#8b5cf6',
-  'BSCS': '#06b6d4',
-  'BSSE': '#22c55e',
-  'Default': '#64748b',
+// Department colors - will be used as base with gradient
+const DEPARTMENT_BASE_COLORS = {
+  student: '#6365baff',
+  teacher: '#247e5bff',
 };
 
-const getColor = (department, colorScheme = 'cyan', index = 0) => {
-  if (colorScheme && COLOR_SCHEMES[colorScheme]) {
-    return COLOR_SCHEMES[colorScheme][index % COLOR_SCHEMES[colorScheme].length];
-  }
-  return DEPARTMENT_COLORS[department] || DEPARTMENT_COLORS['Default'];
+const getColor = (department, colorScheme = 'cyan', index = 0, value = 0, maxValue = 1, minValue = 0) => {
+  const baseColor = colorScheme === 'green' ? '#247e5b' : '#6365ba';
+  const ratio = maxValue !== minValue ? (value - minValue) / (maxValue - minValue) : 1;
+  const opacity = 0.5 + (ratio * 0.5);
+  return baseColor + Math.round(opacity * 255).toString(16).padStart(2, '0');
 };
 
 const DepartmentDistributionChart = ({
@@ -48,23 +49,36 @@ const DepartmentDistributionChart = ({
   const chartData = useMemo(() => {
     if (!data || data.length === 0) {
       return [
-        { name: 'CS', value: 45, color: getColor('CS', colorScheme, 0) },
-        { name: 'IT', value: 38, color: getColor('IT', colorScheme, 1) },
-        { name: 'SE', value: 32, color: getColor('SE', colorScheme, 2) },
-        { name: 'EE', value: 28, color: getColor('EE', colorScheme, 3) },
-        { name: 'BBA', value: 22, color: getColor('BBA', colorScheme, 4) },
+        { name: 'CS', value: 45 },
+        { name: 'IT', value: 38 },
+        { name: 'SE', value: 32 },
+        { name: 'EE', value: 28 },
+        { name: 'BBA', value: 22 },
       ];
     }
-    return data.map((item, index) => ({
+    return data.map((item) => ({
       name: item.department || item.name,
       value: item.count || item.value,
-      color: getColor(item.department || item.name, colorScheme, index),
     }));
-  }, [data, colorScheme]);
+  }, [data]);
 
-  const total = useMemo(() => chartData.reduce((sum, item) => sum + item.value, 0), [chartData]);
+  // Calculate gradient colors based on values
+  const maxValue = Math.max(...chartData.map(d => d.value));
+  const minValue = Math.min(...chartData.map(d => d.value));
+  const baseColor = colorScheme === 'green' ? '#247e5b' : '#6365ba';
+  
+  const chartDataWithColors = chartData.map(item => {
+    const ratio = maxValue !== minValue ? (item.value - minValue) / (maxValue - minValue) : 1;
+    const opacity = 0.5 + (ratio * 0.5);
+    return {
+      ...item,
+      color: baseColor + Math.round(opacity * 255).toString(16).padStart(2, '0')
+    };
+  });
 
-  const accentColor = colorScheme === 'green' ? '#10b981' : colorScheme === 'purple' ? '#8b5cf6' : '#06b6d4';
+  const total = useMemo(() => chartDataWithColors.reduce((sum, item) => sum + item.value, 0), [chartDataWithColors]);
+
+  const accentColor = colorScheme === 'green' ? '#247e5bff' : '#6365baff';
 
   const CustomTooltip = ({ active, payload }) => {
     if (!active || !payload || !payload[0]) return null;
@@ -79,7 +93,6 @@ const DepartmentDistributionChart = ({
         style={{
           backgroundColor: 'var(--bg-card)',
           border: '2px solid ' + color,
-          boxShadow: '0 0 20px ' + color + '40',
         }}
       >
         <p className="font-bold text-lg" style={{ color: color }}>{name}</p>
@@ -94,7 +107,7 @@ const DepartmentDistributionChart = ({
     return (
       <div className="flex flex-wrap justify-center gap-2 mt-2 px-2">
         {payload.map((entry, index) => {
-          const itemColor = chartData[index]?.color || entry.color;
+          const itemColor = chartDataWithColors[index]?.color || entry.color;
           return (
             <motion.div
               key={index}
@@ -111,7 +124,6 @@ const DepartmentDistributionChart = ({
                 className="w-2.5 h-2.5 rounded-full"
                 style={{
                   backgroundColor: itemColor,
-                  boxShadow: '0 0 6px ' + itemColor,
                 }}
               />
               <span className="text-[10px] font-semibold" style={{ color: itemColor }}>
@@ -127,11 +139,11 @@ const DepartmentDistributionChart = ({
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold" style={{ color: 'var(--text-main)' }}>
+        <h3 className="text-lg font-semibold" style={{ color: '#6b7280' }}>
           {title}
         </h3>
         <span
-          className="text-sm font-medium px-3 py-1 rounded-full"
+          className="text-sm font-semibold px-3 py-1 rounded-full"
           style={{
             backgroundColor: accentColor + '15',
             color: accentColor,
@@ -146,7 +158,7 @@ const DepartmentDistributionChart = ({
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <defs>
-              {chartData.map((entry, index) => (
+              {chartDataWithColors.map((entry, index) => (
                 <linearGradient key={'gradient-' + index} id={'deptGradient-' + index} x1="0" y1="0" x2="1" y2="1">
                   <stop offset="0%" stopColor={entry.color} stopOpacity={1} />
                   <stop offset="100%" stopColor={entry.color} stopOpacity={0.7} />
@@ -161,24 +173,22 @@ const DepartmentDistributionChart = ({
               </filter>
             </defs>
             <Pie
-              data={chartData}
+              data={chartDataWithColors}
               cx="50%"
               cy="50%"
               innerRadius={45}
               outerRadius={75}
               paddingAngle={4}
               dataKey="value"
-              filter="url(#deptGlow)"
               animationBegin={0}
               animationDuration={1000}
             >
-              {chartData.map((entry, index) => (
+              {chartDataWithColors.map((entry, index) => (
                 <Cell
                   key={'cell-' + index}
                   fill={entry.color}
                   stroke={entry.color}
-                  strokeWidth={2}
-                  style={{ filter: 'drop-shadow(0 0 6px ' + entry.color + '80)' }}
+                  strokeWidth={0.5}
                 />
               ))}
             </Pie>
@@ -221,16 +231,20 @@ const DepartmentBarChart = ({
   }, [data]);
 
   const maxValue = Math.max.apply(null, chartData.map(function(d) { return d.value; }));
+  const minValue = Math.min.apply(null, chartData.map(function(d) { return d.value; }));
+  const baseColor = colorScheme === 'green' ? '#247e5b' : '#6365ba';
 
   return (
     <div className="w-full">
-      <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-main)' }}>
+      <h3 className="text-lg font-semibold mb-4" style={{ color: '#6b7280' }}>
         {title}
       </h3>
       <div className="space-y-3">
         {chartData.map(function(item, index) {
           var percentage = maxValue > 0 ? (item.value / maxValue) * 100 : 0;
-          var color = getColor(item.name, colorScheme, index);
+          var ratio = maxValue !== minValue ? (item.value - minValue) / (maxValue - minValue) : 1;
+          var opacity = 0.5 + (ratio * 0.5);
+          var color = baseColor + Math.round(opacity * 255).toString(16).padStart(2, '0');
 
           return (
             <motion.div
@@ -240,25 +254,24 @@ const DepartmentBarChart = ({
               transition={{ delay: index * 0.1 }}
               className="flex items-center gap-3"
             >
-              <span className="w-32 sm:w-40 text-xs sm:text-sm font-bold" style={{ color: color }}>
+              <span className="w-32 sm:w-40 text-xs sm:text-sm font-semibold" style={{ color: color }}>
                 {item.name}
               </span>
               <div
                 className="flex-1 h-6 sm:h-7 rounded-full overflow-hidden"
-                style={{ backgroundColor: 'rgba(255, 255, 255, 0.08)' }}
+                style={{ backgroundColor: 'rgba(148, 163, 184, 0.15)' }}
               >
                 <motion.div
                   className="h-full rounded-full"
                   style={{
-                    background: 'linear-gradient(90deg, ' + color + ', ' + color + 'aa)',
-                    boxShadow: '0 0 12px ' + color + '50',
+                    background: color,
                   }}
                   initial={{ width: 0 }}
                   animate={{ width: percentage + '%' }}
                   transition={{ duration: 0.8, delay: index * 0.1, ease: 'easeOut' }}
                 />
               </div>
-              <span className="w-8 text-sm font-bold text-right" style={{ color: 'var(--text-main)' }}>
+              <span className="w-8 text-sm font-semibold text-right" style={{ color: '#6b7280' }}>
                 {item.value}
               </span>
             </motion.div>
