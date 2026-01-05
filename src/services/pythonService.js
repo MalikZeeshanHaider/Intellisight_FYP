@@ -24,9 +24,27 @@ const VENV_PYTHON_WIN = path.join(__dirname, '../../.venv/Scripts/python.exe');
 const VENV_PYTHON_UNIX = path.join(__dirname, '../../.venv/bin/python');
 
 const getPythonExe = () => {
-  // Use system python (anaconda) first since it has all dependencies
-  // The venv might not have opencv and other packages installed
-  return 'python';
+  // Check environment variable first
+  if (process.env.PYTHON_PATH) {
+    return process.env.PYTHON_PATH;
+  }
+  
+  // Try venv paths
+  if (existsSync(FACE_VENV_PYTHON_UNIX)) {
+    return FACE_VENV_PYTHON_UNIX;
+  }
+  if (existsSync(FACE_VENV_PYTHON_WIN)) {
+    return FACE_VENV_PYTHON_WIN;
+  }
+  if (existsSync(VENV_PYTHON_UNIX)) {
+    return VENV_PYTHON_UNIX;
+  }
+  if (existsSync(VENV_PYTHON_WIN)) {
+    return VENV_PYTHON_WIN;
+  }
+  
+  // Fallback to system python
+  return 'python3';
 };
 
 // Store running processes
@@ -114,17 +132,26 @@ export const stopRecognitionForZone = (zoneId) => {
 export const runTraining = (personName = null) => {
   return new Promise((resolve, reject) => {
     if (!existsSync(TRAIN_SCRIPT)) {
-      reject(new Error('Training script not found'));
+      // Resolve with failure instead of rejecting to prevent unhandled rejections
+      resolve({ success: false, error: 'Training script not found' });
       return;
     }
 
     const pythonExe = getPythonExe();
     logger.info(`[PYTHON] Starting training using: ${pythonExe}`);
 
+    // Force CPU-only mode via environment variables
+    const trainEnv = { 
+      ...global.process.env, 
+      PYTHONIOENCODING: 'utf-8',
+      CUDA_VISIBLE_DEVICES: '-1',  // Disable GPU
+      TF_CPP_MIN_LOG_LEVEL: '2'    // Reduce TensorFlow warnings
+    };
+
     const trainProcess = spawn(pythonExe, [TRAIN_SCRIPT], {
       cwd: FACE_RECOGNITION_PATH,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...global.process.env, PYTHONIOENCODING: 'utf-8' }
+      env: trainEnv
     });
 
     let output = '';
@@ -139,7 +166,10 @@ export const runTraining = (personName = null) => {
     trainProcess.stderr.on('data', (data) => {
       const msg = data.toString().trim();
       errorOutput += msg + '\n';
-      logger.error(`[TRAIN ERROR] ${msg}`);
+      // Only log actual errors, not TensorFlow/CUDA info messages
+      if (!msg.includes('tensorflow') && !msg.includes('TF_FORCE_GPU') && !msg.includes('I0000')) {
+        logger.error(`[TRAIN ERROR] ${msg}`);
+      }
     });
 
     trainProcess.on('close', (code) => {
@@ -147,14 +177,16 @@ export const runTraining = (personName = null) => {
         logger.info('[PYTHON] Training completed successfully');
         resolve({ success: true, output });
       } else {
-        logger.error(`[PYTHON] Training failed with code ${code}`);
-        reject(new Error(errorOutput || `Training failed with code ${code}`));
+        logger.warn(`[PYTHON] Training exited with code ${code}`);
+        // Resolve with failure instead of rejecting to prevent unhandled rejections
+        resolve({ success: false, error: errorOutput || `Training failed with code ${code}` });
       }
     });
 
     trainProcess.on('error', (err) => {
       logger.error(`[PYTHON] Failed to start training: ${err.message}`);
-      reject(err);
+      // Resolve with failure instead of rejecting
+      resolve({ success: false, error: err.message });
     });
   });
 };

@@ -62,9 +62,9 @@ export class TimetableService {
         Student_ID: personType === PERSON_TYPES.STUDENT ? personId : null,
       },
       include: {
-        zone: true,
-        teacher: personType === PERSON_TYPES.TEACHER ? { select: { Name: true, Email: true } } : false,
-        student: personType === PERSON_TYPES.STUDENT ? { select: { Name: true, Email: true } } : false,
+        Zone: true,
+        Teacher: personType === PERSON_TYPES.TEACHER ? { select: { Name: true, Email: true } } : false,
+        Students: personType === PERSON_TYPES.STUDENT ? { select: { Name: true, Email: true } } : false,
       },
     });
 
@@ -122,9 +122,9 @@ export class TimetableService {
             Duration: duration,
           },
           include: {
-            zone: true,
-            teacher: personType === PERSON_TYPES.TEACHER ? { select: { Name: true, Email: true } } : false,
-            student: personType === PERSON_TYPES.STUDENT ? { select: { Name: true, Email: true } } : false,
+            Zone: true,
+            Teacher: personType === PERSON_TYPES.TEACHER ? { select: { Name: true, Email: true } } : false,
+            Students: personType === PERSON_TYPES.STUDENT ? { select: { Name: true, Email: true } } : false,
           },
         });
 
@@ -144,9 +144,9 @@ export class TimetableService {
         Duration: 0,
       },
       include: {
-        zone: true,
-        teacher: personType === PERSON_TYPES.TEACHER ? { select: { Name: true, Email: true } } : false,
-        student: personType === PERSON_TYPES.STUDENT ? { select: { Name: true, Email: true } } : false,
+        Zone: true,
+        Teacher: personType === PERSON_TYPES.TEACHER ? { select: { Name: true, Email: true } } : false,
+        Students: personType === PERSON_TYPES.STUDENT ? { select: { Name: true, Email: true } } : false,
       },
     });
 
@@ -195,9 +195,9 @@ export class TimetableService {
         },
       },
       include: {
-        zone: { select: { Zone_Name: true, Zone_id: true } },
-        teacher: { select: { Teacher_ID: true, Name: true, Email: true } },
-        student: { select: { Student_ID: true, Name: true, Email: true } },
+        Zone: { select: { Zone_Name: true, Zone_id: true } },
+        Teacher: { select: { Teacher_ID: true, Name: true, Email: true } },
+        Students: { select: { Student_ID: true, Name: true, Email: true } },
       },
       orderBy: { EntryTime: 'desc' },
     });
@@ -247,9 +247,9 @@ export class TimetableService {
       prisma.attendanceLog.findMany({
         where,
         include: {
-          zone: { select: { Zone_Name: true } },
-          teacher: { select: { Name: true, Email: true } },
-          student: { select: { Name: true, Email: true } },
+          Zone: { select: { Zone_Name: true } },
+          Teacher: { select: { Name: true, Email: true } },
+          Students: { select: { Name: true, Email: true } },
         },
         orderBy: { EntryTime: 'desc' },
         skip,
@@ -332,20 +332,20 @@ export class TimetableService {
         { EntryTime: 'desc' },
       ],
       include: {
-        zone: {
+        Zone: {
           select: {
             Zone_id: true,
             Zone_Name: true,
           },
         },
-        teacher: {
+        Teacher: {
           select: {
             Teacher_ID: true,
             Name: true,
             Email: true,
           },
         },
-        student: {
+        Students: {
           select: {
             Student_ID: true,
             Name: true,
@@ -385,7 +385,7 @@ export class TimetableService {
    * Verify zone exists
    */
   async verifyZoneExists(zoneId) {
-    const zone = await prisma.zone.findUnique({
+    const zone = await prisma.Zone.findUnique({
       where: { Zone_id: zoneId },
     });
 

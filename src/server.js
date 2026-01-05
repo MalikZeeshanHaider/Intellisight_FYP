@@ -88,7 +88,19 @@ process.on('uncaughtException', (error) => {
 
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  gracefulShutdown('UNHANDLED_REJECTION');
+  // Log but don't crash the server for non-critical rejections
+  // Only shutdown for critical errors like database disconnection
+  const errorMessage = reason?.message || String(reason);
+  const isCriticalError = errorMessage.includes('database') || 
+                          errorMessage.includes('ECONNREFUSED') ||
+                          errorMessage.includes('prisma');
+  
+  if (isCriticalError) {
+    logger.error('Critical error detected, shutting down...');
+    gracefulShutdown('UNHANDLED_REJECTION');
+  } else {
+    logger.warn('Non-critical unhandled rejection, server continuing...');
+  }
 });
 
 export default server;

@@ -31,10 +31,10 @@ except ImportError:
     DETECTOR_BACKEND = "retinaface"
     DB_CONFIG = {
         'host': 'localhost',
-        'port': 5432,
+        'port': 5000,
         'database': 'FYP_Intellisight',
         'user': 'postgres',
-        'password': 'zeeshan'
+        'password': 'ozair'
     }
 
 

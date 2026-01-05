@@ -12,7 +12,7 @@ import { HTTP_STATUS, SUCCESS_MESSAGES } from '../config/constants.js';
 export const getAllCameras = asyncHandler(async (req, res) => {
   const cameras = await prisma.camara.findMany({
     include: {
-      zone: {
+      Zone: {
         select: {
           Zone_id: true,
           Zone_Name: true,
@@ -36,7 +36,7 @@ export const getCameraById = asyncHandler(async (req, res) => {
   const camera = await prisma.camara.findUnique({
     where: { Camara_Id: parseInt(id) },
     include: {
-      zone: {
+      Zone: {
         select: {
           Zone_id: true,
           Zone_Name: true,
@@ -68,7 +68,7 @@ export const createCamera = asyncHandler(async (req, res) => {
       Camera_Type: Camera_Type || 'Entry',
     },
     include: {
-      zone: {
+      Zone: {
         select: {
           Zone_id: true,
           Zone_Name: true,
@@ -113,7 +113,7 @@ export const updateCamera = asyncHandler(async (req, res) => {
     where: { Camara_Id: parseInt(id) },
     data: updateData,
     include: {
-      zone: {
+      Zone: {
         select: {
           Zone_id: true,
           Zone_Name: true,

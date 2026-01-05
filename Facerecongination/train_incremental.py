@@ -16,6 +16,18 @@ if sys.platform == 'win32':
     except:
         pass
 
+# Force CPU-only mode to avoid GPU errors
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress TensorFlow warnings
+
+try:
+    import tensorflow as tf
+    # Force TensorFlow to use CPU only
+    tf.config.set_visible_devices([], 'GPU')
+except:
+    pass
+
 try:
     import cv2
     import numpy as np
@@ -49,7 +61,7 @@ DB_CONFIG = {
     'port': 5000,
     'database': 'FYP_Intellisight',
     'user': 'postgres',
-    'password': 'zeeshan'
+    'password': 'ozair'
 }
 
 # DeepFace configuration (must match recognition_live.py)

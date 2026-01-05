@@ -160,9 +160,11 @@ export const savePersonImages = async (personType, personId, personName, facePic
     }
   }
   
-  // Auto-trigger training after saving images
+  // Auto-trigger training after saving images (fire-and-forget with error handling)
   if (savedPaths.length > 0) {
-    triggerAutoTraining(safeName, personType, personId);
+    triggerAutoTraining(safeName, personType, personId).catch(err => {
+      console.error(`[AUTO-TRAIN] Background training failed (non-fatal): ${err.message}`);
+    });
   }
   
   return savedPaths;
@@ -310,6 +312,12 @@ export const triggerAutoTraining = async (personName = null, personType = null, 
   try {
     // Use the centralized Python service for training
     const result = await runTraining(personName);
+    
+    if (!result.success) {
+      console.warn(`[AUTO-TRAIN] Training failed: ${result.error}`);
+      return { success: false, error: result.error };
+    }
+    
     console.log('[AUTO-TRAIN] Training completed successfully');
     
     // After training, save embeddings to database if person info provided
@@ -323,8 +331,9 @@ export const triggerAutoTraining = async (personName = null, personType = null, 
     
     return result;
   } catch (err) {
+    // Log but don't throw - training failures are non-fatal
     console.error(`[AUTO-TRAIN ERROR] ${err.message}`);
-    throw err;
+    return { success: false, error: err.message };
   }
 };
 
@@ -408,8 +417,10 @@ export const deletePersonImages = async (personName) => {
       await fs.rm(folderPath, { recursive: true, force: true });
       console.log(`[IMAGE SERVICE] Deleted folder: ${folderPath}`);
       
-      // Re-train after deletion to update embeddings
-      triggerAutoTraining();
+      // Re-train after deletion to update embeddings (fire-and-forget with error handling)
+      triggerAutoTraining().catch(err => {
+        console.error(`[AUTO-TRAIN] Background re-training failed (non-fatal): ${err.message}`);
+      });
       
       return true;
     }

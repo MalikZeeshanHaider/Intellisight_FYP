@@ -1,3 +1,11 @@
+run frontend on WSL: cd /mnt/e/FYP/Intellisight_FYP/new/Intellisight_FYP/admin-dashboard && npm run dev -- --host 0.0.0.0 --port 3001
+run Backend on WSL: cd /mnt/e/FYP/Intellisight_FYP/new/Intellisight_FYP && node src/server.js
+run Backend on WSL: cd /mnt/e/FYP/Intellisight_FYP/new/Intellisight_FYP/Facerecongination && source .venv/bin/activate && python gpu_face_service.py
+npx prisma studio
+camara cammand:curl -s -X POST http://localhost:3002/cameras/start \
+  -H "Content-Type: application/json" \
+  -d '{"camera_id": 2, "camera_url": "rtsp://admin:ozair123@192.168.10.2/cam/realmonitor?channel=1&subtype=0", "camera_type": "Entry", "zone_id": 2}' | python3 -m json.tool
+
 # IntelliSight - Complete Facial Recognition Access Control System
 
 A production-ready system combining Node.js backend with Python-based face recognition for intelligent access control and attendance tracking.

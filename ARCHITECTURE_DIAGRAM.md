@@ -7,7 +7,7 @@
 │                        INTELLISIGHT AUTHENTICATION SYSTEM                    │
 │                                                                              │
 │  Frontend (React)           Backend (Node.js)              Database (PostgreSQL)
-│  Port: 5173                 Port: 3000                     Port: 5000       │
+│  Port: 3001                Port: 3000                     Port: 5000       │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
