@@ -575,3 +575,394 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   scrollbar-width: thin;
   scrollbar-color: #247e5bff #f3f4f6;
 }
+
+/* ============================================
+   CUSTOM DROPDOWN STYLES - GLOBAL
+   ============================================ */
+
+/* Base dropdown style - applies to all dropdowns */
+.custom-dropdown {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.125em;
+  padding-right: 2.5rem;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  transition: background-color 0s, color 0s; /* Instant hover */
+}
+
+/* Dark mode dropdown */
+.dark .custom-dropdown {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+/* Logs page dropdown (Blue theme) */
+.custom-logs-dropdown {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23305796' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.125em;
+  padding-right: 2.5rem;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+  background-color: #f3f4f6 !important;
+  color: #6b7280 !important;
+}
+
+.custom-logs-dropdown:hover {
+  background-color: rgba(48, 87, 150, 0.15) !important;
+  color: #305796 !important;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+}
+
+.custom-logs-dropdown * {
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+}
+
+/* Active Presence dropdown (Blue theme) */
+.custom-active-presence-dropdown {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236365ba' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.125em;
+  padding-right: 2.5rem;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+  background-color: #f3f4f6 !important;
+  color: #6b7280 !important;
+}
+
+.custom-active-presence-dropdown:hover {
+  background-color: rgba(99, 101, 186, 0.15) !important;
+  color: #6365ba !important;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+}
+
+/* Students dropdown (Purple theme) */
+.custom-students-dropdown {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236365ba' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.125em;
+  padding-right: 2.5rem;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+  background-color: #f3f4f6 !important;
+  color: #6b7280 !important;
+}
+
+.custom-students-dropdown:hover {
+  background-color: rgba(99, 101, 186, 0.15) !important;
+  color: #6365ba !important;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+}
+
+.dark .custom-students-dropdown {
+  background-color: #374151 !important;
+  color: #d1d5db !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23d1d5db' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+.dark .custom-students-dropdown:hover {
+  background-color: rgba(99, 101, 186, 0.2) !important;
+  color: #a5b4fc !important;
+}
+
+/* Teachers dropdown (Green theme) */
+.custom-teachers-dropdown {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23247e5b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.125em;
+  padding-right: 2.5rem;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+  background-color: #f3f4f6 !important;
+  color: #6b7280 !important;
+}
+
+.custom-teachers-dropdown:hover {
+  background-color: rgba(36, 126, 91, 0.15) !important;
+  color: #247e5b !important;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+}
+
+.dark .custom-teachers-dropdown {
+  background-color: #374151 !important;
+  color: #d1d5db !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23d1d5db' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+.dark .custom-teachers-dropdown:hover {
+  background-color: rgba(36, 126, 91, 0.2) !important;
+  color: #6ee7b7 !important;
+}
+
+/* Settings dropdown (Cyan/Blue theme) */
+.custom-settings-dropdown {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.125em;
+  padding-right: 2.5rem;
+  cursor: pointer;
+  outline: none;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+}
+
+.custom-settings-dropdown:hover {
+  background-color: rgba(48, 87, 150, 0.15) !important;
+  color: #003d82 !important;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+}
+
+.dark .custom-settings-dropdown {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2300ffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+.dark .custom-settings-dropdown:hover {
+  background-color: rgba(0, 255, 255, 0.1) !important;
+  color: #00ffff !important;
+}
+
+/* Cameras dropdown (Orange theme) */
+.custom-cameras-dropdown {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23ea580c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.125em;
+  padding-right: 2.5rem;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+  background-color: #f3f4f6 !important;
+  color: #6b7280 !important;
+}
+
+.custom-cameras-dropdown:hover {
+  background-color: rgba(234, 88, 12, 0.15) !important;
+  color: #ea580c !important;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+}
+
+.dark .custom-cameras-dropdown {
+  background-color: #374151 !important;
+  color: #d1d5db !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23d1d5db' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+.dark .custom-cameras-dropdown:hover {
+  background-color: rgba(251, 146, 60, 0.2) !important;
+  color: #fb923c !important;
+}
+
+/* Zones/ZoneLive dropdown (Purple theme) */
+.custom-zones-dropdown {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237c3aed' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.125em;
+  padding-right: 2.5rem;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+  background-color: #f3f4f6 !important;
+  color: #6b7280 !important;
+}
+
+.custom-zones-dropdown:hover {
+  background-color: rgba(124, 58, 237, 0.15) !important;
+  color: #7c3aed !important;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+}
+
+.dark .custom-zones-dropdown {
+  background-color: #374151 !important;
+  color: #d1d5db !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23d1d5db' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+.dark .custom-zones-dropdown:hover {
+  background-color: rgba(167, 139, 250, 0.2) !important;
+  color: #a78bfa !important;
+}
+
+/* Unknown Faces dropdown (Red/Alert theme) */
+.custom-unknown-dropdown {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23dc2626' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.125em;
+  padding-right: 2.5rem;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+  background-color: #f3f4f6 !important;
+  color: #6b7280 !important;
+}
+
+.custom-unknown-dropdown:hover {
+  background-color: rgba(220, 38, 38, 0.15) !important;
+  color: #dc2626 !important;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+}
+
+.dark .custom-unknown-dropdown {
+  background-color: #374151 !important;
+  color: #d1d5db !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23d1d5db' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+.dark .custom-unknown-dropdown:hover {
+  background-color: rgba(248, 113, 113, 0.2) !important;
+  color: #f87171 !important;
+}
+
+/* LiveDetection dropdown (Teal theme) */
+.custom-live-detection-dropdown {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%230d9488' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.125em;
+  padding-right: 2.5rem;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+  background-color: #f3f4f6 !important;
+  color: #6b7280 !important;
+}
+
+.custom-live-detection-dropdown:hover {
+  background-color: rgba(13, 148, 136, 0.15) !important;
+  color: #0d9488 !important;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+}
+
+.dark .custom-live-detection-dropdown {
+  background-color: #374151 !important;
+  color: #d1d5db !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23d1d5db' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+.dark .custom-live-detection-dropdown:hover {
+  background-color: rgba(94, 234, 212, 0.2) !important;
+  color: #5eead4 !important;
+}
+
+/* Global select element styles - ensure instant hover for all dropdowns */
+select,
+select * {
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+}
+
+select:hover,
+select:focus,
+select option,
+select option:hover {
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+}

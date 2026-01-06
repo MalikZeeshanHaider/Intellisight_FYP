@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { FiX, FiUpload, FiTrash2 } from 'react-icons/fi';
+import React, { useState, useRef, useEffect } from 'react';
+import { FiX, FiUpload, FiTrash2, FiChevronDown } from 'react-icons/fi';
 import { studentAPI } from '../api/api';
 
 const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
@@ -19,6 +19,19 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [genderDropdownOpen, setGenderDropdownOpen] = useState(false);
+    const genderDropdownRef = useRef(null);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (genderDropdownRef.current && !genderDropdownRef.current.contains(event.target)) {
+                setGenderDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const handleInputChange = (e) => {
         setFormData({
@@ -217,30 +230,44 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                         />
                     </div>
 
-                    {/* Gender */}
+                    {/* Gender - Custom Dropdown */}
                     <div>
                         <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
                             Gender
                         </label>
-                        <select
-                            name="Gender"
-                            value={formData.Gender}
-                            onChange={handleInputChange}
-                            className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
-                            style={{
-                                background: 'rgba(255, 255, 255, 0.8)',
-                                border: '2px solid rgba(148, 163, 184, 0.3)',
-                                color: '#0F172A',
-                                transition: 'border-color 0.15s ease'
-                            }}
-                            onFocus={(e) => e.target.style.borderColor = '#305796'}
-                            onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
-                        >
-                            <option value="">Select gender</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                            <option value="Other">Other</option>
-                        </select>
+                        <div className="relative" ref={genderDropdownRef}>
+                            <button
+                                type="button"
+                                onClick={() => setGenderDropdownOpen(!genderDropdownOpen)}
+                                className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none flex items-center justify-between"
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.8)',
+                                    border: '2px solid rgba(148, 163, 184, 0.3)',
+                                    color: formData.Gender ? '#0F172A' : '#9CA3AF'
+                                }}
+                            >
+                                <span>{formData.Gender || 'Select gender'}</span>
+                                <FiChevronDown className={`transition-transform ${genderDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#6365ba' }} />
+                            </button>
+                            
+                            {genderDropdownOpen && (
+                                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                                    {['Male', 'Female', 'Other'].map((gender) => (
+                                        <button
+                                            key={gender}
+                                            type="button"
+                                            onClick={() => {
+                                                setFormData({ ...formData, Gender: gender });
+                                                setGenderDropdownOpen(false);
+                                            }}
+                                            className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-purple-100 hover:text-purple-700 ${formData.Gender === gender ? 'bg-purple-50 text-purple-700' : 'text-gray-700'}`}
+                                        >
+                                            {gender}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Department */}

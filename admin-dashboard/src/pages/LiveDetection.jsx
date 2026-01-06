@@ -137,7 +137,7 @@ const LiveDetection = () => {
             <select
               value={selectedZone || ''}
               onChange={(e) => setSelectedZone(parseInt(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="custom-live-detection-dropdown w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               {zones.map(zone => (
                 <option key={zone.Zone_id} value={zone.Zone_id}>

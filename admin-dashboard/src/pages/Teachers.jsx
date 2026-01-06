@@ -1,6 +1,6 @@
 /**
- * Teachers Page
- * Display and manage all teachers
+ * Faculty Page
+ * Display and manage all faculty members
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -146,7 +146,7 @@ const Teachers = () => {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 shadow-lg shadow-green-500/50 mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-300 text-lg">Loading teachers...</p>
+          <p className="text-gray-600 dark:text-gray-300 text-lg">Loading faculty...</p>
         </div>
       </div>
     );
@@ -166,9 +166,9 @@ const Teachers = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold mb-2" style={{ color: '#247e5bff' }}>
-            Teachers
+            Faculty
           </h1>
-          <p className="text-sm font-medium" style={{ color: '#6b7280' }}>{teachers.length} teachers registered</p>
+          <p className="text-sm font-medium" style={{ color: '#6b7280' }}>{teachers.length} faculty members registered</p>
         </div>
 
         <div className="flex items-center space-x-3">
@@ -185,7 +185,7 @@ const Teachers = () => {
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#247e5bff'}
           >
             <FiPlus size={16} />
-            <span>Add Teacher</span>
+            <span>Add Faculty</span>
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -244,7 +244,7 @@ const Teachers = () => {
         </div>
       </motion.div>
 
-      {/* Teachers Table */}
+      {/* Faculty Table */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -256,7 +256,7 @@ const Teachers = () => {
         {/* Table Header */}
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold" style={{ color: '#6b7280' }}>
-            Teacher Records
+            Faculty Records
           </h3>
           {filteredTeachers.length > DISPLAY_LIMIT && (
             <motion.button
@@ -286,7 +286,7 @@ const Teachers = () => {
               <GiTeacher size={64} className="mx-auto mb-4 opacity-30" style={{ color: '#247e5bff' }} />
             </motion.div>
             <p className="text-lg font-medium">
-              {searchQuery ? 'No teachers found matching your search' : 'No teachers registered'}
+              {searchQuery ? 'No faculty found matching your search' : 'No faculty registered'}
             </p>
           </div>
         ) : (
@@ -429,7 +429,7 @@ const Teachers = () => {
         >
           <DepartmentDistributionChart 
             data={departmentData} 
-            title="Teachers by Type"
+            title="Faculty by Type"
             type="teachers"
             height={250}
             colorScheme="green"

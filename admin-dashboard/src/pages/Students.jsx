@@ -37,16 +37,23 @@ const Students = () => {
       setLoading(true);
 
       const response = await studentAPI.getAllStudents();
-
-      if (response.success && response.data) {
-        setStudents(response.data);
-        setFilteredStudents(response.data);
+      
+      // Handle different response formats
+      let studentsData = [];
+      if (response?.success && response?.data) {
+        studentsData = response.data;
+      } else if (Array.isArray(response?.data)) {
+        studentsData = response.data;
+      } else if (Array.isArray(response)) {
+        studentsData = response;
       }
-
+      
+      setStudents(studentsData);
+      setFilteredStudents(studentsData);
       setLoading(false);
     } catch (err) {
       console.error('Error fetching students:', err);
-      setError('Failed to load students');
+      setError('Failed to load students. Please check if the server is running.');
       setLoading(false);
     }
   };

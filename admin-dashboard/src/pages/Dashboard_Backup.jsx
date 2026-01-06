@@ -409,7 +409,7 @@ const Dashboard = () => {
           </div>
         </motion.div>
 
-        {/* Teachers Card */}
+        {/* Faculty Card */}
         <motion.div
           whileHover={{ scale: 1.03, y: -8 }}
           transition={{ type: "spring", stiffness: 300 }}
@@ -439,7 +439,7 @@ const Dashboard = () => {
           <div className="flex items-start justify-between relative z-10">
             <div>
               <p className="text-sm font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-soft)' }}>
-                Teachers
+                Faculty
               </p>
               <motion.p
                 key={stats.totalTeachers}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getAllActivePresence } from '../api/faceRecognition';
 import { zoneAPI } from '../api/api';
 import { FiActivity, FiUsers, FiClock, FiMapPin, FiChevronDown } from 'react-icons/fi';
@@ -9,6 +9,19 @@ export default function ActivePresence() {
   const [selectedZone, setSelectedZone] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     fetchZones();
@@ -22,9 +35,19 @@ export default function ActivePresence() {
   const fetchZones = async () => {
     try {
       const response = await zoneAPI.getAllZones();
-      setZones(response.data || []);
+      // Handle both array format and { success, data } format
+      if (response?.success && Array.isArray(response.data)) {
+        setZones(response.data);
+      } else if (Array.isArray(response.data)) {
+        setZones(response.data);
+      } else if (Array.isArray(response)) {
+        setZones(response);
+      } else {
+        setZones([]);
+      }
     } catch (err) {
       console.error('Error fetching zones:', err);
+      setZones([]);
     }
   };
 
@@ -32,9 +55,20 @@ export default function ActivePresence() {
     try {
       setLoading(true);
       const response = await getAllActivePresence();
-      setActivePersons(response.data || []);
+      console.log('Active Presence API Response:', response);
+      // Handle both array format and { success, data } format
+      if (response?.success && Array.isArray(response.data)) {
+        setActivePersons(response.data);
+      } else if (Array.isArray(response.data)) {
+        setActivePersons(response.data);
+      } else if (Array.isArray(response)) {
+        setActivePersons(response);
+      } else {
+        setActivePersons([]);
+      }
       setError(null);
     } catch (err) {
+      console.error('Error fetching active presence:', err);
       setError(err.response?.data?.message || 'Failed to load active presence');
     } finally {
       setLoading(false);
@@ -85,6 +119,13 @@ export default function ActivePresence() {
     );
   }
 
+  // Get selected zone name for display
+  const getSelectedZoneName = () => {
+    if (selectedZone === 'all') return 'All Zones';
+    const zone = zones.find(z => z.Zone_id.toString() === selectedZone.toString());
+    return zone ? zone.Zone_Name : 'All Zones';
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Section */}
@@ -95,63 +136,45 @@ export default function ActivePresence() {
               Active Presence
             </h1>
             <p className="text-sm font-medium" style={{ color: '#6b7280' }}>
-              Currently {filteredPersons.length} {filteredPersons.length === 1 ? 'person' : 'people'} detected in zones
+              Currently <span className="font-bold" style={{ color: '#8849a1ff' }}>{activePersons.length}</span> identified {activePersons.length === 1 ? 'person' : 'people'} in zones
+              {selectedZone !== 'all' && (
+                <span> • Showing <span className="font-bold" style={{ color: '#8849a1ff' }}>{filteredPersons.length}</span> in selected zone</span>
+              )}
             </p>
           </div>
 
           {/* Filter Section */}
           <div className="flex items-center gap-4">
             {/* Custom Dropdown */}
-            <div className="relative">
-              <style>{`
-                .custom-active-presence-dropdown {
-                  appearance: none;
-                  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238849a1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-                  background-repeat: no-repeat;
-                  background-position: right 0.75rem center;
-                  background-size: 1.125em;
-                  padding-right: 2.5rem;
-                }
-                .custom-active-presence-dropdown option {
-                  background-color: white;
-                  color: #374151;
-                  padding: 8px;
-                }
-                .custom-active-presence-dropdown option:hover {
-                  background-color: rgba(136, 73, 161, 0.1) !important;
-                  color: #8849a1ff !important;
-                }
-                .custom-active-presence-dropdown option:checked {
-                  background-color: rgba(136, 73, 161, 0.15);
-                  color: #8849a1ff;
-                }
-              `}</style>
-              <select
-                value={selectedZone}
-                onChange={(e) => setSelectedZone(e.target.value)}
-                className="custom-active-presence-dropdown px-4 py-2 rounded-xl font-medium text-sm transition-all cursor-pointer"
-                style={{ 
-                  backgroundColor: '#f3f4f6',
-                  color: '#6b7280',
-                  border: 'none',
-                  outline: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(136, 73, 161, 0.1)';
-                  e.currentTarget.style.color = '#8849a1ff';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f3f4f6';
-                  e.currentTarget.style.color = '#6b7280';
-                }}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700"
+                style={{ minWidth: '140px' }}
               >
-                <option value="all">All Zones</option>
-                {zones.map(zone => (
-                  <option key={zone.Zone_id} value={zone.Zone_id}>
-                    {zone.Zone_Name}
-                  </option>
-                ))}
-              </select>
+                <span>{getSelectedZoneName()}</span>
+                <FiChevronDown className={`transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {dropdownOpen && (
+                <div className="absolute top-full left-0 mt-1 w-full min-w-[160px] bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                  <button
+                    onClick={() => { setSelectedZone('all'); setDropdownOpen(false); }}
+                    className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-purple-100 hover:text-purple-700 ${selectedZone === 'all' ? 'bg-purple-50 text-purple-700' : 'text-gray-700'}`}
+                  >
+                    All Zones
+                  </button>
+                  {zones.map(zone => (
+                    <button
+                      key={zone.Zone_id}
+                      onClick={() => { setSelectedZone(zone.Zone_id); setDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-purple-100 hover:text-purple-700 ${selectedZone.toString() === zone.Zone_id.toString() ? 'bg-purple-50 text-purple-700' : 'text-gray-700'}`}
+                    >
+                      {zone.Zone_Name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Auto-refresh indicator */}
@@ -250,7 +273,7 @@ export default function ActivePresence() {
                           backgroundColor: isStudent ? 'rgba(99, 101, 186, 0.1)' : 'rgba(36, 126, 91, 0.1)',
                           color: isStudent ? '#6365baff' : '#247e5bff'
                         }}>
-                          {isStudent ? 'Student' : 'Teacher'}
+                          {isStudent ? 'Student' : 'Faculty'}
                         </span>
                         {person?.Department && (
                           <>
@@ -281,10 +304,10 @@ export default function ActivePresence() {
             <FiActivity style={{ color: '#8849a1ff' }} size={40} />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            No Active Presence
+            No Identified Persons
           </h3>
           <p className="text-gray-600">
-            No one is currently detected in {selectedZone === 'all' ? 'any zones' : 'this zone'}.
+            No identified students or faculty are currently in {selectedZone === 'all' ? 'any zones' : 'this zone'}.
           </p>
         </div>
       )}

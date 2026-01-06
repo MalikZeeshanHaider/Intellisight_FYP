@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { FiX, FiUpload, FiTrash2 } from 'react-icons/fi';
+import React, { useState, useRef, useEffect } from 'react';
+import { FiX, FiUpload, FiTrash2, FiChevronDown } from 'react-icons/fi';
 import { teacherAPI } from '../api/api';
 
 const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
@@ -19,6 +19,24 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [genderDropdownOpen, setGenderDropdownOpen] = useState(false);
+    const [facultyDropdownOpen, setFacultyDropdownOpen] = useState(false);
+    const genderDropdownRef = useRef(null);
+    const facultyDropdownRef = useRef(null);
+
+    // Close dropdowns when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (genderDropdownRef.current && !genderDropdownRef.current.contains(event.target)) {
+                setGenderDropdownOpen(false);
+            }
+            if (facultyDropdownRef.current && !facultyDropdownRef.current.contains(event.target)) {
+                setFacultyDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const handleInputChange = (e) => {
         setFormData({
@@ -103,7 +121,7 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
         } catch (err) {
             console.error('Error creating teacher:', err);
             
-            let errorMessage = 'Failed to create teacher. Please check all fields.';
+            let errorMessage = 'Failed to create faculty. Please check all fields.';;
             
             if (err.response?.data) {
                 const data = err.response.data;
@@ -134,7 +152,7 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
             <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-teacher-modal-scrollbar">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h2 className="text-2xl font-bold" style={{ color: '#247e5bff' }}>Add New Teacher</h2>
+                    <h2 className="text-2xl font-bold" style={{ color: '#247e5bff' }}>Add New Faculty</h2>
                     <button
                         onClick={onClose}
                         className="text-gray-500 hover:text-gray-700 transition"
@@ -163,7 +181,7 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                                 color: '#0F172A',
                                 transition: 'border-color 0.15s ease'
                             }}
-                            placeholder="Enter teacher name"
+                            placeholder="Enter faculty name"
                             onFocus={(e) => e.target.style.borderColor = '#247e5bff'}
                             onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
                         />
@@ -187,61 +205,90 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                                 color: '#0F172A',
                                 transition: 'border-color 0.15s ease'
                             }}
-                            placeholder="teacher@example.com"
+                            placeholder="faculty@example.com"
                             onFocus={(e) => e.target.style.borderColor = '#247e5bff'}
                             onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
                         />
                     </div>
 
-                    {/* Gender */}
+                    {/* Gender - Custom Dropdown */}
                     <div>
                         <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
                             Gender
                         </label>
-                        <select
-                            name="Gender"
-                            value={formData.Gender}
-                            onChange={handleInputChange}
-                            className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
-                            style={{
-                                background: 'rgba(255, 255, 255, 0.8)',
-                                border: '2px solid rgba(148, 163, 184, 0.3)',
-                                color: '#0F172A',
-                                transition: 'border-color 0.15s ease'
-                            }}
-                            onFocus={(e) => e.target.style.borderColor = '#247e5bff'}
-                            onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
-                        >
-                            <option value="">Select gender</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                            <option value="Other">Other</option>
-                        </select>
+                        <div className="relative" ref={genderDropdownRef}>
+                            <button
+                                type="button"
+                                onClick={() => setGenderDropdownOpen(!genderDropdownOpen)}
+                                className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none flex items-center justify-between"
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.8)',
+                                    border: '2px solid rgba(148, 163, 184, 0.3)',
+                                    color: formData.Gender ? '#0F172A' : '#9CA3AF'
+                                }}
+                            >
+                                <span>{formData.Gender || 'Select gender'}</span>
+                                <FiChevronDown className={`transition-transform ${genderDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#247e5b' }} />
+                            </button>
+                            
+                            {genderDropdownOpen && (
+                                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                                    {['Male', 'Female', 'Other'].map((gender) => (
+                                        <button
+                                            key={gender}
+                                            type="button"
+                                            onClick={() => {
+                                                setFormData({ ...formData, Gender: gender });
+                                                setGenderDropdownOpen(false);
+                                            }}
+                                            className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-green-100 hover:text-green-700 ${formData.Gender === gender ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
+                                        >
+                                            {gender}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Faculty Type */}
+                    {/* Faculty Type - Custom Dropdown */}
                     <div>
                         <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
                             Faculty Type
                         </label>
-                        <select
-                            name="Faculty_Type"
-                            value={formData.Faculty_Type}
-                            onChange={handleInputChange}
-                            className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
-                            style={{
-                                background: 'rgba(255, 255, 255, 0.8)',
-                                border: '2px solid rgba(148, 163, 184, 0.3)',
-                                color: '#0F172A',
-                                transition: 'border-color 0.15s ease'
-                            }}
-                            onFocus={(e) => e.target.style.borderColor = '#247e5bff'}
-                            onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
-                        >
-                            <option value="">Select faculty type</option>
-                            <option value="Permanent">Permanent</option>
-                            <option value="Visiting">Visiting</option>
-                        </select>
+                        <div className="relative" ref={facultyDropdownRef}>
+                            <button
+                                type="button"
+                                onClick={() => setFacultyDropdownOpen(!facultyDropdownOpen)}
+                                className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none flex items-center justify-between"
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.8)',
+                                    border: '2px solid rgba(148, 163, 184, 0.3)',
+                                    color: formData.Faculty_Type ? '#0F172A' : '#9CA3AF'
+                                }}
+                            >
+                                <span>{formData.Faculty_Type || 'Select faculty type'}</span>
+                                <FiChevronDown className={`transition-transform ${facultyDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#247e5b' }} />
+                            </button>
+                            
+                            {facultyDropdownOpen && (
+                                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                                    {['Permanent', 'Visiting'].map((type) => (
+                                        <button
+                                            key={type}
+                                            type="button"
+                                            onClick={() => {
+                                                setFormData({ ...formData, Faculty_Type: type });
+                                                setFacultyDropdownOpen(false);
+                                            }}
+                                            className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-green-100 hover:text-green-700 ${formData.Faculty_Type === type ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
+                                        >
+                                            {type}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Department (conditional) */}
@@ -369,7 +416,7 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                             }}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#247e5bff'}
                         >
-                            {loading ? 'Adding...' : 'Add Teacher'}
+                            {loading ? 'Adding...' : 'Add Faculty'}
                         </button>
                     </div>
                 </form>

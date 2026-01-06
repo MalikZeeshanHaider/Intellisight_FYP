@@ -21,8 +21,8 @@ const TeacherDetail = () => {
       const response = await teacherAPI.getTeacherById(id);
       setTeacher(response.data);
     } catch (err) {
-      console.error('Error fetching teacher details:', err);
-      setError('Failed to load teacher details');
+      console.error('Error fetching faculty details:', err);
+      setError('Failed to load faculty details');
     } finally {
       setLoading(false);
     }
@@ -40,13 +40,13 @@ const TeacherDetail = () => {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
         <div className="text-center">
-          <p className="text-xl text-red-600 mb-4">{error || 'Teacher not found'}</p>
+          <p className="text-xl text-red-600 mb-4">{error || 'Faculty not found'}</p>
           <button
             onClick={() => navigate('/teachers')}
             className="px-6 py-2 rounded-xl font-semibold text-white"
             style={{ backgroundColor: '#247e5bff' }}
           >
-            Back to Teachers
+            Back to Faculty
           </button>
         </div>
       </div>
@@ -88,9 +88,9 @@ const TeacherDetail = () => {
             }}
           >
             <FiArrowLeft size={20} />
-            Back to Teachers
+            Back to Faculty
           </button>
-          <h1 className="text-4xl font-bold" style={{ color: '#247e5bff' }}>Teacher Details</h1>
+          <h1 className="text-4xl font-bold" style={{ color: '#247e5bff' }}>Faculty Details</h1>
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -118,7 +118,7 @@ const TeacherDetail = () => {
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <FiBook className="text-gray-500" size={18} />
-                  <label className="text-xs font-semibold text-gray-600">Teacher ID</label>
+                  <label className="text-xs font-semibold text-gray-600">Faculty ID</label>
                 </div>
                 <p className="text-lg font-semibold ml-6" style={{ color: '#305796' }}>
                   {teacher.Teacher_ID}

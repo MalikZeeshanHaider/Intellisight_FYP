@@ -133,18 +133,7 @@ const Zone1 = () => {
           err.message?.includes('FaceLandmark') || 
           err.message?.includes('FaceRecognition') ||
           err.message?.includes('models')) {
-        setError(`Model loading failed: ${err.message}. 
-
-Please ensure the following files exist in /public/models/:
-- tiny_face_detector_model-weights_manifest.json
-- tiny_face_detector_model-shard1
-- face_landmark_68_model-weights_manifest.json  
-- face_landmark_68_model-shard1
-- face_recognition_model-weights_manifest.json
-- face_recognition_model-shard1
-- face_recognition_model-shard2
-
-If models are missing, run: npm run download-models`);
+        setError(`Model loading failed: ${err.message}. Click "Retry" to try again or refresh the page.`);
       } else if (err.message?.includes('camera') || err.message?.includes('webcam')) {
         setError('Camera access denied. Please allow camera permissions and refresh.');
       } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
@@ -153,6 +142,13 @@ If models are missing, run: npm run download-models`);
         setError(errorMessage);
       }
     }
+  };
+
+  // Retry initialization
+  const retryInitialization = async () => {
+    setError(null);
+    faceRecognition.resetModelsState();
+    await initializeFaceRecognition();
   };
 
   // Start continuous face detection for all cameras
@@ -622,17 +618,31 @@ If models are missing, run: npm run download-models`);
           animate={{ opacity: 1, y: 0 }}
           className="rounded-xl p-4 flex items-start justify-between border" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)' }}
         >
-          <div className="flex items-start">
+          <div className="flex items-start flex-1">
             <FiAlertCircle className="text-red-500 dark:text-red-400 mt-0.5 mr-3 flex-shrink-0" size={20} />
             <p className="text-red-700 dark:text-red-300">{error}</p>
           </div>
-          <motion.button 
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setError(null)}
-          >
-            <FiX className="text-red-500 dark:text-red-400" />
-          </motion.button>
+          <div className="flex items-center gap-2">
+            {error.includes('Model loading failed') && (
+              <motion.button 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={retryInitialization}
+                className="px-3 py-1 text-sm font-semibold rounded-lg"
+                style={{ backgroundColor: '#247e5b', color: 'white' }}
+              >
+                <FiRefreshCw className="inline mr-1" size={14} />
+                Retry
+              </motion.button>
+            )}
+            <motion.button 
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setError(null)}
+            >
+              <FiX className="text-red-500 dark:text-red-400" />
+            </motion.button>
+          </div>
         </motion.div>
       )}
 
@@ -882,8 +892,7 @@ If models are missing, run: npm run download-models`);
                 <select
                   value={newCamera.type}
                   onChange={(e) => setNewCamera({ ...newCamera, type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-xl focus:outline-none text-gray-800 dark:text-gray-200"
-                  style={{ focusRingColor: '#003d82' }}
+                  className="custom-zones-dropdown w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-xl focus:outline-none text-gray-800 dark:text-gray-200"
                 >
                   <option value="Entry">Entry (Adds to Active Presence)</option>
                   <option value="Exit">Exit (Logs to Attendance)</option>

@@ -313,7 +313,7 @@ export const ZonesStackedComparison = ({ data = null, height = 250 }) => {
         <Legend />
 
         <Bar dataKey="students" stackId="a" fill="#00ffff" name="Students" radius={[0, 0, 0, 0]} />
-        <Bar dataKey="teachers" stackId="a" fill="#10b981" name="Teachers" radius={[0, 0, 0, 0]} />
+        <Bar dataKey="teachers" stackId="a" fill="#10b981" name="Faculty" radius={[0, 0, 0, 0]} />
         <Bar dataKey="unknown" stackId="a" fill="#f59e0b" name="Unknown" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>

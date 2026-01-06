@@ -18,6 +18,26 @@ const Logs = () => {
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const intervalRef = useRef(null);
+  
+  // Dropdown states
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
+  const [limitDropdownOpen, setLimitDropdownOpen] = useState(false);
+  const typeDropdownRef = useRef(null);
+  const limitDropdownRef = useRef(null);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(event.target)) {
+        setTypeDropdownOpen(false);
+      }
+      if (limitDropdownRef.current && !limitDropdownRef.current.contains(event.target)) {
+        setLimitDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Fetch logs from TimeTable
   const fetchLogs = useCallback(async (showLoading = true) => {
@@ -136,55 +156,61 @@ const Logs = () => {
         style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)' }}
       >
         <div className="flex items-center gap-3">
-          <style>{`
-            .custom-logs-dropdown {
-              appearance: none;
-              background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23305796' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-              background-repeat: no-repeat;
-              background-position: right 0.75rem center;
-              background-size: 1.125em;
-              padding-right: 2.5rem;
-            }
-          `}</style>
+          {/* Person Type Filter - Custom Dropdown */}
+          <div className="relative" ref={typeDropdownRef}>
+            <button
+              onClick={() => setTypeDropdownOpen(!typeDropdownOpen)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-700"
+              style={{ minWidth: '140px' }}
+            >
+              <span>{personTypeFilter === '' ? 'All Types' : personTypeFilter === 'Student' ? 'Students Only' : 'Faculty Only'}</span>
+              <FiChevronDown className={`transition-transform ${typeDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {typeDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 w-full min-w-[150px] bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                {[
+                  { value: '', label: 'All Types' },
+                  { value: 'Student', label: 'Students Only' },
+                  { value: 'Teacher', label: 'Faculty Only' }
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => { setPersonTypeFilter(option.value); setTypeDropdownOpen(false); }}
+                    className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-blue-100 hover:text-blue-700 ${personTypeFilter === option.value ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           
-          <select
-            value={personTypeFilter}
-            onChange={(e) => setPersonTypeFilter(e.target.value)}
-            className="custom-logs-dropdown px-4 py-2 rounded-xl font-medium text-sm transition-all cursor-pointer"
-            style={{ backgroundColor: '#f3f4f6', color: '#6b7280', border: 'none', outline: 'none' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(48, 87, 150, 0.1)';
-              e.currentTarget.style.color = '#305796';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6';
-              e.currentTarget.style.color = '#6b7280';
-            }}
-          >
-            <option value="">All Types</option>
-            <option value="Student">Students Only</option>
-            <option value="Teacher">Teachers Only</option>
-          </select>
-          
-          <select
-            value={limit}
-            onChange={(e) => setLimit(Number(e.target.value))}
-            className="custom-logs-dropdown px-4 py-2 rounded-xl font-medium text-sm transition-all cursor-pointer"
-            style={{ backgroundColor: '#f3f4f6', color: '#6b7280', border: 'none', outline: 'none' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(48, 87, 150, 0.1)';
-              e.currentTarget.style.color = '#305796';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6';
-              e.currentTarget.style.color = '#6b7280';
-            }}
-          >
-            <option value={25}>Last 25 entries</option>
-            <option value={50}>Last 50 entries</option>
-            <option value={100}>Last 100 entries</option>
-            <option value={200}>Last 200 entries</option>
-          </select>
+          {/* Limit Filter - Custom Dropdown */}
+          <div className="relative" ref={limitDropdownRef}>
+            <button
+              onClick={() => setLimitDropdownOpen(!limitDropdownOpen)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-700"
+              style={{ minWidth: '150px' }}
+            >
+              <span>Last {limit} entries</span>
+              <FiChevronDown className={`transition-transform ${limitDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {limitDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 w-full min-w-[160px] bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                {[25, 50, 100, 200].map((value) => (
+                  <button
+                    key={value}
+                    onClick={() => { setLimit(value); setLimitDropdownOpen(false); }}
+                    className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-blue-100 hover:text-blue-700 ${limit === value ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                  >
+                    Last {value} entries
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         
         <motion.button

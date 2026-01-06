@@ -12,7 +12,10 @@ echo  ================================================================
 echo  ^|                                                              ^|
 echo  ^|              INTELLISIGHT - FACE RECOGNITION                 ^|
 echo  ^|                  ATTENDANCE SYSTEM                           ^|
-echo  ^|                                                              ^|
+echo  ^|                  ------------------                          ^|
+echo  ^|                    Abdullah Uzair - 221083                   ^|
+echo  ^|                    Zeeshan Haider - 221093                   ^|
+echo  ^|                    Zainab Moazzam - 221095                   ^|
 echo  ================================================================
 echo.
 

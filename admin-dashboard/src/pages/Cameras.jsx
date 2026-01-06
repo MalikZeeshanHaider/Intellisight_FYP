@@ -3,9 +3,9 @@
  * Manage cameras for each zone with Entry/Exit configuration
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiVideo, FiRefreshCw, FiPlus, FiAlertCircle, FiX, FiEdit2, FiTrash2, FiMapPin } from 'react-icons/fi';
+import { FiVideo, FiRefreshCw, FiPlus, FiAlertCircle, FiX, FiEdit2, FiTrash2, FiMapPin, FiChevronDown } from 'react-icons/fi';
 import { cameraAPI, zoneAPI } from '../api/api';
 
 const Cameras = () => {
@@ -27,6 +27,38 @@ const Cameras = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingCamera, setDeletingCamera] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Dropdown states for Add Modal
+  const [addZoneDropdownOpen, setAddZoneDropdownOpen] = useState(false);
+  const [addTypeDropdownOpen, setAddTypeDropdownOpen] = useState(false);
+  const addZoneDropdownRef = useRef(null);
+  const addTypeDropdownRef = useRef(null);
+  
+  // Dropdown states for Edit Modal
+  const [editZoneDropdownOpen, setEditZoneDropdownOpen] = useState(false);
+  const [editTypeDropdownOpen, setEditTypeDropdownOpen] = useState(false);
+  const editZoneDropdownRef = useRef(null);
+  const editTypeDropdownRef = useRef(null);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (addZoneDropdownRef.current && !addZoneDropdownRef.current.contains(event.target)) {
+        setAddZoneDropdownOpen(false);
+      }
+      if (addTypeDropdownRef.current && !addTypeDropdownRef.current.contains(event.target)) {
+        setAddTypeDropdownOpen(false);
+      }
+      if (editZoneDropdownRef.current && !editZoneDropdownRef.current.contains(event.target)) {
+        setEditZoneDropdownOpen(false);
+      }
+      if (editTypeDropdownRef.current && !editTypeDropdownRef.current.contains(event.target)) {
+        setEditTypeDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Fetch cameras and zones
   const fetchData = async () => {
@@ -368,39 +400,63 @@ const Cameras = () => {
                   <label className="block text-sm font-semibold mb-2 text-gray-700">
                     Zone *
                   </label>
-                  <select
-                    value={newCamera.Zone_id}
-                    onChange={(e) => setNewCamera({ ...newCamera, Zone_id: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl bg-gray-50 border-2 border-gray-200 outline-none transition text-gray-900"
-                    style={{ borderColor: 'rgba(48, 87, 150, 0.3)' }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#305796'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(48, 87, 150, 0.3)'}
-                  >
-                    <option value="">Select Zone</option>
-                    {zones.map((zone) => (
-                      <option key={zone.Zone_id} value={zone.Zone_id}>
-                        {zone.Zone_Name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative" ref={addZoneDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setAddZoneDropdownOpen(!addZoneDropdownOpen)}
+                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border-2 border-gray-200 outline-none text-left flex items-center justify-between"
+                      style={{ color: newCamera.Zone_id ? '#111827' : '#9CA3AF' }}
+                    >
+                      <span>{newCamera.Zone_id ? zones.find(z => z.Zone_id.toString() === newCamera.Zone_id.toString())?.Zone_Name || 'Select Zone' : 'Select Zone'}</span>
+                      <FiChevronDown className={`transition-transform ${addZoneDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#ea580c' }} />
+                    </button>
+                    
+                    {addZoneDropdownOpen && (
+                      <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50 max-h-48 overflow-y-auto">
+                        {zones.map((zone) => (
+                          <button
+                            key={zone.Zone_id}
+                            type="button"
+                            onClick={() => { setNewCamera({ ...newCamera, Zone_id: zone.Zone_id }); setAddZoneDropdownOpen(false); }}
+                            className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-orange-100 hover:text-orange-700 ${newCamera.Zone_id?.toString() === zone.Zone_id.toString() ? 'bg-orange-50 text-orange-700' : 'text-gray-700'}`}
+                          >
+                            {zone.Zone_Name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-gray-700">
                     Camera Type *
                   </label>
-                  <select
-                    value={newCamera.Camera_Type}
-                    onChange={(e) => setNewCamera({ ...newCamera, Camera_Type: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl bg-gray-50 border-2 border-gray-200 outline-none transition text-gray-900"
-                    style={{ borderColor: 'rgba(48, 87, 150, 0.3)' }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#305796'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(48, 87, 150, 0.3)'}
-                  >
-                    <option value="Entry">Entry</option>
-                    <option value="Exit">Exit</option>
-                    <option value="Both">Both</option>
-                  </select>
+                  <div className="relative" ref={addTypeDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setAddTypeDropdownOpen(!addTypeDropdownOpen)}
+                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border-2 border-gray-200 outline-none text-left flex items-center justify-between text-gray-900"
+                    >
+                      <span>{newCamera.Camera_Type}</span>
+                      <FiChevronDown className={`transition-transform ${addTypeDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#ea580c' }} />
+                    </button>
+                    
+                    {addTypeDropdownOpen && (
+                      <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                        {['Entry', 'Exit', 'Both'].map((type) => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => { setNewCamera({ ...newCamera, Camera_Type: type }); setAddTypeDropdownOpen(false); }}
+                            className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-orange-100 hover:text-orange-700 ${newCamera.Camera_Type === type ? 'bg-orange-50 text-orange-700' : 'text-gray-700'}`}
+                          >
+                            {type}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -509,39 +565,63 @@ const Cameras = () => {
                   <label className="block text-sm font-semibold mb-2 text-gray-700">
                     Zone *
                   </label>
-                  <select
-                    value={editingCamera.Zone_id}
-                    onChange={(e) => setEditingCamera({ ...editingCamera, Zone_id: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl bg-gray-50 border-2 border-gray-200 outline-none transition text-gray-900"
-                    style={{ borderColor: 'rgba(48, 87, 150, 0.3)' }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#305796'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(48, 87, 150, 0.3)'}
-                  >
-                    <option value="">Select Zone</option>
-                    {zones.map((zone) => (
-                      <option key={zone.Zone_id} value={zone.Zone_id}>
-                        {zone.Zone_Name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative" ref={editZoneDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setEditZoneDropdownOpen(!editZoneDropdownOpen)}
+                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border-2 border-gray-200 outline-none text-left flex items-center justify-between"
+                      style={{ color: editingCamera.Zone_id ? '#111827' : '#9CA3AF' }}
+                    >
+                      <span>{editingCamera.Zone_id ? zones.find(z => z.Zone_id.toString() === editingCamera.Zone_id.toString())?.Zone_Name || 'Select Zone' : 'Select Zone'}</span>
+                      <FiChevronDown className={`transition-transform ${editZoneDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#ea580c' }} />
+                    </button>
+                    
+                    {editZoneDropdownOpen && (
+                      <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50 max-h-48 overflow-y-auto">
+                        {zones.map((zone) => (
+                          <button
+                            key={zone.Zone_id}
+                            type="button"
+                            onClick={() => { setEditingCamera({ ...editingCamera, Zone_id: zone.Zone_id }); setEditZoneDropdownOpen(false); }}
+                            className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-orange-100 hover:text-orange-700 ${editingCamera.Zone_id?.toString() === zone.Zone_id.toString() ? 'bg-orange-50 text-orange-700' : 'text-gray-700'}`}
+                          >
+                            {zone.Zone_Name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-gray-700">
                     Camera Type *
                   </label>
-                  <select
-                    value={editingCamera.Camera_Type}
-                    onChange={(e) => setEditingCamera({ ...editingCamera, Camera_Type: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl bg-gray-50 border-2 border-gray-200 outline-none transition text-gray-900"
-                    style={{ borderColor: 'rgba(48, 87, 150, 0.3)' }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#305796'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(48, 87, 150, 0.3)'}
-                  >
-                    <option value="Entry">Entry</option>
-                    <option value="Exit">Exit</option>
-                    <option value="Both">Both</option>
-                  </select>
+                  <div className="relative" ref={editTypeDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setEditTypeDropdownOpen(!editTypeDropdownOpen)}
+                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border-2 border-gray-200 outline-none text-left flex items-center justify-between text-gray-900"
+                    >
+                      <span>{editingCamera.Camera_Type}</span>
+                      <FiChevronDown className={`transition-transform ${editTypeDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#ea580c' }} />
+                    </button>
+                    
+                    {editTypeDropdownOpen && (
+                      <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                        {['Entry', 'Exit', 'Both'].map((type) => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => { setEditingCamera({ ...editingCamera, Camera_Type: type }); setEditTypeDropdownOpen(false); }}
+                            className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-orange-100 hover:text-orange-700 ${editingCamera.Camera_Type === type ? 'bg-orange-50 text-orange-700' : 'text-gray-700'}`}
+                          >
+                            {type}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>

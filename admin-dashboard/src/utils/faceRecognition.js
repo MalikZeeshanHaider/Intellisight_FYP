@@ -12,13 +12,23 @@ let modelsLoaded = false;
 let faceDescriptors = [];
 
 /**
+ * Reset models loaded state (useful for retry scenarios)
+ */
+export const resetModelsState = () => {
+  modelsLoaded = false;
+  console.log('🔄 Models state reset');
+};
+
+/**
  * Load face-api.js models
  */
-export const loadModels = async () => {
+export const loadModels = async (retryCount = 0) => {
   if (modelsLoaded) {
     console.log('✅ Models already loaded');
     return true;
   }
+
+  const MAX_RETRIES = 2;
 
   try {
     console.log('🔄 Loading face-api.js models from:', MODEL_URL);
@@ -57,6 +67,14 @@ export const loadModels = async () => {
   } catch (error) {
     console.error('❌ Error loading face-api.js models:', error);
     console.error('Error details:', error.message);
+    
+    // Retry logic
+    if (retryCount < MAX_RETRIES) {
+      console.log(`🔄 Retrying model load (attempt ${retryCount + 2}/${MAX_RETRIES + 1})...`);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+      return loadModels(retryCount + 1);
+    }
+    
     console.error('Make sure model files exist in /public/models/ directory');
     console.error('Expected files:');
     console.error('  - tiny_face_detector_model-weights_manifest.json & shard1');

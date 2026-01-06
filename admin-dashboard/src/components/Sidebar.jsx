@@ -81,7 +81,7 @@ const Sidebar = ({ onClose, onCollapseChange }) => {
     {
       path: '/teachers',
       icon: GiTeacher,
-      label: 'Teachers'
+      label: 'Faculty'
     },
     {
       path: '/zones',
@@ -298,30 +298,47 @@ const Sidebar = ({ onClose, onCollapseChange }) => {
 
       {/* Bottom Section - Reduced padding for visibility */}
       <div 
-        className="relative p-3 space-y-1.5"
+        className="relative p-3 space-y-2"
         style={{
           borderTop: isDarkMode
             ? '1px solid rgba(6, 182, 212, 0.2)'
             : '1px solid rgba(100, 116, 139, 0.2)'
         }}
       >
-        {/* Toggle Collapse Button - Moved above Settings */}
+        {/* Toggle Collapse Button - Styled with proper spacing */}
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={handleCollapseToggle}
-          className="w-full relative flex items-center justify-center py-1.5 rounded-xl transition-all duration-300 overflow-hidden group"
+          className="w-full relative flex items-center justify-center py-2 rounded-lg transition-all duration-300 overflow-hidden group mb-2"
           style={{
             background: isDarkMode
-              ? 'linear-gradient(135deg, rgba(0, 255, 255, 0.1), rgba(0, 128, 255, 0.02))'
-              : 'linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(147, 197, 253, 0.1))',
+              ? 'linear-gradient(135deg, rgba(100, 116, 139, 0.15), rgba(71, 85, 105, 0.1))'
+              : 'linear-gradient(135deg, rgba(203, 213, 225, 0.4), rgba(226, 232, 240, 0.3))',
             border: isDarkMode
-              ? '1px solid rgba(0, 255, 255, 0.3)'
-              : '1px solid rgba(59, 130, 246, 0.3)',
-            color: isDarkMode ? '#00ffff' : '#3b82f6'
+              ? '1px solid rgba(100, 116, 139, 0.3)'
+              : '1px solid rgba(148, 163, 184, 0.3)',
+            color: isDarkMode ? '#cbd5e1' : '#475569',
+            boxShadow: isDarkMode
+              ? '0 2px 4px rgba(0, 0, 0, 0.2)'
+              : '0 2px 4px rgba(100, 116, 139, 0.1)'
           }}
         >
-          {isCollapsed ? <FiChevronRight size={18} /> : <FiChevronLeft size={18} />}
+          <div className="flex items-center">
+            {isCollapsed ? <FiChevronRight size={18} /> : <FiChevronLeft size={18} />}
+          </div>
+          
+          {/* Subtle glow on hover */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileHover={{ opacity: 1 }}
+            className="absolute inset-0 rounded-lg"
+            style={{
+              background: isDarkMode
+                ? 'radial-gradient(circle at center, rgba(148, 163, 184, 0.1), transparent)'
+                : 'radial-gradient(circle at center, rgba(100, 116, 139, 0.1), transparent)'
+            }}
+          />
         </motion.button>
 
         {/* Settings Button */}

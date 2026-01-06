@@ -162,7 +162,9 @@ export const savePersonImages = async (personType, personId, personName, facePic
   
   // Auto-trigger training after saving images
   if (savedPaths.length > 0) {
-    triggerAutoTraining(safeName, personType, personId);
+    triggerAutoTraining(safeName, personType, personId).catch(err => {
+      console.warn('[AUTO-TRAIN] Training failed but continuing:', err.message);
+    });
   }
   
   return savedPaths;
@@ -323,8 +325,10 @@ export const triggerAutoTraining = async (personName = null, personType = null, 
     
     return result;
   } catch (err) {
-    console.error(`[AUTO-TRAIN ERROR] ${err.message}`);
-    throw err;
+    // Log the error but don't throw - prevent server crash
+    console.error(`[AUTO-TRAIN ERROR] Training failed: ${err.message}`);
+    console.warn('[AUTO-TRAIN] Server will continue running despite training failure.');
+    return { success: false, error: err.message };
   }
 };
 
@@ -409,7 +413,9 @@ export const deletePersonImages = async (personName) => {
       console.log(`[IMAGE SERVICE] Deleted folder: ${folderPath}`);
       
       // Re-train after deletion to update embeddings
-      triggerAutoTraining();
+      triggerAutoTraining().catch(err => {
+        console.warn('[AUTO-TRAIN] Training after deletion failed but continuing:', err.message);
+      });
       
       return true;
     }

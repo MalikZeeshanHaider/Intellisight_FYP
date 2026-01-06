@@ -237,7 +237,7 @@ export default function AttendanceLogs() {
               options={[
                 { value: '', label: 'All Types' },
                 { value: 'Student', label: 'Students' },
-                { value: 'Teacher', label: 'Teachers' }
+                { value: 'Teacher', label: 'Faculty' }
               ]}
             />
           </div>

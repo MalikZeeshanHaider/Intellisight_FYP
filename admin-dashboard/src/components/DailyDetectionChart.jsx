@@ -196,7 +196,7 @@ const DailyDetectionChart = ({ data, loading }) => {
           animationDuration={1000}
         />
         
-        {/* Bars for students and teachers */}
+        {/* Bars for students and faculty */}
         <Bar
           dataKey="studentDetections"
           name="Students"
@@ -207,7 +207,7 @@ const DailyDetectionChart = ({ data, loading }) => {
         />
         <Bar
           dataKey="teacherDetections"
-          name="Teachers"
+          name="Faculty"
           fill="url(#colorTeachers)"
           radius={[6, 6, 0, 0]}
           animationDuration={1200}

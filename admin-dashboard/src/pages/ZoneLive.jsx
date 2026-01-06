@@ -501,7 +501,7 @@ const ZoneLive = () => {
                   <select
                     value={newCamera.Camera_Type}
                     onChange={(e) => setNewCamera({ ...newCamera, Camera_Type: e.target.value })}
-                    className="w-full px-4 py-3 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-blue-500"
+                    className="custom-zones-dropdown w-full px-4 py-3 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none"
                   >
                     <option value="Entry">Entry</option>
                     <option value="Exit">Exit</option>
@@ -604,7 +604,7 @@ const ZoneLive = () => {
                   <select
                     value={editingCamera.Camera_Type}
                     onChange={(e) => setEditingCamera({ ...editingCamera, Camera_Type: e.target.value })}
-                    className="w-full px-4 py-3 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-blue-500"
+                    className="custom-zones-dropdown w-full px-4 py-3 rounded-lg border dark:border-gray-700 dark:bg-gray-900 focus:outline-none"
                   >
                     <option value="Entry">Entry</option>
                     <option value="Exit">Exit</option>
