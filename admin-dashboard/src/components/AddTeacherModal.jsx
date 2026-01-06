@@ -278,7 +278,12 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                                             key={type}
                                             type="button"
                                             onClick={() => {
-                                                setFormData({ ...formData, Faculty_Type: type });
+                                                setFormData({ 
+                                                    ...formData, 
+                                                    Faculty_Type: type,
+                                                    // Clear Department if changing to Visiting
+                                                    Department: type === 'Visiting' ? '' : formData.Department
+                                                });
                                                 setFacultyDropdownOpen(false);
                                             }}
                                             className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-green-100 hover:text-green-700 ${formData.Faculty_Type === type ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}

@@ -381,7 +381,7 @@ const Dashboard = () => {
           <div className="flex items-center gap-3">
             <h1 className="text-4xl font-display font-black"
               style={{
-                color: '#003d82'
+                color: document.documentElement.classList.contains('dark') ? '#c0f0f0' : '#003d82'
               }}
             >
               Dashboard
@@ -392,11 +392,11 @@ const Dashboard = () => {
                 transition={{ duration: 2, repeat: Infinity }}
                 className="w-2.5 h-2.5 rounded-full"
                 style={{ 
-                  backgroundColor: '#305796',
-                  boxShadow: '0 0 8px #305796'
+                  backgroundColor: document.documentElement.classList.contains('dark') ? '#22d3ee' : '#305796',
+                  boxShadow: document.documentElement.classList.contains('dark') ? '0 0 12px #22d3ee' : '0 0 8px #305796'
                 }}
               />
-              <span className="text-sm font-bold" style={{ color: '#305796' }}>Live</span>
+              <span className="text-sm font-bold" style={{ color: document.documentElement.classList.contains('dark') ? '#22d3ee' : '#305796' }}>Live</span>
             </div>
           </div>
         </div>
@@ -405,29 +405,29 @@ const Dashboard = () => {
         <div className="flex items-center space-x-4">
           {/* Compact Date Display */}
           <div className="text-right">
-            <div className="text-xs font-medium text-gray-500">
+            <div className="text-xs font-medium" style={{ color: document.documentElement.classList.contains('dark') ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
               {format(currentTime, 'EEEE, MMMM d, yyyy')}
             </div>
-            <div className="text-sm font-bold" style={{ color: '#305796' }}>
+            <div className="text-sm font-bold" style={{ color: document.documentElement.classList.contains('dark') ? '#22d3ee' : '#305796' }}>
               {format(currentTime, 'HH:mm:ss')}
             </div>
           </div>
           
           {/* Divider */}
-          <div className="w-px h-8 bg-gray-300" />
+          <div className="w-px h-8" style={{ backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(6, 182, 212, 0.3)' : '#d1d5db' }} />
           
           {/* Last Update - Minimal */}
           <div className="text-right">
-            <div className="text-xs font-medium text-gray-500">
+            <div className="text-xs font-medium" style={{ color: document.documentElement.classList.contains('dark') ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
               Last Update
             </div>
-            <div className="text-sm font-bold" style={{ color: '#305796' }}>
+            <div className="text-sm font-bold" style={{ color: document.documentElement.classList.contains('dark') ? '#22d3ee' : '#305796' }}>
               {format(lastUpdate, 'HH:mm:ss')}
             </div>
           </div>
           
           {/* Divider */}
-          <div className="w-px h-8 bg-gray-300" />
+          <div className="w-px h-8" style={{ backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(6, 182, 212, 0.3)' : '#d1d5db' }} />
           
           {/* Refresh Icon Only */}
           <motion.button
@@ -435,21 +435,40 @@ const Dashboard = () => {
             onClick={handleRefresh}
             className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300"
             style={{
-              backgroundColor: loading ? '#e5e7eb' : '#f3f4f6',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.06)'
+              backgroundColor: document.documentElement.classList.contains('dark') 
+                ? (loading ? 'rgba(6, 182, 212, 0.2)' : 'rgba(15, 23, 42, 0.8)')
+                : (loading ? '#e5e7eb' : '#f3f4f6'),
+              border: document.documentElement.classList.contains('dark') ? '1px solid rgba(6, 182, 212, 0.3)' : 'none',
+              boxShadow: document.documentElement.classList.contains('dark') 
+                ? '0 0 15px rgba(6, 182, 212, 0.1)' 
+                : '0 2px 4px rgba(0, 0, 0, 0.06)'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#305796';
-              const svg = e.currentTarget.querySelector('svg');
-              if (svg) svg.style.color = '#ffffff';
+              if (document.documentElement.classList.contains('dark')) {
+                e.currentTarget.style.backgroundColor = 'rgba(6, 182, 212, 0.3)';
+                e.currentTarget.style.boxShadow = '0 0 20px rgba(6, 182, 212, 0.4)';
+                const svg = e.currentTarget.querySelector('svg');
+                if (svg) svg.style.color = '#22d3ee';
+              } else {
+                e.currentTarget.style.backgroundColor = '#305796';
+                const svg = e.currentTarget.querySelector('svg');
+                if (svg) svg.style.color = '#ffffff';
+              }
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6';
-              const svg = e.currentTarget.querySelector('svg');
-              if (svg) svg.style.color = '#305796';
+              if (document.documentElement.classList.contains('dark')) {
+                e.currentTarget.style.backgroundColor = 'rgba(15, 23, 42, 0.8)';
+                e.currentTarget.style.boxShadow = '0 0 15px rgba(6, 182, 212, 0.1)';
+                const svg = e.currentTarget.querySelector('svg');
+                if (svg) svg.style.color = '#22d3ee';
+              } else {
+                e.currentTarget.style.backgroundColor = '#f3f4f6';
+                const svg = e.currentTarget.querySelector('svg');
+                if (svg) svg.style.color = '#305796';
+              }
             }}
           >
-            <FiRefreshCw size={18} style={{ color: '#305796', transition: 'color 0.3s' }} />
+            <FiRefreshCw size={18} style={{ color: document.documentElement.classList.contains('dark') ? '#22d3ee' : '#305796', transition: 'color 0.3s' }} />
           </motion.button>
         </div>
       </motion.div>
@@ -482,17 +501,42 @@ const Dashboard = () => {
           <motion.div variants={itemVariants} className="grid grid-cols-4 gap-3">
             {/* Students Card */}
             <motion.div
-              className="relative p-5 rounded-2xl overflow-hidden transition-all duration-200 h-28"
+              className="relative p-5 rounded-2xl overflow-hidden transition-all duration-300 h-28 group"
                 style={{
-                  backgroundColor: '#ffffff',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+                  background: document.documentElement.classList.contains('dark')
+                    ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+                    : '#ffffff',
+                  border: document.documentElement.classList.contains('dark')
+                    ? '1px solid rgba(6, 182, 212, 0.2)'
+                    : 'none',
+                  boxShadow: document.documentElement.classList.contains('dark')
+                    ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)'
+                    : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                onMouseEnter={(e) => {
+                  if (document.documentElement.classList.contains('dark')) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(34, 211, 238, 0.08))';
+                    e.currentTarget.style.borderColor = 'rgba(34, 211, 238, 0.5)';
+                    e.currentTarget.style.boxShadow = '0 0 30px rgba(6, 182, 212, 0.3), 0 0 60px rgba(6, 182, 212, 0.1)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  } else {
+                    e.currentTarget.style.backgroundColor = '#f9fafb';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (document.documentElement.classList.contains('dark')) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))';
+                    e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.2)';
+                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  } else {
+                    e.currentTarget.style.backgroundColor = '#ffffff';
+                  }
+                }}
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider mb-1 text-gray-600">
+                    <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: document.documentElement.classList.contains('dark') ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
                       Students
                     </p>
                     <motion.p
@@ -500,14 +544,15 @@ const Dashboard = () => {
                       initial={{ scale: 1.3, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       className="text-3xl font-black"
-                      style={{ color: '#305796' }}
+                      style={{ color: document.documentElement.classList.contains('dark') ? '#22d3ee' : '#305796' }}
                     >
                       {stats.totalStudents}
                     </motion.p>
                   </div>
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300"
                     style={{
-                      backgroundColor: '#6365baff'
+                      backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(99, 102, 241, 0.8)' : '#6365baff',
+                      boxShadow: document.documentElement.classList.contains('dark') ? '0 0 20px rgba(99, 102, 241, 0.4)' : 'none'
                     }}
                   >
                     <FiUsers className="text-white" size={22} />
@@ -518,17 +563,42 @@ const Dashboard = () => {
 
             {/* Faculty Card */}
             <motion.div
-              className="relative p-5 rounded-2xl overflow-hidden transition-all duration-200 h-28"
+              className="relative p-5 rounded-2xl overflow-hidden transition-all duration-300 h-28 group"
                 style={{
-                  backgroundColor: '#ffffff',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+                  background: document.documentElement.classList.contains('dark')
+                    ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+                    : '#ffffff',
+                  border: document.documentElement.classList.contains('dark')
+                    ? '1px solid rgba(6, 182, 212, 0.2)'
+                    : 'none',
+                  boxShadow: document.documentElement.classList.contains('dark')
+                    ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)'
+                    : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                onMouseEnter={(e) => {
+                  if (document.documentElement.classList.contains('dark')) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(34, 211, 238, 0.08))';
+                    e.currentTarget.style.borderColor = 'rgba(34, 211, 238, 0.5)';
+                    e.currentTarget.style.boxShadow = '0 0 30px rgba(6, 182, 212, 0.3), 0 0 60px rgba(6, 182, 212, 0.1)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  } else {
+                    e.currentTarget.style.backgroundColor = '#f9fafb';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (document.documentElement.classList.contains('dark')) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))';
+                    e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.2)';
+                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  } else {
+                    e.currentTarget.style.backgroundColor = '#ffffff';
+                  }
+                }}
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider mb-1 text-gray-600">
+                    <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: document.documentElement.classList.contains('dark') ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
                       Faculty
                     </p>
                     <motion.p
@@ -536,14 +606,15 @@ const Dashboard = () => {
                       initial={{ scale: 1.3, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       className="text-3xl font-black"
-                      style={{ color: '#305796' }}
+                      style={{ color: document.documentElement.classList.contains('dark') ? '#22d3ee' : '#305796' }}
                     >
                       {stats.totalTeachers}
                   </motion.p>
                 </div>
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300"
                   style={{
-                    backgroundColor: '#247e5bff'
+                    backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(16, 185, 129, 0.8)' : '#247e5bff',
+                    boxShadow: document.documentElement.classList.contains('dark') ? '0 0 20px rgba(16, 185, 129, 0.4)' : 'none'
                   }}
                 >
                   <GiTeacher className="text-white" size={22} />
@@ -553,17 +624,42 @@ const Dashboard = () => {
 
             {/* Active Presence Card */}
             <motion.div
-              className="relative p-5 rounded-2xl overflow-hidden transition-all duration-200 h-28"
+              className="relative p-5 rounded-2xl overflow-hidden transition-all duration-300 h-28 group"
                 style={{
-                  backgroundColor: '#ffffff',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+                  background: document.documentElement.classList.contains('dark')
+                    ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+                    : '#ffffff',
+                  border: document.documentElement.classList.contains('dark')
+                    ? '1px solid rgba(6, 182, 212, 0.2)'
+                    : 'none',
+                  boxShadow: document.documentElement.classList.contains('dark')
+                    ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)'
+                    : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                onMouseEnter={(e) => {
+                  if (document.documentElement.classList.contains('dark')) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(34, 211, 238, 0.08))';
+                    e.currentTarget.style.borderColor = 'rgba(34, 211, 238, 0.5)';
+                    e.currentTarget.style.boxShadow = '0 0 30px rgba(6, 182, 212, 0.3), 0 0 60px rgba(6, 182, 212, 0.1)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  } else {
+                    e.currentTarget.style.backgroundColor = '#f9fafb';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (document.documentElement.classList.contains('dark')) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))';
+                    e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.2)';
+                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  } else {
+                    e.currentTarget.style.backgroundColor = '#ffffff';
+                  }
+                }}
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider mb-1 text-gray-600">
+                    <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: document.documentElement.classList.contains('dark') ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
                       Active Presence
                     </p>
                     <motion.p
@@ -571,14 +667,15 @@ const Dashboard = () => {
                       initial={{ scale: 1.3, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       className="text-3xl font-black"
-                      style={{ color: '#305796' }}
+                      style={{ color: document.documentElement.classList.contains('dark') ? '#22d3ee' : '#305796' }}
                     >
                       {stats.activePersons}
                     </motion.p>
                   </div>
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300"
                     style={{
-                      backgroundColor: '#8849a1ff'
+                      backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(168, 85, 247, 0.8)' : '#8849a1ff',
+                      boxShadow: document.documentElement.classList.contains('dark') ? '0 0 20px rgba(168, 85, 247, 0.4)' : 'none'
                     }}
                   >
                     <FiActivity className="text-white" size={22} />
@@ -589,17 +686,42 @@ const Dashboard = () => {
 
             {/* Zones Card */}
             <motion.div
-              className="relative p-5 rounded-2xl overflow-hidden transition-all duration-200 h-28"
+              className="relative p-5 rounded-2xl overflow-hidden transition-all duration-300 h-28 group"
                 style={{
-                  backgroundColor: '#ffffff',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+                  background: document.documentElement.classList.contains('dark')
+                    ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+                    : '#ffffff',
+                  border: document.documentElement.classList.contains('dark')
+                    ? '1px solid rgba(6, 182, 212, 0.2)'
+                    : 'none',
+                  boxShadow: document.documentElement.classList.contains('dark')
+                    ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)'
+                    : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                onMouseEnter={(e) => {
+                  if (document.documentElement.classList.contains('dark')) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(34, 211, 238, 0.08))';
+                    e.currentTarget.style.borderColor = 'rgba(34, 211, 238, 0.5)';
+                    e.currentTarget.style.boxShadow = '0 0 30px rgba(6, 182, 212, 0.3), 0 0 60px rgba(6, 182, 212, 0.1)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  } else {
+                    e.currentTarget.style.backgroundColor = '#f9fafb';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (document.documentElement.classList.contains('dark')) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))';
+                    e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.2)';
+                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  } else {
+                    e.currentTarget.style.backgroundColor = '#ffffff';
+                  }
+                }}
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider mb-1 text-gray-600">
+                    <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: document.documentElement.classList.contains('dark') ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
                       Zones
                     </p>
                     <motion.p
@@ -607,14 +729,15 @@ const Dashboard = () => {
                       initial={{ scale: 1.3, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       className="text-3xl font-black"
-                      style={{ color: '#305796' }}
+                      style={{ color: document.documentElement.classList.contains('dark') ? '#22d3ee' : '#305796' }}
                     >
                       {stats.totalZones}
                     </motion.p>
                   </div>
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300"
                     style={{
-                      backgroundColor: '#3ca1afff'
+                      backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(6, 182, 212, 0.8)' : '#3ca1afff',
+                      boxShadow: document.documentElement.classList.contains('dark') ? '0 0 20px rgba(6, 182, 212, 0.4)' : 'none'
                     }}
                   >
                     <FiMapPin className="text-white" size={22} />
@@ -627,28 +750,29 @@ const Dashboard = () => {
           <motion.div variants={itemVariants} className="relative p-4 rounded-2xl overflow-hidden h-[calc(100%-140px)]"
             style={{
               background: document.documentElement.classList.contains('dark')
-                ? 'linear-gradient(135deg, rgba(48, 87, 150, 0.05), rgba(48, 87, 150, 0.05))'
+                ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
                 : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(224, 231, 255, 0.9))',
               border: document.documentElement.classList.contains('dark')
-                ? '1px solid rgba(48, 87, 150, 0.2)'
+                ? '1px solid rgba(6, 182, 212, 0.2)'
                 : '1px solid rgba(48, 87, 150, 0.3)',
               boxShadow: document.documentElement.classList.contains('dark')
-                ? '0 4px 16px rgba(48, 87, 150, 0.15)'
+                ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)'
                 : '0 4px 16px rgba(48, 87, 150, 0.15)',
               backdropFilter: 'blur(10px)',
             }}
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300"
                   style={{
-                    backgroundColor: '#305796'
+                    backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(6, 182, 212, 0.8)' : '#305796',
+                    boxShadow: document.documentElement.classList.contains('dark') ? '0 0 15px rgba(6, 182, 212, 0.4)' : 'none'
                   }}
                 >
                   <FiTrendingUp className="text-white" size={16} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold" style={{ color: '#6b7280' }}>
+                  <h2 className="text-lg font-bold" style={{ color: document.documentElement.classList.contains('dark') ? '#c0f0f0' : '#6b7280' }}>
                     Detection Tracking
                   </h2>
                 </div>
@@ -657,14 +781,24 @@ const Dashboard = () => {
                 <button 
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer"
                   style={{ 
-                    backgroundColor: chartPeriod === 'daily' ? '#305796' : '#f3f4f6', 
-                    color: chartPeriod === 'daily' ? 'white' : '#6b7280' 
+                    backgroundColor: chartPeriod === 'daily' 
+                      ? (document.documentElement.classList.contains('dark') ? 'rgba(6, 182, 212, 0.8)' : '#305796')
+                      : (document.documentElement.classList.contains('dark') ? 'rgba(15, 23, 42, 0.8)' : '#f3f4f6'), 
+                    color: chartPeriod === 'daily' ? 'white' : (document.documentElement.classList.contains('dark') ? '#c0f0f0' : '#6b7280'),
+                    border: document.documentElement.classList.contains('dark') ? '1px solid rgba(6, 182, 212, 0.3)' : 'none',
+                    boxShadow: chartPeriod === 'daily' && document.documentElement.classList.contains('dark') ? '0 0 15px rgba(6, 182, 212, 0.4)' : 'none'
                   }}
                   onMouseEnter={(e) => {
-                    if (chartPeriod !== 'daily') e.currentTarget.style.backgroundColor = '#e5e7eb';
+                    if (chartPeriod !== 'daily') {
+                      e.currentTarget.style.backgroundColor = document.documentElement.classList.contains('dark') ? 'rgba(6, 182, 212, 0.2)' : '#e5e7eb';
+                      if (document.documentElement.classList.contains('dark')) e.currentTarget.style.boxShadow = '0 0 10px rgba(6, 182, 212, 0.2)';
+                    }
                   }}
                   onMouseLeave={(e) => {
-                    if (chartPeriod !== 'daily') e.currentTarget.style.backgroundColor = '#f3f4f6';
+                    if (chartPeriod !== 'daily') {
+                      e.currentTarget.style.backgroundColor = document.documentElement.classList.contains('dark') ? 'rgba(15, 23, 42, 0.8)' : '#f3f4f6';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }
                   }}
                   onClick={() => setChartPeriod('daily')}
                 >
@@ -673,14 +807,24 @@ const Dashboard = () => {
                 <button 
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer"
                   style={{ 
-                    backgroundColor: chartPeriod === 'weekly' ? '#305796' : '#f3f4f6', 
-                    color: chartPeriod === 'weekly' ? 'white' : '#6b7280' 
+                    backgroundColor: chartPeriod === 'weekly' 
+                      ? (document.documentElement.classList.contains('dark') ? 'rgba(6, 182, 212, 0.8)' : '#305796')
+                      : (document.documentElement.classList.contains('dark') ? 'rgba(15, 23, 42, 0.8)' : '#f3f4f6'), 
+                    color: chartPeriod === 'weekly' ? 'white' : (document.documentElement.classList.contains('dark') ? '#c0f0f0' : '#6b7280'),
+                    border: document.documentElement.classList.contains('dark') ? '1px solid rgba(6, 182, 212, 0.3)' : 'none',
+                    boxShadow: chartPeriod === 'weekly' && document.documentElement.classList.contains('dark') ? '0 0 15px rgba(6, 182, 212, 0.4)' : 'none'
                   }}
                   onMouseEnter={(e) => {
-                    if (chartPeriod !== 'weekly') e.currentTarget.style.backgroundColor = '#e5e7eb';
+                    if (chartPeriod !== 'weekly') {
+                      e.currentTarget.style.backgroundColor = document.documentElement.classList.contains('dark') ? 'rgba(6, 182, 212, 0.2)' : '#e5e7eb';
+                      if (document.documentElement.classList.contains('dark')) e.currentTarget.style.boxShadow = '0 0 10px rgba(6, 182, 212, 0.2)';
+                    }
                   }}
                   onMouseLeave={(e) => {
-                    if (chartPeriod !== 'weekly') e.currentTarget.style.backgroundColor = '#f3f4f6';
+                    if (chartPeriod !== 'weekly') {
+                      e.currentTarget.style.backgroundColor = document.documentElement.classList.contains('dark') ? 'rgba(15, 23, 42, 0.8)' : '#f3f4f6';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }
                   }}
                   onClick={() => setChartPeriod('weekly')}
                 >
@@ -689,14 +833,24 @@ const Dashboard = () => {
                 <button 
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer"
                   style={{ 
-                    backgroundColor: chartPeriod === 'monthly' ? '#305796' : '#f3f4f6', 
-                    color: chartPeriod === 'monthly' ? 'white' : '#6b7280' 
+                    backgroundColor: chartPeriod === 'monthly' 
+                      ? (document.documentElement.classList.contains('dark') ? 'rgba(6, 182, 212, 0.8)' : '#305796')
+                      : (document.documentElement.classList.contains('dark') ? 'rgba(15, 23, 42, 0.8)' : '#f3f4f6'), 
+                    color: chartPeriod === 'monthly' ? 'white' : (document.documentElement.classList.contains('dark') ? '#c0f0f0' : '#6b7280'),
+                    border: document.documentElement.classList.contains('dark') ? '1px solid rgba(6, 182, 212, 0.3)' : 'none',
+                    boxShadow: chartPeriod === 'monthly' && document.documentElement.classList.contains('dark') ? '0 0 15px rgba(6, 182, 212, 0.4)' : 'none'
                   }}
                   onMouseEnter={(e) => {
-                    if (chartPeriod !== 'monthly') e.currentTarget.style.backgroundColor = '#e5e7eb';
+                    if (chartPeriod !== 'monthly') {
+                      e.currentTarget.style.backgroundColor = document.documentElement.classList.contains('dark') ? 'rgba(6, 182, 212, 0.2)' : '#e5e7eb';
+                      if (document.documentElement.classList.contains('dark')) e.currentTarget.style.boxShadow = '0 0 10px rgba(6, 182, 212, 0.2)';
+                    }
                   }}
                   onMouseLeave={(e) => {
-                    if (chartPeriod !== 'monthly') e.currentTarget.style.backgroundColor = '#f3f4f6';
+                    if (chartPeriod !== 'monthly') {
+                      e.currentTarget.style.backgroundColor = document.documentElement.classList.contains('dark') ? 'rgba(15, 23, 42, 0.8)' : '#f3f4f6';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }
                   }}
                   onClick={() => setChartPeriod('monthly')}
                 >
@@ -709,8 +863,8 @@ const Dashboard = () => {
               <DailyDetectionChart data={filteredChartData} loading={chartLoading} />
               {filteredChartData.length > 0 && (
                 <div className="absolute bottom-2 left-2">
-                  <p className="text-xs font-semibold" style={{ color: '#6b7280' }}>
-                    Detected Today: <span className="font-black" style={{ color: '#305796' }}>{dailyDetectionData.find(d => d.isToday)?.totalDetections || 0}</span>
+                  <p className="text-xs font-semibold" style={{ color: document.documentElement.classList.contains('dark') ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
+                    Detected Today: <span className="font-black" style={{ color: document.documentElement.classList.contains('dark') ? '#22d3ee' : '#305796' }}>{dailyDetectionData.find(d => d.isToday)?.totalDetections || 0}</span>
                   </p>
                 </div>
               )}
@@ -725,19 +879,19 @@ const Dashboard = () => {
           <motion.div variants={itemVariants} className="relative p-4 rounded-2xl overflow-hidden h-[50%]"
             style={{
               background: document.documentElement.classList.contains('dark')
-                ? 'linear-gradient(135deg, rgba(48, 87, 150, 0.05), rgba(48, 87, 150, 0.05))'
+                ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
                 : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(224, 231, 255, 0.9))',
               border: document.documentElement.classList.contains('dark')
-                ? '1px solid rgba(48, 87, 150, 0.2)'
+                ? '1px solid rgba(6, 182, 212, 0.2)'
                 : '1px solid rgba(48, 87, 150, 0.3)',
               boxShadow: document.documentElement.classList.contains('dark')
-                ? '0 4px 16px rgba(48, 87, 150, 0.15)'
+                ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)'
                 : '0 4px 16px rgba(48, 87, 150, 0.15)',
               backdropFilter: 'blur(10px)',
             }}
           >
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-bold" style={{ color: '#6b7280' }}>Recent Activity</h2>
+              <h2 className="text-lg font-bold" style={{ color: document.documentElement.classList.contains('dark') ? '#c0f0f0' : '#6b7280' }}>Recent Activity</h2>
             </div>
             
             <div className="space-y-2 overflow-y-auto overflow-x-hidden max-h-[calc(100%-50px)] custom-activity-scrollbar">
@@ -754,30 +908,44 @@ const Dashboard = () => {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
                     whileHover={{
-                      background: 'rgba(48, 87, 150, 0.12)',
-                      borderColor: 'rgba(48, 87, 150, 0.3)'
+                      background: document.documentElement.classList.contains('dark')
+                        ? 'linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(34, 211, 238, 0.1))'
+                        : 'rgba(48, 87, 150, 0.12)',
+                      borderColor: document.documentElement.classList.contains('dark')
+                        ? 'rgba(34, 211, 238, 0.5)'
+                        : 'rgba(48, 87, 150, 0.3)',
+                      boxShadow: document.documentElement.classList.contains('dark')
+                        ? '0 0 20px rgba(6, 182, 212, 0.25)'
+                        : 'none'
                     }}
-                    className="p-3 rounded-xl transition-all duration-150"
+                    className="p-3 rounded-xl transition-all duration-200"
                     style={{
-                      background: 'rgba(48, 87, 150, 0.05)',
-                      border: '1px solid rgba(48, 87, 150, 0.1)'
+                      background: document.documentElement.classList.contains('dark')
+                        ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.6))'
+                        : 'rgba(48, 87, 150, 0.05)',
+                      border: document.documentElement.classList.contains('dark')
+                        ? '1px solid rgba(6, 182, 212, 0.15)'
+                        : '1px solid rgba(48, 87, 150, 0.1)'
                     }}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <p className="text-sm font-semibold" style={{ color: '#305796' }}>
+                        <p className="text-sm font-semibold" style={{ color: document.documentElement.classList.contains('dark') ? '#22d3ee' : '#305796' }}>
                           {activity.student?.Name || activity.teacher?.Name || 'Unknown'}
                         </p>
-                        <p className="text-xs font-medium" style={{ color: '#6b7280' }}>
+                        <p className="text-xs font-medium" style={{ color: document.documentElement.classList.contains('dark') ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
                           {activity.zone?.Zone_Name || 'Unknown'}
                         </p>
-                        <p className="text-xs font-semibold mt-0.5" style={{ color: '#305796' }}>
+                        <p className="text-xs font-semibold mt-0.5" style={{ color: document.documentElement.classList.contains('dark') ? '#67e8f9' : '#305796' }}>
                           {activity.Timestamp ? format(new Date(activity.Timestamp), 'HH:mm') : 'N/A'}
                         </p>
                       </div>
                       <button 
-                        className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-white cursor-pointer"
-                        style={{ color: '#305796' }}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+                        style={{ 
+                          color: document.documentElement.classList.contains('dark') ? '#22d3ee' : '#305796',
+                          backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(6, 182, 212, 0.1)' : 'transparent'
+                        }}
                         onClick={() => {
                           if (activity.student?.Student_ID) {
                             navigate(`/students/${activity.student.Student_ID}`);
@@ -800,20 +968,24 @@ const Dashboard = () => {
           <motion.div variants={itemVariants} className="relative p-4 rounded-2xl overflow-hidden h-[calc(50%-16px)]"
             style={{
               background: document.documentElement.classList.contains('dark')
-                ? 'linear-gradient(135deg, rgba(48, 87, 150, 0.05), rgba(48, 87, 150, 0.05))'
+                ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
                 : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(224, 231, 255, 0.9))',
               border: document.documentElement.classList.contains('dark')
-                ? '1px solid rgba(48, 87, 150, 0.2)'
+                ? '1px solid rgba(6, 182, 212, 0.2)'
                 : '1px solid rgba(48, 87, 150, 0.3)',
               boxShadow: document.documentElement.classList.contains('dark')
-                ? '0 4px 16px rgba(48, 87, 150, 0.15)'
+                ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)'
                 : '0 4px 16px rgba(48, 87, 150, 0.15)',
               backdropFilter: 'blur(10px)',
             }}
           >
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-bold" style={{ color: '#6b7280' }}>Zone Overview</h2>
-              <span className="text-xs font-semibold px-2 py-1 rounded-lg" style={{ backgroundColor: 'rgba(48, 87, 150, 0.1)', color: '#305796' }}>
+              <h2 className="text-lg font-bold" style={{ color: document.documentElement.classList.contains('dark') ? '#c0f0f0' : '#6b7280' }}>Zone Overview</h2>
+              <span className="text-xs font-semibold px-2 py-1 rounded-lg" style={{ 
+                backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(6, 182, 212, 0.15)' : 'rgba(48, 87, 150, 0.1)', 
+                color: document.documentElement.classList.contains('dark') ? '#22d3ee' : '#305796',
+                border: document.documentElement.classList.contains('dark') ? '1px solid rgba(6, 182, 212, 0.3)' : 'none'
+              }}>
                 {zoneOverview.reduce((sum, z) => sum + (z.personCount || 0), 0)} Total
               </span>
             </div>
@@ -838,39 +1010,56 @@ const Dashboard = () => {
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
                         whileHover={{
-                          background: 'rgba(48, 87, 150, 0.12)',
-                          borderColor: 'rgba(48, 87, 150, 0.3)'
+                          background: document.documentElement.classList.contains('dark')
+                            ? 'linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(34, 211, 238, 0.1))'
+                            : 'rgba(48, 87, 150, 0.12)',
+                          borderColor: document.documentElement.classList.contains('dark')
+                            ? 'rgba(34, 211, 238, 0.5)'
+                            : 'rgba(48, 87, 150, 0.3)',
+                          boxShadow: document.documentElement.classList.contains('dark')
+                            ? '0 0 20px rgba(6, 182, 212, 0.25)'
+                            : 'none'
                         }}
-                        className="p-2.5 rounded-xl transition-all duration-150"
+                        className="p-2.5 rounded-xl transition-all duration-200"
                         style={{
-                          background: 'rgba(48, 87, 150, 0.05)',
-                          border: '1px solid rgba(48, 87, 150, 0.1)'
+                          background: document.documentElement.classList.contains('dark')
+                            ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.6))'
+                            : 'rgba(48, 87, 150, 0.05)',
+                          border: document.documentElement.classList.contains('dark')
+                            ? '1px solid rgba(6, 182, 212, 0.15)'
+                            : '1px solid rgba(48, 87, 150, 0.1)'
                         }}
                       >
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
                             <div className="w-6 h-6 rounded-lg flex items-center justify-center"
-                              style={{ backgroundColor: 'rgba(48, 87, 150, 0.15)' }}
+                              style={{ 
+                                backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(6, 182, 212, 0.2)' : 'rgba(48, 87, 150, 0.15)',
+                                boxShadow: document.documentElement.classList.contains('dark') ? '0 0 10px rgba(6, 182, 212, 0.2)' : 'none'
+                              }}
                             >
-                              <FiMapPin size={12} style={{ color: '#305796' }} />
+                              <FiMapPin size={12} style={{ color: document.documentElement.classList.contains('dark') ? '#22d3ee' : '#305796' }} />
                             </div>
-                            <span className="text-sm font-semibold" style={{ color: '#305796' }}>
+                            <span className="text-sm font-semibold" style={{ color: document.documentElement.classList.contains('dark') ? '#c0f0f0' : '#305796' }}>
                               {zone.Zone_Name}
                             </span>
                           </div>
-                          <span className="text-sm font-bold" style={{ color: personCount > 0 ? '#305796' : '#9ca3af' }}>
+                          <span className="text-sm font-bold" style={{ color: personCount > 0 ? (document.documentElement.classList.contains('dark') ? '#22d3ee' : '#305796') : '#9ca3af' }}>
                             {personCount}
                           </span>
                         </div>
-                        <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(48, 87, 150, 0.1)' }}>
+                        <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: document.documentElement.classList.contains('dark') ? 'rgba(6, 182, 212, 0.1)' : 'rgba(48, 87, 150, 0.1)' }}>
                           <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${percentage}%` }}
                             transition={{ duration: 0.5, delay: index * 0.05 }}
                             className="h-full rounded-full"
                             style={{ 
-                              backgroundColor: personCount > 0 ? '#305796' : 'rgba(48, 87, 150, 0.2)',
-                              minWidth: personCount > 0 ? '4px' : '0'
+                              backgroundColor: personCount > 0 
+                                ? (document.documentElement.classList.contains('dark') ? '#06b6d4' : '#305796') 
+                                : (document.documentElement.classList.contains('dark') ? 'rgba(6, 182, 212, 0.2)' : 'rgba(48, 87, 150, 0.2)'),
+                              minWidth: personCount > 0 ? '4px' : '0',
+                              boxShadow: personCount > 0 && document.documentElement.classList.contains('dark') ? '0 0 8px rgba(6, 182, 212, 0.5)' : 'none'
                             }}
                           />
                         </div>
