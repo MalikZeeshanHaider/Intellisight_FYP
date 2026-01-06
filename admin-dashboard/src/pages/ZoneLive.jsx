@@ -66,7 +66,7 @@ const ZoneLive = () => {
   // Check camera service status
   const checkServiceStatus = async () => {
     try {
-      const response = await fetch('http://localhost:5001/health');
+      const response = await fetch('http://localhost:3002/health');
       const data = await response.json();
       if (data.status === 'ok') {
         setServiceOnline(true);
@@ -81,7 +81,7 @@ const ZoneLive = () => {
   // Fetch camera statuses from persistent service
   const fetchCameraStatuses = async () => {
     try {
-      const response = await fetch('http://localhost:5001/cameras/status');
+      const response = await fetch('http://localhost:3002/cameras/status');
       const data = await response.json();
       
       if (data.success) {
@@ -395,7 +395,7 @@ const ZoneLive = () => {
               {/* Live Video Stream */}
               <div className="relative bg-black aspect-video">
                 <img
-                  src={`http://localhost:5001/stream/${camera.Camara_Id}`}
+                  src={`http://localhost:3002/stream/${camera.Camara_Id}`}
                   alt={`Camera ${camera.Camara_Id}`}
                   className="w-full h-full object-contain"
                   onError={(e) => {

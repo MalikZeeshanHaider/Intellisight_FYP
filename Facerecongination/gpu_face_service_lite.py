@@ -229,14 +229,14 @@ def recognize_face_deepface(face_img, db_path='embeddings'):
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
+    """Health check endpoint - returns 'ok' for frontend compatibility"""
     return jsonify({
-        'status': 'healthy',
+        'status': 'ok',  # Frontend expects 'ok' not 'healthy'
         'service': 'GPU Face Recognition Service',
         'gpu_available': gpu_available,
         'deepface_loaded': deepface_module is not None,
         'active_cameras': len(active_cameras),
-        'port': 5001
+        'port': 3002
     })
 
 
@@ -379,7 +379,7 @@ if __name__ == '__main__':
     # Run Flask app
     app.run(
         host='0.0.0.0',
-        port=5001,
+        port=3002,
         debug=False,
         threaded=True
     )

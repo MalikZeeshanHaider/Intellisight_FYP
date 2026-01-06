@@ -155,28 +155,58 @@ db_handler = DatabaseHandler()
 # =============================================================================
 
 def load_embeddings():
-    """Load face embeddings from JSON file"""
+    """Load face embeddings from database FaceEmbeddings table"""
     global embeddings_data
     
-    embeddings_file = os.path.join(os.path.dirname(__file__), 'embeddings', 'representations_facenet.json')
-    
-    if os.path.exists(embeddings_file):
-        try:
-            with open(embeddings_file, 'r') as f:
-                embeddings_data = json.load(f)
-            print(f"✅ Loaded {len(embeddings_data)} face embeddings")
-            
-            # Print loaded persons
-            persons = set([d.get('person', 'Unknown') for d in embeddings_data])
-            print(f"   Persons: {', '.join(list(persons)[:10])}...")
-            
-        except Exception as e:
-            print(f"❌ Error loading embeddings: {e}")
-            embeddings_data = []
-    else:
-        print(f"⚠️ Embeddings file not found: {embeddings_file}")
-        print("   Run 'python train.py' to generate embeddings")
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Load embeddings from database
+        cursor.execute('''
+            SELECT "Embedding_ID", "PersonType", "PersonName", "Student_ID", "Teacher_ID", "EmbeddingJson"
+            FROM "FaceEmbeddings"
+            WHERE "EmbeddingJson" IS NOT NULL
+        ''')
+        
+        rows = cursor.fetchall()
         embeddings_data = []
+        
+        for row in rows:
+            try:
+                embedding = json.loads(row['EmbeddingJson']) if row['EmbeddingJson'] else None
+                if embedding:
+                    embeddings_data.append({
+                        'embedding': embedding,
+                        'person': row['PersonName'],
+                        'person_type': row['PersonType'],
+                        'student_id': row['Student_ID'],
+                        'teacher_id': row['Teacher_ID']
+                    })
+            except Exception as e:
+                print(f"⚠️ Error parsing embedding for {row['PersonName']}: {e}")
+        
+        conn.close()
+        
+        print(f"✅ Loaded {len(embeddings_data)} face embeddings")
+        
+        # Print loaded persons
+        persons = set([d.get('person', 'Unknown') for d in embeddings_data])
+        print(f"   Persons: {', '.join(list(persons)[:10])}...")
+        
+    except Exception as e:
+        print(f"❌ Error loading embeddings from database: {e}")
+        # Fallback to JSON file
+        embeddings_file = os.path.join(os.path.dirname(__file__), 'embeddings', 'representations_facenet.json')
+        if os.path.exists(embeddings_file):
+            try:
+                with open(embeddings_file, 'r') as f:
+                    embeddings_data = json.load(f)
+                print(f"✅ Loaded {len(embeddings_data)} embeddings from JSON fallback")
+            except:
+                embeddings_data = []
+        else:
+            embeddings_data = []
 
 
 def cosine_distance(a, b):
@@ -498,9 +528,9 @@ class CameraStream:
 
 @app.route('/health', methods=['GET'])
 def health():
-    """Health check endpoint"""
+    """Health check endpoint - returns 'ok' for frontend compatibility"""
     return jsonify({
-        'status': 'healthy',
+        'status': 'ok',  # Frontend expects 'ok' not 'healthy'
         'gpu': len(gpus) > 0,
         'gpu_count': len(gpus),
         'gpu_name': gpus[0].name if gpus else 'None',
