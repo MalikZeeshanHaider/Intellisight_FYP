@@ -10,6 +10,7 @@ const StudentDetail = () => {
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const isDarkMode = document.documentElement.classList.contains('dark');
 
   useEffect(() => {
     fetchStudentDetails();
@@ -30,21 +31,29 @@ const StudentDetail = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2" style={{ borderColor: '#6365baff' }}></div>
+      <div className="min-h-screen flex items-center justify-center" style={{ 
+        background: isDarkMode 
+          ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+          : 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' 
+      }}>
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2" style={{ borderColor: isDarkMode ? '#818cf8' : '#6365baff' }}></div>
       </div>
     );
   }
 
   if (error || !student) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ 
+        background: isDarkMode 
+          ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+          : 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' 
+      }}>
         <div className="text-center">
           <p className="text-xl text-red-600 mb-4">{error || 'Student not found'}</p>
           <button
             onClick={() => navigate('/students')}
             className="px-6 py-2 rounded-xl font-semibold text-white"
-            style={{ backgroundColor: '#6365baff' }}
+            style={{ backgroundColor: isDarkMode ? '#818cf8' : '#6365baff' }}
           >
             Back to Students
           </button>
@@ -62,7 +71,11 @@ const StudentDetail = () => {
   ].filter(Boolean);
 
   return (
-    <div className="min-h-screen p-6" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
+    <div className="min-h-screen p-6" style={{ 
+      background: isDarkMode 
+        ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+        : 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' 
+    }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
@@ -74,23 +87,23 @@ const StudentDetail = () => {
             onClick={() => navigate('/students')}
             className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition-all mb-4"
             style={{
-              background: '#ffffff',
-              color: '#6365baff',
-              border: '2px solid #6365baff'
+              background: isDarkMode ? 'rgba(129, 140, 248, 0.1)' : '#ffffff',
+              color: isDarkMode ? '#818cf8' : '#6365baff',
+              border: isDarkMode ? '2px solid rgba(129, 140, 248, 0.5)' : '2px solid #6365baff'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#6365baff';
-              e.currentTarget.style.color = '#ffffff';
+              e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(129, 140, 248, 0.2)' : '#6365baff';
+              e.currentTarget.style.color = isDarkMode ? '#818cf8' : '#ffffff';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#ffffff';
-              e.currentTarget.style.color = '#6365baff';
+              e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(129, 140, 248, 0.1)' : '#ffffff';
+              e.currentTarget.style.color = isDarkMode ? '#818cf8' : '#6365baff';
             }}
           >
             <FiArrowLeft size={20} />
             Back to Students
           </button>
-          <h1 className="text-4xl font-bold" style={{ color: '#6365baff' }}>Student Details</h1>
+          <h1 className="text-4xl font-bold" style={{ color: isDarkMode ? '#c0f0f0' : '#6365baff' }}>Student Details</h1>
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -99,77 +112,92 @@ const StudentDetail = () => {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.1 }}
-            className="lg:col-span-2 bg-white rounded-2xl p-8"
+            className="lg:col-span-2 rounded-2xl p-8"
             style={{
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+              background: isDarkMode 
+                ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+                : 'white',
+              boxShadow: isDarkMode 
+                ? '0 10px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(129, 140, 248, 0.1)'
+                : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)',
+              border: isDarkMode ? '1px solid rgba(129, 140, 248, 0.2)' : 'none'
             }}
           >
-            <h2 className="text-2xl font-bold mb-6" style={{ color: '#6365baff' }}>Personal Information</h2>
+            <h2 className="text-2xl font-bold mb-6" style={{ color: isDarkMode ? '#818cf8' : '#6365baff' }}>Personal Information</h2>
             
             <div className="space-y-6">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <FiUser className="text-gray-500" size={18} />
-                  <label className="text-xs font-semibold text-gray-600">Full Name</label>
+                  <FiUser style={{ color: isDarkMode ? '#818cf8' : '#6b7280' }} size={18} />
+                  <label className="text-xs font-semibold" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#4b5563' }}>Full Name</label>
                 </div>
-                <p className="text-lg font-semibold text-gray-900 ml-6">{student.Name}</p>
+                <p className="text-lg font-semibold ml-6" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>{student.Name}</p>
               </div>
 
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <FiBook className="text-gray-500" size={18} />
-                  <label className="text-xs font-semibold text-gray-600">Student ID</label>
+                  <FiBook style={{ color: isDarkMode ? '#818cf8' : '#6b7280' }} size={18} />
+                  <label className="text-xs font-semibold" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#4b5563' }}>Student ID</label>
                 </div>
-                <p className="text-lg font-semibold ml-6" style={{ color: '#305796' }}>
+                <p className="text-lg font-semibold ml-6" style={{ color: isDarkMode ? '#818cf8' : '#305796' }}>
                   {student.Student_ID}
                 </p>
               </div>
 
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <FiBook className="text-gray-500" size={18} />
-                  <label className="text-xs font-semibold text-gray-600">Roll Number</label>
+                  <FiBook style={{ color: isDarkMode ? '#818cf8' : '#6b7280' }} size={18} />
+                  <label className="text-xs font-semibold" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#4b5563' }}>Roll Number</label>
                 </div>
-                <p className="text-lg font-semibold text-gray-900 ml-6">{student.RollNumber}</p>
+                <p className="text-lg font-semibold ml-6" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>{student.RollNumber}</p>
               </div>
 
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <FiMail className="text-gray-500" size={18} />
-                  <label className="text-xs font-semibold text-gray-600">Email</label>
+                  <FiMail style={{ color: isDarkMode ? '#818cf8' : '#6b7280' }} size={18} />
+                  <label className="text-xs font-semibold" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#4b5563' }}>Email</label>
                 </div>
-                <p className="text-lg font-semibold text-gray-900 ml-6">{student.Email}</p>
+                <p className="text-lg font-semibold ml-6" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>{student.Email}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
-                    <FiUser className="text-gray-500" size={18} />
-                    <label className="text-xs font-semibold text-gray-600">Gender</label>
+                    <FiUser style={{ color: isDarkMode ? '#818cf8' : '#6b7280' }} size={18} />
+                    <label className="text-xs font-semibold" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#4b5563' }}>Gender</label>
                   </div>
-                  <p className="text-lg font-semibold text-gray-900 ml-6">{student.Gender || 'N/A'}</p>
+                  <p className="text-lg font-semibold ml-6" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>{student.Gender || 'N/A'}</p>
                 </div>
 
                 <div>
                   <div className="flex items-center gap-2 mb-2">
-                    <FiBook className="text-gray-500" size={18} />
-                    <label className="text-xs font-semibold text-gray-600">Department</label>
+                    <FiBook style={{ color: isDarkMode ? '#818cf8' : '#6b7280' }} size={18} />
+                    <label className="text-xs font-semibold" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#4b5563' }}>Department</label>
                   </div>
-                  <p className="text-lg font-semibold text-gray-900 ml-6">{student.Department || 'N/A'}</p>
+                  <p className="text-lg font-semibold ml-6" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>{student.Department || 'N/A'}</p>
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <FiBook className="text-gray-500" size={18} />
-                  <label className="text-xs font-semibold text-gray-600">Enrollment Status</label>
+                  <FiBook style={{ color: isDarkMode ? '#818cf8' : '#6b7280' }} size={18} />
+                  <label className="text-xs font-semibold" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#4b5563' }}>Enrollment Status</label>
                 </div>
                 <p className="text-lg font-semibold ml-6">
-                  <span className={`px-3 py-1 rounded-full text-sm ${
-                    student.is_enrolled 
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-yellow-100 text-yellow-700'
-                  }`}>
+                  <span 
+                    className="px-3 py-1 rounded-full text-sm"
+                    style={{
+                      backgroundColor: student.is_enrolled 
+                        ? (isDarkMode ? 'rgba(52, 211, 153, 0.2)' : '#dcfce7')
+                        : (isDarkMode ? 'rgba(250, 204, 21, 0.2)' : '#fef9c3'),
+                      color: student.is_enrolled 
+                        ? (isDarkMode ? '#34d399' : '#15803d')
+                        : (isDarkMode ? '#fbbf24' : '#a16207'),
+                      border: isDarkMode 
+                        ? `1px solid ${student.is_enrolled ? 'rgba(52, 211, 153, 0.5)' : 'rgba(250, 204, 21, 0.5)'}`
+                        : 'none'
+                    }}
+                  >
                     {student.is_enrolled ? 'Enrolled' : 'Not Enrolled'}
                   </span>
                 </p>
@@ -182,19 +210,26 @@ const StudentDetail = () => {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
-            className="bg-white rounded-2xl p-6"
+            className="rounded-2xl p-6"
             style={{
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+              background: isDarkMode 
+                ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+                : 'white',
+              boxShadow: isDarkMode 
+                ? '0 10px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(129, 140, 248, 0.1)'
+                : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)',
+              border: isDarkMode ? '1px solid rgba(129, 140, 248, 0.2)' : 'none'
             }}
           >
-            <h3 className="text-xl font-bold mb-4" style={{ color: '#6365baff' }}>Profile Picture</h3>
+            <h3 className="text-xl font-bold mb-4" style={{ color: isDarkMode ? '#818cf8' : '#6365baff' }}>Profile Picture</h3>
             <div className="flex items-center justify-center">
               <div 
                 className="w-48 h-48 rounded-full flex items-center justify-center text-6xl font-bold"
                 style={{
-                  backgroundColor: '#f3f4f6',
-                  border: '4px solid #6365baff',
-                  color: '#305796'
+                  backgroundColor: isDarkMode ? 'rgba(129, 140, 248, 0.15)' : '#f3f4f6',
+                  border: isDarkMode ? '4px solid rgba(129, 140, 248, 0.7)' : '4px solid #6365baff',
+                  color: isDarkMode ? '#818cf8' : '#305796',
+                  boxShadow: isDarkMode ? '0 0 30px rgba(129, 140, 248, 0.2)' : 'none'
                 }}
               >
                 {student.Name?.[0] || '?'}
@@ -209,14 +244,20 @@ const StudentDetail = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="mt-6 bg-white rounded-2xl p-8"
+            className="mt-6 rounded-2xl p-8"
             style={{
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+              background: isDarkMode 
+                ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+                : 'white',
+              boxShadow: isDarkMode 
+                ? '0 10px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(129, 140, 248, 0.1)'
+                : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)',
+              border: isDarkMode ? '1px solid rgba(129, 140, 248, 0.2)' : 'none'
             }}
           >
             <div className="flex items-center gap-2 mb-6">
-              <FiImage style={{ color: '#6365baff' }} size={24} />
-              <h2 className="text-2xl font-bold" style={{ color: '#6365baff' }}>
+              <FiImage style={{ color: isDarkMode ? '#818cf8' : '#6365baff' }} size={24} />
+              <h2 className="text-2xl font-bold" style={{ color: isDarkMode ? '#818cf8' : '#6365baff' }}>
                 Face Pictures ({facePictures.length})
               </h2>
             </div>
@@ -227,9 +268,18 @@ const StudentDetail = () => {
                   <img
                     src={picture}
                     alt={`Face ${index + 1}`}
-                    className="w-full h-40 object-cover rounded-xl border-2 border-gray-200 transition-transform group-hover:scale-105"
+                    className="w-full h-40 object-cover rounded-xl transition-transform group-hover:scale-105"
+                    style={{
+                      border: isDarkMode ? '2px solid rgba(129, 140, 248, 0.3)' : '2px solid #e5e7eb'
+                    }}
                   />
-                  <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
+                  <div 
+                    className="absolute bottom-2 left-2 text-xs px-2 py-1 rounded"
+                    style={{
+                      backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.6)',
+                      color: isDarkMode ? '#818cf8' : 'white'
+                    }}
+                  >
                     Picture {index + 1}
                   </div>
                 </div>
@@ -243,17 +293,23 @@ const StudentDetail = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="mt-6 bg-white rounded-2xl p-8"
+          className="mt-6 rounded-2xl p-8"
           style={{
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+            background: isDarkMode 
+              ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+              : 'white',
+            boxShadow: isDarkMode 
+              ? '0 10px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(129, 140, 248, 0.1)'
+              : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)',
+            border: isDarkMode ? '1px solid rgba(129, 140, 248, 0.2)' : 'none'
           }}
         >
-          <h2 className="text-2xl font-bold mb-6" style={{ color: '#6365baff' }}>Additional Information</h2>
+          <h2 className="text-2xl font-bold mb-6" style={{ color: isDarkMode ? '#818cf8' : '#6365baff' }}>Additional Information</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="text-xs font-semibold text-gray-600">Created At</label>
-              <p className="text-lg font-semibold text-gray-900 mt-2">
+              <label className="text-xs font-semibold" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#4b5563' }}>Created At</label>
+              <p className="text-lg font-semibold mt-2" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>
                 {student.createdAt ? new Date(student.createdAt).toLocaleDateString('en-US', {
                   year: 'numeric',
                   month: 'long',
@@ -265,8 +321,8 @@ const StudentDetail = () => {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-gray-600">Last Updated</label>
-              <p className="text-lg font-semibold text-gray-900 mt-2">
+              <label className="text-xs font-semibold" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#4b5563' }}>Last Updated</label>
+              <p className="text-lg font-semibold mt-2" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>
                 {student.updatedAt ? new Date(student.updatedAt).toLocaleDateString('en-US', {
                   year: 'numeric',
                   month: 'long',

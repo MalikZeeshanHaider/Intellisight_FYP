@@ -31,6 +31,24 @@ const DEPARTMENT_BASE_COLORS = {
   teacher: '#247e5bff',
 };
 
+// Green gradient colors for Faculty page
+const GREEN_GRADIENT_COLORS = [
+  '#10b981', // Brightest green
+  '#34d399',
+  '#6ee7b7',
+  '#a7f3d0',
+  '#d1fae5', // Lightest green
+];
+
+// Blue/Indigo gradient colors for Students page
+const BLUE_GRADIENT_COLORS = [
+  '#6366f1', // Brightest indigo
+  '#818cf8',
+  '#a5b4fc',
+  '#c7d2fe',
+  '#e0e7ff', // Lightest indigo
+];
+
 const getColor = (department, colorScheme = 'cyan', index = 0, value = 0, maxValue = 1, minValue = 0) => {
   const baseColor = colorScheme === 'green' ? '#247e5b' : '#6365ba';
   const ratio = maxValue !== minValue ? (value - minValue) / (maxValue - minValue) : 1;
@@ -46,6 +64,8 @@ const DepartmentDistributionChart = ({
   showLegend = true,
   colorScheme = 'cyan',
 }) => {
+  const isDarkMode = document.documentElement.classList.contains('dark');
+  
   const chartData = useMemo(() => {
     if (!data || data.length === 0) {
       return [
@@ -62,23 +82,28 @@ const DepartmentDistributionChart = ({
     }));
   }, [data]);
 
-  // Calculate gradient colors based on values
-  const maxValue = Math.max(...chartData.map(d => d.value));
-  const minValue = Math.min(...chartData.map(d => d.value));
-  const baseColor = colorScheme === 'green' ? '#247e5b' : '#6365ba';
+  // Sort data by value for gradient assignment (highest value = brightest color)
+  const sortedData = [...chartData].sort((a, b) => b.value - a.value);
   
+  // Select gradient colors based on color scheme
+  const gradientColors = colorScheme === 'green' ? GREEN_GRADIENT_COLORS : BLUE_GRADIENT_COLORS;
+  
+  // Calculate gradient colors based on values - highest value gets brightest color
   const chartDataWithColors = chartData.map(item => {
-    const ratio = maxValue !== minValue ? (item.value - minValue) / (maxValue - minValue) : 1;
-    const opacity = 0.5 + (ratio * 0.5);
+    const sortedIndex = sortedData.findIndex(d => d.name === item.name);
+    // Map sorted index to color (0 = brightest, length-1 = lightest)
+    const colorIndex = Math.min(sortedIndex, gradientColors.length - 1);
     return {
       ...item,
-      color: baseColor + Math.round(opacity * 255).toString(16).padStart(2, '0')
+      color: gradientColors[colorIndex]
     };
   });
 
   const total = useMemo(() => chartDataWithColors.reduce((sum, item) => sum + item.value, 0), [chartDataWithColors]);
 
-  const accentColor = colorScheme === 'green' ? '#247e5bff' : '#6365baff';
+  const accentColor = colorScheme === 'green' 
+    ? (isDarkMode ? '#34d399' : '#247e5bff') 
+    : (isDarkMode ? '#818cf8' : '#6365baff');
 
   const CustomTooltip = ({ active, payload }) => {
     if (!active || !payload || !payload[0]) return null;
@@ -91,13 +116,14 @@ const DepartmentDistributionChart = ({
         animate={{ opacity: 1, scale: 1 }}
         className="px-4 py-3 rounded-xl shadow-xl"
         style={{
-          backgroundColor: 'var(--bg-card)',
+          backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.95)' : 'white',
           border: '2px solid ' + color,
+          boxShadow: isDarkMode ? '0 10px 40px rgba(0, 0, 0, 0.5)' : '0 4px 15px rgba(0, 0, 0, 0.1)'
         }}
       >
         <p className="font-bold text-lg" style={{ color: color }}>{name}</p>
-        <p className="text-sm" style={{ color: 'var(--text-main)' }}>{value} {type}</p>
-        <p className="text-xs" style={{ color: 'var(--text-soft)' }}>{percentage}% of total</p>
+        <p className="text-sm" style={{ color: isDarkMode ? '#c0f0f0' : '#374151' }}>{value} {type}</p>
+        <p className="text-xs" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>{percentage}% of total</p>
       </motion.div>
     );
   };
@@ -139,15 +165,15 @@ const DepartmentDistributionChart = ({
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold" style={{ color: '#6b7280' }}>
+        <h3 className="text-lg font-semibold" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.9)' : '#6b7280' }}>
           {title}
         </h3>
         <span
           className="text-sm font-semibold px-3 py-1 rounded-full"
           style={{
-            backgroundColor: accentColor + '15',
+            backgroundColor: accentColor + '20',
             color: accentColor,
-            border: '1px solid ' + accentColor + '40',
+            border: '1px solid ' + accentColor + '50',
           }}
         >
           Total: {total}
@@ -210,6 +236,8 @@ const DepartmentBarChart = ({
   height = 250,
   colorScheme = 'cyan',
 }) => {
+  const isDarkMode = document.documentElement.classList.contains('dark');
+  
   const chartData = useMemo(() => {
     if (!data || data.length === 0) {
       return [
@@ -231,20 +259,21 @@ const DepartmentBarChart = ({
   }, [data]);
 
   const maxValue = Math.max.apply(null, chartData.map(function(d) { return d.value; }));
-  const minValue = Math.min.apply(null, chartData.map(function(d) { return d.value; }));
-  const baseColor = colorScheme === 'green' ? '#247e5b' : '#6365ba';
+  
+  // Select gradient colors based on color scheme
+  const gradientColors = colorScheme === 'green' ? GREEN_GRADIENT_COLORS : BLUE_GRADIENT_COLORS;
 
   return (
     <div className="w-full">
-      <h3 className="text-lg font-semibold mb-4" style={{ color: '#6b7280' }}>
+      <h3 className="text-lg font-semibold mb-4" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.9)' : '#6b7280' }}>
         {title}
       </h3>
       <div className="space-y-3">
         {chartData.map(function(item, index) {
           var percentage = maxValue > 0 ? (item.value / maxValue) * 100 : 0;
-          var ratio = maxValue !== minValue ? (item.value - minValue) / (maxValue - minValue) : 1;
-          var opacity = 0.5 + (ratio * 0.5);
-          var color = baseColor + Math.round(opacity * 255).toString(16).padStart(2, '0');
+          // Use gradient colors - index determines shade (higher value = earlier index = brighter)
+          var colorIndex = Math.min(index, gradientColors.length - 1);
+          var color = gradientColors[colorIndex];
 
           return (
             <motion.div
@@ -259,19 +288,20 @@ const DepartmentBarChart = ({
               </span>
               <div
                 className="flex-1 h-6 sm:h-7 rounded-full overflow-hidden"
-                style={{ backgroundColor: 'rgba(148, 163, 184, 0.15)' }}
+                style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.15)' }}
               >
                 <motion.div
                   className="h-full rounded-full"
                   style={{
-                    background: color,
+                    background: `linear-gradient(90deg, ${color}, ${color}cc)`,
+                    boxShadow: isDarkMode ? `0 0 10px ${color}40` : 'none'
                   }}
                   initial={{ width: 0 }}
                   animate={{ width: percentage + '%' }}
                   transition={{ duration: 0.8, delay: index * 0.1, ease: 'easeOut' }}
                 />
               </div>
-              <span className="w-8 text-sm font-semibold text-right" style={{ color: '#6b7280' }}>
+              <span className="w-8 text-sm font-semibold text-right" style={{ color: isDarkMode ? '#c0f0f0' : '#6b7280' }}>
                 {item.value}
               </span>
             </motion.div>

@@ -476,6 +476,55 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   scrollbar-color: #305796 #f3f4f6;
 }
 
+/* Smooth hover effects for Recent Activity items */
+.activity-item-hover {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark .activity-item-hover:hover {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(34, 211, 238, 0.1)) !important;
+  border-color: rgba(34, 211, 238, 0.5) !important;
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.25) !important;
+}
+
+.activity-item-hover:hover {
+  background: rgba(48, 87, 150, 0.12) !important;
+  border-color: rgba(48, 87, 150, 0.3) !important;
+}
+
+/* Smooth hover effects for Zone Overview items */
+.zone-item-hover {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark .zone-item-hover:hover {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(34, 211, 238, 0.1)) !important;
+  border-color: rgba(34, 211, 238, 0.5) !important;
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.25) !important;
+}
+
+.zone-item-hover:hover {
+  background: rgba(48, 87, 150, 0.12) !important;
+  border-color: rgba(48, 87, 150, 0.3) !important;
+}
+
+/* Dark mode input placeholder styles */
+.dark input::placeholder {
+  color: rgba(192, 240, 240, 0.4) !important;
+}
+
+.dark input::-webkit-input-placeholder {
+  color: rgba(192, 240, 240, 0.4) !important;
+}
+
+.dark input::-moz-placeholder {
+  color: rgba(192, 240, 240, 0.4) !important;
+}
+
+.dark input:-ms-input-placeholder {
+  color: rgba(192, 240, 240, 0.4) !important;
+}
+
 /* Custom Scrollbar for Student Modal */
 .custom-student-modal-scrollbar::-webkit-scrollbar {
   width: 6px;
@@ -526,6 +575,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   scrollbar-color: #6365baff #f3f4f6;
 }
 
+/* Dark mode Student Table Scrollbar */
+.dark .custom-student-table-scrollbar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.dark .custom-student-table-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.5);
+}
+
+.dark .custom-student-table-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.7);
+}
+
+.dark .custom-student-table-scrollbar {
+  scrollbar-color: rgba(99, 102, 241, 0.5) rgba(15, 23, 42, 0.6);
+}
+
 /* Custom Scrollbar for Teacher Modal */
 .custom-teacher-modal-scrollbar::-webkit-scrollbar {
   width: 6px;
@@ -574,6 +640,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .custom-teacher-table-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: #247e5bff #f3f4f6;
+}
+
+/* Dark mode Teacher Table Scrollbar */
+.dark .custom-teacher-table-scrollbar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.dark .custom-teacher-table-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.5);
+}
+
+.dark .custom-teacher-table-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.7);
+}
+
+.dark .custom-teacher-table-scrollbar {
+  scrollbar-color: rgba(16, 185, 129, 0.5) rgba(15, 23, 42, 0.6);
 }
 
 /* ============================================

@@ -152,23 +152,33 @@ const Teachers = () => {
     );
   }
 
+  const isDarkMode = document.documentElement.classList.contains('dark');
+
   return (
     <div className="space-y-6 relative">
       {/* Header */}
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative p-6 rounded-2xl bg-white"
+        className="relative p-6 rounded-2xl"
         style={{
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+          background: isDarkMode 
+            ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+            : '#ffffff',
+          border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.2)' : 'none',
+          boxShadow: isDarkMode 
+            ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(16, 185, 129, 0.1)'
+            : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
         }}
       >
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2" style={{ color: '#247e5bff' }}>
+          <h1 className="text-3xl font-bold mb-2" style={{ color: isDarkMode ? '#c0f0f0' : '#247e5bff' }}>
             Faculty
           </h1>
-          <p className="text-sm font-medium" style={{ color: '#6b7280' }}>{teachers.length} faculty members registered</p>
+          <p className="text-sm font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
+            <span style={{ color: isDarkMode ? '#34d399' : '#247e5bff', fontWeight: 'bold' }}>{teachers.length}</span> faculty members registered
+          </p>
         </div>
 
         <div className="flex items-center space-x-3">
@@ -178,11 +188,11 @@ const Teachers = () => {
             onClick={() => setIsModalOpen(true)}
             className="flex items-center space-x-2 px-4 py-2 text-white rounded-xl font-semibold text-sm transition-all"
             style={{
-              backgroundColor: '#247e5bff',
-              boxShadow: '0 2px 8px rgba(36, 126, 91, 0.25)'
+              backgroundColor: isDarkMode ? '#10b981' : '#247e5bff',
+              boxShadow: isDarkMode ? '0 2px 12px rgba(16, 185, 129, 0.4)' : '0 2px 8px rgba(36, 126, 91, 0.25)'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1d6549'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#247e5bff'}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDarkMode ? '#059669' : '#1d6549'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isDarkMode ? '#10b981' : '#247e5bff'}
           >
             <FiPlus size={16} />
             <span>Add Faculty</span>
@@ -193,17 +203,18 @@ const Teachers = () => {
             onClick={fetchTeachers}
             className="flex items-center space-x-2 px-4 py-2 rounded-xl font-medium text-sm transition-all"
             style={{
-              backgroundColor: '#f3f4f6',
-              color: '#6b7280'
+              backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f3f4f6',
+              color: isDarkMode ? '#c0f0f0' : '#6b7280',
+              border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.3)' : 'none'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e5e7eb'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#e5e7eb'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f3f4f6'}
           >
             <motion.div
               animate={loading ? { rotate: 360 } : {}}
               transition={{ duration: 1, repeat: loading ? Infinity : 0, ease: "linear" }}
             >
-              <FiRefreshCw size={16} style={{ color: '#247e5bff' }} />
+              <FiRefreshCw size={16} style={{ color: isDarkMode ? '#34d399' : '#247e5bff' }} />
             </motion.div>
             <span>Refresh</span>
           </motion.button>
@@ -227,19 +238,41 @@ const Teachers = () => {
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="relative p-4 rounded-2xl bg-white"
+        className="relative p-4 rounded-2xl"
         style={{
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+          background: isDarkMode 
+            ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+            : '#ffffff',
+          border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.2)' : 'none',
+          boxShadow: isDarkMode 
+            ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(16, 185, 129, 0.1)'
+            : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
         }}
       >
         <div className="relative">
-          <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2" style={{ color: '#247e5bff' }} size={20} />
+          <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2" style={{ color: isDarkMode ? '#34d399' : '#247e5bff' }} size={20} />
           <input
             type="text"
             placeholder="Search by name, email, or designation..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#247e5bff] text-gray-800 placeholder-gray-500 font-medium transition-colors"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl focus:outline-none font-medium"
+            style={{
+              backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f3f4f6',
+              border: isDarkMode ? '2px solid rgba(16, 185, 129, 0.3)' : '2px solid #e5e7eb',
+              color: isDarkMode ? '#c0f0f0' : '#1f2937',
+              transition: 'border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = isDarkMode ? '#34d399' : '#247e5bff';
+              e.target.style.boxShadow = isDarkMode ? '0 0 0 3px rgba(52, 211, 153, 0.15)' : '0 0 0 3px rgba(36, 126, 91, 0.15)';
+              e.target.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.95)' : '#ffffff';
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = isDarkMode ? 'rgba(16, 185, 129, 0.3)' : '#e5e7eb';
+              e.target.style.boxShadow = 'none';
+              e.target.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f3f4f6';
+            }}
           />
         </div>
       </motion.div>
@@ -248,14 +281,20 @@ const Teachers = () => {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative p-6 rounded-2xl bg-white"
+        className="relative p-6 rounded-2xl"
         style={{
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+          background: isDarkMode 
+            ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+            : '#ffffff',
+          border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.2)' : 'none',
+          boxShadow: isDarkMode 
+            ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(16, 185, 129, 0.1)'
+            : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
         }}
       >
         {/* Table Header */}
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold" style={{ color: '#6b7280' }}>
+          <h3 className="text-lg font-semibold" style={{ color: isDarkMode ? '#c0f0f0' : '#6b7280' }}>
             Faculty Records
           </h3>
           {filteredTeachers.length > DISPLAY_LIMIT && (
@@ -265,12 +304,12 @@ const Teachers = () => {
               onClick={() => setShowAllTeachers(!showAllTeachers)}
               className="px-4 py-2 text-sm font-semibold rounded-xl transition-all"
               style={{
-                color: '#247e5bff',
-                backgroundColor: 'rgba(36, 126, 91, 0.1)',
-                border: '2px solid rgba(36, 126, 91, 0.3)'
+                color: isDarkMode ? '#34d399' : '#247e5bff',
+                backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : 'rgba(36, 126, 91, 0.1)',
+                border: isDarkMode ? '2px solid rgba(16, 185, 129, 0.4)' : '2px solid rgba(36, 126, 91, 0.3)'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(36, 126, 91, 0.2)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(36, 126, 91, 0.1)'}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(16, 185, 129, 0.25)' : 'rgba(36, 126, 91, 0.2)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(16, 185, 129, 0.15)' : 'rgba(36, 126, 91, 0.1)'}
             >
               {showAllTeachers ? 'Show Less' : `Show All (${filteredTeachers.length})`}
             </motion.button>
@@ -278,12 +317,12 @@ const Teachers = () => {
         </div>
         
         {filteredTeachers.length === 0 ? (
-          <div className="text-center py-12" style={{ color: '#6b7280' }}>
+          <div className="text-center py-12" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
             <motion.div
               animate={{ scale: [1, 1.1, 1] }}
               transition={{ duration: 2, repeat: Infinity }}
             >
-              <GiTeacher size={64} className="mx-auto mb-4 opacity-30" style={{ color: '#247e5bff' }} />
+              <GiTeacher size={64} className="mx-auto mb-4 opacity-30" style={{ color: isDarkMode ? '#34d399' : '#247e5bff' }} />
             </motion.div>
             <p className="text-lg font-medium">
               {searchQuery ? 'No faculty found matching your search' : 'No faculty registered'}
@@ -293,34 +332,41 @@ const Teachers = () => {
           <div className="overflow-x-auto">
             <div className="max-h-[400px] overflow-y-auto custom-teacher-table-scrollbar">
             <table className="min-w-full">
-              <thead className="bg-gray-50 sticky top-0 z-10">
+              <thead className="sticky top-0 z-10" style={{ 
+                backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.98)' : '#f9fafb'
+              }}>
                 <tr>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: '#6b7280' }}>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
                     ID
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: '#6b7280' }}>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
                     Name
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell" style={{ color: '#6b7280' }}>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
                     Faculty Type
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden sm:table-cell" style={{ color: '#6b7280' }}>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden sm:table-cell" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
                     Gender
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: '#6b7280' }}>
+                  <th className="px-3 sm:px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody style={{ backgroundColor: isDarkMode ? 'transparent' : '#ffffff' }} className="divide-y" >
                 {(showAllTeachers ? filteredTeachers : filteredTeachers.slice(0, DISPLAY_LIMIT)).map((teacher) => (
                   <motion.tr 
                     key={teacher.Teacher_ID} 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="hover:bg-gray-50 transition-colors"
+                    className="transition-colors"
+                    style={{ 
+                      borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.1)' : '#e5e7eb'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(16, 185, 129, 0.1)' : '#f9fafb'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold hidden lg:table-cell" style={{ color: '#247e5bff' }}>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold hidden lg:table-cell" style={{ color: isDarkMode ? '#34d399' : '#247e5bff' }}>
                       {teacher.Teacher_ID}
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
@@ -329,16 +375,16 @@ const Teachers = () => {
                           whileHover={{ scale: 1.1 }}
                           className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center border-2 shadow-sm"
                           style={{ 
-                            borderColor: '#247e5bff',
-                            backgroundColor: 'rgba(36, 126, 91, 0.1)'
+                            borderColor: isDarkMode ? '#34d399' : '#247e5bff',
+                            backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : 'rgba(36, 126, 91, 0.1)'
                           }}
                         >
-                          <span className="font-semibold" style={{ color: '#247e5bff' }}>
+                          <span className="font-semibold" style={{ color: isDarkMode ? '#34d399' : '#247e5bff' }}>
                             {teacher.Name?.[0] || '?'}
                           </span>
                         </motion.div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium" style={{ color: '#1f2937' }}>
+                          <div className="text-sm font-medium" style={{ color: isDarkMode ? '#c0f0f0' : '#1f2937' }}>
                             {teacher.Name}
                           </div>
                         </div>
@@ -351,14 +397,20 @@ const Teachers = () => {
                           : 'border-2'
                       }`}
                       style={{
-                        backgroundColor: teacher.Faculty_Type === 'Permanent' ? 'rgba(36, 126, 91, 0.15)' : 'rgba(36, 126, 91, 0.08)',
-                        color: teacher.Faculty_Type === 'Permanent' ? '#1d6549' : '#247e5bff',
-                        borderColor: teacher.Faculty_Type === 'Permanent' ? '#247e5bff' : 'rgba(36, 126, 91, 0.3)'
+                        backgroundColor: teacher.Faculty_Type === 'Permanent' 
+                          ? (isDarkMode ? 'rgba(16, 185, 129, 0.25)' : 'rgba(36, 126, 91, 0.15)') 
+                          : (isDarkMode ? 'rgba(16, 185, 129, 0.12)' : 'rgba(36, 126, 91, 0.08)'),
+                        color: teacher.Faculty_Type === 'Permanent' 
+                          ? (isDarkMode ? '#34d399' : '#1d6549') 
+                          : (isDarkMode ? '#6ee7b7' : '#247e5bff'),
+                        borderColor: teacher.Faculty_Type === 'Permanent' 
+                          ? (isDarkMode ? '#34d399' : '#247e5bff') 
+                          : (isDarkMode ? 'rgba(16, 185, 129, 0.4)' : 'rgba(36, 126, 91, 0.3)')
                       }}>
                         {teacher.Faculty_Type || 'N/A'}
                       </span>
                     </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm hidden sm:table-cell" style={{ color: '#6b7280' }}>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm hidden sm:table-cell" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
                       {teacher.Gender || 'N/A'}
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -367,7 +419,7 @@ const Teachers = () => {
                         whileTap={{ scale: 0.9 }}
                         onClick={() => handleViewDetails(teacher.Teacher_ID)}
                         className="mr-2 sm:mr-4"
-                        style={{ color: '#247e5bff' }}
+                        style={{ color: isDarkMode ? '#34d399' : '#247e5bff' }}
                         title="View details"
                       >
                         <FiEye size={18} />
@@ -378,11 +430,11 @@ const Teachers = () => {
                         onClick={() => handleEnroll(teacher.Teacher_ID)}
                         disabled={enrollingIds.has(teacher.Teacher_ID)}
                         className="mr-2 sm:mr-4 disabled:opacity-50 disabled:cursor-not-allowed"
-                        style={{ color: '#6b7280' }}
+                        style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}
                         title="Enroll face embeddings"
                       >
                         {enrollingIds.has(teacher.Teacher_ID) ? (
-                          <div className="animate-spin h-5 w-5 border-2 border-t-transparent rounded-full" style={{ borderColor: '#6b7280' }} />
+                          <div className="animate-spin h-5 w-5 border-2 border-t-transparent rounded-full" style={{ borderColor: isDarkMode ? '#34d399' : '#6b7280' }} />
                         ) : (
                           <FiUserCheck size={18} />
                         )}
@@ -392,7 +444,7 @@ const Teachers = () => {
                         whileTap={{ scale: 0.9 }}
                         onClick={() => handleEdit(teacher)}
                         className="mr-2 sm:mr-4"
-                        style={{ color: '#247e5bff' }}
+                        style={{ color: isDarkMode ? '#34d399' : '#247e5bff' }}
                         title="Edit teacher"
                       >
                         <FiEdit2 size={18} />
@@ -422,9 +474,15 @@ const Teachers = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="relative p-6 rounded-2xl bg-white"
+          className="relative p-6 rounded-2xl"
           style={{
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+            background: isDarkMode 
+              ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+              : '#ffffff',
+            border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.2)' : 'none',
+            boxShadow: isDarkMode 
+              ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(16, 185, 129, 0.1)'
+              : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
           }}
         >
           <DepartmentDistributionChart 
@@ -440,9 +498,15 @@ const Teachers = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="relative p-6 rounded-2xl bg-white"
+          className="relative p-6 rounded-2xl"
           style={{
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+            background: isDarkMode 
+              ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+              : '#ffffff',
+            border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.2)' : 'none',
+            boxShadow: isDarkMode 
+              ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(16, 185, 129, 0.1)'
+              : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
           }}
         >
           <DepartmentBarChart 

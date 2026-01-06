@@ -863,7 +863,7 @@ const Dashboard = () => {
               <DailyDetectionChart data={filteredChartData} loading={chartLoading} />
               {filteredChartData.length > 0 && (
                 <div className="absolute bottom-2 left-2">
-                  <p className="text-xs font-semibold" style={{ color: document.documentElement.classList.contains('dark') ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
+                  <p className="text-xs font-semibold" style={{ color: document.documentElement.classList.contains('dark') ? '#c0f0f0' : '#003d82' }}>
                     Detected Today: <span className="font-black" style={{ color: document.documentElement.classList.contains('dark') ? '#22d3ee' : '#305796' }}>{dailyDetectionData.find(d => d.isToday)?.totalDetections || 0}</span>
                   </p>
                 </div>
@@ -907,25 +907,15 @@ const Dashboard = () => {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    whileHover={{
-                      background: document.documentElement.classList.contains('dark')
-                        ? 'linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(34, 211, 238, 0.1))'
-                        : 'rgba(48, 87, 150, 0.12)',
-                      borderColor: document.documentElement.classList.contains('dark')
-                        ? 'rgba(34, 211, 238, 0.5)'
-                        : 'rgba(48, 87, 150, 0.3)',
-                      boxShadow: document.documentElement.classList.contains('dark')
-                        ? '0 0 20px rgba(6, 182, 212, 0.25)'
-                        : 'none'
-                    }}
-                    className="p-3 rounded-xl transition-all duration-200"
+                    className="p-3 rounded-xl activity-item-hover"
                     style={{
                       background: document.documentElement.classList.contains('dark')
                         ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.6))'
                         : 'rgba(48, 87, 150, 0.05)',
                       border: document.documentElement.classList.contains('dark')
                         ? '1px solid rgba(6, 182, 212, 0.15)'
-                        : '1px solid rgba(48, 87, 150, 0.1)'
+                        : '1px solid rgba(48, 87, 150, 0.1)',
+                      transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
                     }}
                   >
                     <div className="flex items-center justify-between">
@@ -990,7 +980,7 @@ const Dashboard = () => {
               </span>
             </div>
             
-            <div className="h-[calc(100%-50px)] overflow-y-auto scrollbar-thin pr-1">
+            <div className="h-[calc(100%-50px)] overflow-y-auto overflow-x-hidden custom-activity-scrollbar pr-1">
               {zoneOverview.length === 0 ? (
                 <div className="text-center py-8">
                   <FiMapPin size={32} className="mx-auto mb-2" style={{ color: 'var(--text-soft)' }} />
@@ -1009,25 +999,15 @@ const Dashboard = () => {
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        whileHover={{
-                          background: document.documentElement.classList.contains('dark')
-                            ? 'linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(34, 211, 238, 0.1))'
-                            : 'rgba(48, 87, 150, 0.12)',
-                          borderColor: document.documentElement.classList.contains('dark')
-                            ? 'rgba(34, 211, 238, 0.5)'
-                            : 'rgba(48, 87, 150, 0.3)',
-                          boxShadow: document.documentElement.classList.contains('dark')
-                            ? '0 0 20px rgba(6, 182, 212, 0.25)'
-                            : 'none'
-                        }}
-                        className="p-2.5 rounded-xl transition-all duration-200"
+                        className="p-2.5 rounded-xl zone-item-hover"
                         style={{
                           background: document.documentElement.classList.contains('dark')
                             ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.6))'
                             : 'rgba(48, 87, 150, 0.05)',
                           border: document.documentElement.classList.contains('dark')
                             ? '1px solid rgba(6, 182, 212, 0.15)'
-                            : '1px solid rgba(48, 87, 150, 0.1)'
+                            : '1px solid rgba(48, 87, 150, 0.1)',
+                          transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
                         }}
                       >
                         <div className="flex items-center justify-between mb-1.5">

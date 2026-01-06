@@ -141,16 +141,42 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
     if (!isOpen) return null;
 
     const uploadedCount = Object.values(facePictures).filter(Boolean).length;
+    const isDarkMode = document.documentElement.classList.contains('dark');
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-student-modal-scrollbar">
+        <div 
+            className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            style={{
+                background: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
+                backdropFilter: 'blur(10px)'
+            }}
+        >
+            <div 
+                className="rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-student-modal-scrollbar"
+                style={{
+                    background: isDarkMode 
+                        ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95))'
+                        : 'white',
+                    border: isDarkMode ? '1px solid rgba(129, 140, 248, 0.2)' : 'none',
+                    boxShadow: isDarkMode 
+                        ? '0 20px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(129, 140, 248, 0.1)'
+                        : '0 20px 60px rgba(0, 0, 0, 0.3)'
+                }}
+            >
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h2 className="text-2xl font-bold" style={{ color: '#6365baff' }}>Add New Student</h2>
+                <div 
+                    className="flex items-center justify-between p-6"
+                    style={{
+                        borderBottom: isDarkMode ? '1px solid rgba(129, 140, 248, 0.2)' : '1px solid #e5e7eb'
+                    }}
+                >
+                    <h2 className="text-2xl font-bold" style={{ color: isDarkMode ? '#818cf8' : '#6365baff' }}>Add New Student</h2>
                     <button
                         onClick={onClose}
-                        className="text-gray-500 hover:text-gray-700 transition"
+                        className="transition"
+                        style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = isDarkMode ? '#c0f0f0' : '#374151'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280'}
                     >
                         <FiX size={24} />
                     </button>
@@ -160,7 +186,7 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     {/* Name */}
                     <div>
-                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.9)' : '#1e293b' }}>
                             Name <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -171,20 +197,28 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                             required
                             className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
                             style={{
-                                background: 'rgba(255, 255, 255, 0.8)',
-                                border: '2px solid rgba(148, 163, 184, 0.3)',
-                                color: '#0F172A',
-                                transition: 'border-color 0.15s ease'
+                                background: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                                border: isDarkMode ? '2px solid rgba(129, 140, 248, 0.3)' : '2px solid rgba(148, 163, 184, 0.3)',
+                                color: isDarkMode ? '#c0f0f0' : '#0F172A',
+                                transition: 'border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease'
                             }}
                             placeholder="Enter student name"
-                            onFocus={(e) => e.target.style.borderColor = '#305796'}
-                            onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
+                            onFocus={(e) => {
+                                e.target.style.borderColor = isDarkMode ? '#818cf8' : '#305796';
+                                e.target.style.boxShadow = isDarkMode ? '0 0 0 3px rgba(129, 140, 248, 0.15)' : '0 0 0 3px rgba(48, 87, 150, 0.15)';
+                                e.target.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.95)' : '#ffffff';
+                            }}
+                            onBlur={(e) => {
+                                e.target.style.borderColor = isDarkMode ? 'rgba(129, 140, 248, 0.3)' : 'rgba(148, 163, 184, 0.3)';
+                                e.target.style.boxShadow = 'none';
+                                e.target.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)';
+                            }}
                         />
                     </div>
 
                     {/* Roll Number */}
                     <div>
-                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.9)' : '#1e293b' }}>
                             Roll Number <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -195,20 +229,28 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                             required
                             className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
                             style={{
-                                background: 'rgba(255, 255, 255, 0.8)',
-                                border: '2px solid rgba(148, 163, 184, 0.3)',
-                                color: '#0F172A',
-                                transition: 'border-color 0.15s ease'
+                                background: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                                border: isDarkMode ? '2px solid rgba(129, 140, 248, 0.3)' : '2px solid rgba(148, 163, 184, 0.3)',
+                                color: isDarkMode ? '#c0f0f0' : '#0F172A',
+                                transition: 'border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease'
                             }}
                             placeholder="Enter roll number"
-                            onFocus={(e) => e.target.style.borderColor = '#305796'}
-                            onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
+                            onFocus={(e) => {
+                                e.target.style.borderColor = isDarkMode ? '#818cf8' : '#305796';
+                                e.target.style.boxShadow = isDarkMode ? '0 0 0 3px rgba(129, 140, 248, 0.15)' : '0 0 0 3px rgba(48, 87, 150, 0.15)';
+                                e.target.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.95)' : '#ffffff';
+                            }}
+                            onBlur={(e) => {
+                                e.target.style.borderColor = isDarkMode ? 'rgba(129, 140, 248, 0.3)' : 'rgba(148, 163, 184, 0.3)';
+                                e.target.style.boxShadow = 'none';
+                                e.target.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)';
+                            }}
                         />
                     </div>
 
                     {/* Email */}
                     <div>
-                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.9)' : '#1e293b' }}>
                             Email <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -219,20 +261,28 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                             required
                             className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
                             style={{
-                                background: 'rgba(255, 255, 255, 0.8)',
-                                border: '2px solid rgba(148, 163, 184, 0.3)',
-                                color: '#0F172A',
-                                transition: 'border-color 0.15s ease'
+                                background: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                                border: isDarkMode ? '2px solid rgba(129, 140, 248, 0.3)' : '2px solid rgba(148, 163, 184, 0.3)',
+                                color: isDarkMode ? '#c0f0f0' : '#0F172A',
+                                transition: 'border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease'
                             }}
                             placeholder="student@example.com"
-                            onFocus={(e) => e.target.style.borderColor = '#305796'}
-                            onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
+                            onFocus={(e) => {
+                                e.target.style.borderColor = isDarkMode ? '#818cf8' : '#305796';
+                                e.target.style.boxShadow = isDarkMode ? '0 0 0 3px rgba(129, 140, 248, 0.15)' : '0 0 0 3px rgba(48, 87, 150, 0.15)';
+                                e.target.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.95)' : '#ffffff';
+                            }}
+                            onBlur={(e) => {
+                                e.target.style.borderColor = isDarkMode ? 'rgba(129, 140, 248, 0.3)' : 'rgba(148, 163, 184, 0.3)';
+                                e.target.style.boxShadow = 'none';
+                                e.target.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)';
+                            }}
                         />
                     </div>
 
                     {/* Gender - Custom Dropdown */}
                     <div>
-                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.9)' : '#1e293b' }}>
                             Gender
                         </label>
                         <div className="relative" ref={genderDropdownRef}>
@@ -241,17 +291,25 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                                 onClick={() => setGenderDropdownOpen(!genderDropdownOpen)}
                                 className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none flex items-center justify-between"
                                 style={{
-                                    background: 'rgba(255, 255, 255, 0.8)',
-                                    border: '2px solid rgba(148, 163, 184, 0.3)',
-                                    color: formData.Gender ? '#0F172A' : '#9CA3AF'
+                                    background: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                                    border: isDarkMode ? '2px solid rgba(129, 140, 248, 0.3)' : '2px solid rgba(148, 163, 184, 0.3)',
+                                    color: formData.Gender ? (isDarkMode ? '#c0f0f0' : '#0F172A') : (isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#9CA3AF')
                                 }}
                             >
                                 <span>{formData.Gender || 'Select gender'}</span>
-                                <FiChevronDown className={`transition-transform ${genderDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#6365ba' }} />
+                                <FiChevronDown className={`transition-transform ${genderDropdownOpen ? 'rotate-180' : ''}`} style={{ color: isDarkMode ? '#818cf8' : '#6365ba' }} />
                             </button>
                             
                             {genderDropdownOpen && (
-                                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                                <div 
+                                    className="absolute top-full left-0 mt-1 w-full rounded-xl shadow-lg py-1 z-50"
+                                    style={{
+                                        background: isDarkMode 
+                                            ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95))'
+                                            : 'white',
+                                        border: isDarkMode ? '1px solid rgba(129, 140, 248, 0.3)' : '1px solid #e5e7eb'
+                                    }}
+                                >
                                     {['Male', 'Female', 'Other'].map((gender) => (
                                         <button
                                             key={gender}
@@ -260,7 +318,27 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                                                 setFormData({ ...formData, Gender: gender });
                                                 setGenderDropdownOpen(false);
                                             }}
-                                            className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-purple-100 hover:text-purple-700 ${formData.Gender === gender ? 'bg-purple-50 text-purple-700' : 'text-gray-700'}`}
+                                            className="w-full text-left px-4 py-2 text-sm font-medium transition-colors"
+                                            style={{
+                                                backgroundColor: formData.Gender === gender 
+                                                    ? (isDarkMode ? 'rgba(129, 140, 248, 0.2)' : '#eef2ff')
+                                                    : 'transparent',
+                                                color: formData.Gender === gender
+                                                    ? (isDarkMode ? '#818cf8' : '#6366f1')
+                                                    : (isDarkMode ? '#c0f0f0' : '#374151')
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (formData.Gender !== gender) {
+                                                    e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(129, 140, 248, 0.15)' : '#eef2ff';
+                                                    e.currentTarget.style.color = isDarkMode ? '#818cf8' : '#6366f1';
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (formData.Gender !== gender) {
+                                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                                    e.currentTarget.style.color = isDarkMode ? '#c0f0f0' : '#374151';
+                                                }
+                                            }}
                                         >
                                             {gender}
                                         </button>
@@ -272,7 +350,7 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
 
                     {/* Department */}
                     <div>
-                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.9)' : '#1e293b' }}>
                             Department
                         </label>
                         <input
@@ -282,23 +360,31 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                             onChange={handleInputChange}
                             className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
                             style={{
-                                background: 'rgba(255, 255, 255, 0.8)',
-                                border: '2px solid rgba(148, 163, 184, 0.3)',
-                                color: '#0F172A',
-                                transition: 'border-color 0.15s ease'
+                                background: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                                border: isDarkMode ? '2px solid rgba(129, 140, 248, 0.3)' : '2px solid rgba(148, 163, 184, 0.3)',
+                                color: isDarkMode ? '#c0f0f0' : '#0F172A',
+                                transition: 'border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease'
                             }}
                             placeholder="Enter department"
-                            onFocus={(e) => e.target.style.borderColor = '#305796'}
-                            onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
+                            onFocus={(e) => {
+                                e.target.style.borderColor = isDarkMode ? '#818cf8' : '#305796';
+                                e.target.style.boxShadow = isDarkMode ? '0 0 0 3px rgba(129, 140, 248, 0.15)' : '0 0 0 3px rgba(48, 87, 150, 0.15)';
+                                e.target.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.95)' : '#ffffff';
+                            }}
+                            onBlur={(e) => {
+                                e.target.style.borderColor = isDarkMode ? 'rgba(129, 140, 248, 0.3)' : 'rgba(148, 163, 184, 0.3)';
+                                e.target.style.boxShadow = 'none';
+                                e.target.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)';
+                            }}
                         />
                     </div>
 
                     {/* Face Pictures Upload */}
                     <div>
-                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.9)' : '#1e293b' }}>
                             Face Pictures (1-5 images) <span className="text-red-500">*</span>
                         </label>
-                        <p className="text-xs text-gray-500 mb-3">
+                        <p className="text-xs mb-3" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#6b7280' }}>
                             {uploadedCount}/5 images uploaded. First image is required.
                         </p>
 
@@ -323,7 +409,10 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                                                 <img
                                                     src={picture}
                                                     alt={`Picture ${num}`}
-                                                    className="w-full h-32 object-cover rounded-lg border-2 border-gray-300"
+                                                    className="w-full h-32 object-cover rounded-lg"
+                                                    style={{
+                                                        border: isDarkMode ? '2px solid rgba(129, 140, 248, 0.3)' : '2px solid #d1d5db'
+                                                    }}
                                                 />
                                                 <button
                                                     type="button"
@@ -332,17 +421,29 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                                                 >
                                                     <FiTrash2 size={16} />
                                                 </button>
-                                                <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
+                                                <div 
+                                                    className="absolute bottom-2 left-2 text-xs px-2 py-1 rounded"
+                                                    style={{
+                                                        backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.6)',
+                                                        color: isDarkMode ? '#818cf8' : 'white'
+                                                    }}
+                                                >
                                                     Picture {num}
                                                 </div>
                                             </div>
                                         ) : (
                                             <label
                                                 htmlFor={`imageUpload${num}`}
-                                                className="cursor-pointer flex flex-col items-center justify-center h-32 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 transition"
+                                                className="cursor-pointer flex flex-col items-center justify-center h-32 border-2 border-dashed rounded-lg transition"
+                                                style={{
+                                                    borderColor: isDarkMode ? 'rgba(129, 140, 248, 0.3)' : '#d1d5db',
+                                                    backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.5)' : 'transparent'
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.borderColor = isDarkMode ? '#818cf8' : '#6365baff'}
+                                                onMouseLeave={(e) => e.currentTarget.style.borderColor = isDarkMode ? 'rgba(129, 140, 248, 0.3)' : '#d1d5db'}
                                             >
-                                                <FiUpload size={24} className="text-gray-400 mb-1" />
-                                                <span className="text-xs text-gray-600">
+                                                <FiUpload size={24} style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#9ca3af', marginBottom: '4px' }} />
+                                                <span className="text-xs" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#4b5563' }}>
                                                     Picture {num}
                                                     {num === 1 && <span className="text-red-500">*</span>}
                                                 </span>
@@ -356,9 +457,15 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
 
                     {/* Error Message */}
                     {error && (
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                            <p className="text-red-800 font-semibold mb-1">Validation failed</p>
-                            <p className="text-red-600 text-sm">{error}</p>
+                        <div 
+                            className="rounded-lg p-4"
+                            style={{
+                                backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2',
+                                border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid #fecaca'
+                            }}
+                        >
+                            <p className="font-semibold mb-1" style={{ color: isDarkMode ? '#f87171' : '#991b1b' }}>Validation failed</p>
+                            <p className="text-sm" style={{ color: isDarkMode ? '#fca5a5' : '#dc2626' }}>{error}</p>
                         </div>
                     )}
 
@@ -369,27 +476,35 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                             onClick={onClose}
                             className="px-6 py-2 rounded-xl text-sm font-semibold transition-all"
                             style={{
-                                border: '2px solid #e5e7eb',
-                                color: '#6b7280',
-                                background: '#ffffff'
+                                border: isDarkMode ? '2px solid rgba(148, 163, 184, 0.3)' : '2px solid #e5e7eb',
+                                color: isDarkMode ? '#94a3b8' : '#6b7280',
+                                background: isDarkMode ? 'rgba(100, 116, 139, 0.1)' : '#ffffff'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(100, 116, 139, 0.2)' : '#f9fafb'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(100, 116, 139, 0.1)' : '#ffffff'}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={loading || !facePictures.Face_Picture_1}
-                            className={`px-6 py-2 text-white rounded-xl text-sm font-semibold transition-all ${loading || !facePictures.Face_Picture_1 ? 'opacity-50 cursor-not-allowed' : ''
+                            className={`px-6 py-2 rounded-xl text-sm font-semibold transition-all ${loading || !facePictures.Face_Picture_1 ? 'opacity-50 cursor-not-allowed' : ''
                                 }`}
-                            style={{ backgroundColor: '#6365baff' }}
+                            style={{ 
+                                backgroundColor: isDarkMode ? 'rgba(129, 140, 248, 0.2)' : '#6365baff',
+                                border: isDarkMode ? '1px solid rgba(129, 140, 248, 0.5)' : 'none',
+                                color: isDarkMode ? '#818cf8' : 'white'
+                            }}
                             onMouseEnter={(e) => {
                                 if (!loading && facePictures.Face_Picture_1) {
-                                    e.currentTarget.style.backgroundColor = '#5558a8';
+                                    e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(129, 140, 248, 0.3)' : '#5558a8';
+                                    if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 20px rgba(129, 140, 248, 0.3)';
                                 }
                             }}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#6365baff'}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(129, 140, 248, 0.2)' : '#6365baff';
+                                e.currentTarget.style.boxShadow = 'none';
+                            }}
                         >
                             {loading ? 'Adding...' : 'Add Student'}
                         </button>

@@ -125,12 +125,12 @@ const DailyDetectionChart = ({ data, loading }) => {
             <stop offset="95%" stopColor="#305796" stopOpacity={0.3} />
           </linearGradient>
           <linearGradient id="colorStudents" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#6365baff" stopOpacity={0.8} />
-            <stop offset="95%" stopColor="#6365baff" stopOpacity={0.3} />
+            <stop offset="5%" stopColor={document.documentElement.classList.contains('dark') ? '#6366f1' : '#6365baff'} stopOpacity={0.9} />
+            <stop offset="95%" stopColor={document.documentElement.classList.contains('dark') ? '#6366f1' : '#6365baff'} stopOpacity={0.4} />
           </linearGradient>
           <linearGradient id="colorTeachers" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#247e5bff" stopOpacity={0.8} />
-            <stop offset="95%" stopColor="#247e5bff" stopOpacity={0.3} />
+            <stop offset="5%" stopColor={document.documentElement.classList.contains('dark') ? '#10b981' : '#247e5bff'} stopOpacity={0.9} />
+            <stop offset="95%" stopColor={document.documentElement.classList.contains('dark') ? '#10b981' : '#247e5bff'} stopOpacity={0.4} />
           </linearGradient>
           <linearGradient id="areaTotal" x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor="#305796" stopOpacity={0.4} />
@@ -183,6 +183,15 @@ const DailyDetectionChart = ({ data, loading }) => {
           }}
           iconType="circle"
           iconSize={8}
+          formatter={(value, entry, index) => (
+            <span style={{ 
+              color: document.documentElement.classList.contains('dark') ? '#c0f0f0' : '#003d82',
+              fontSize: '11px',
+              fontWeight: '600'
+            }}>
+              {value}
+            </span>
+          )}
         />
         
         {/* Area chart for total trend */}
