@@ -168,7 +168,7 @@ export const getActivePresence = async (req, res) => {
     const activePersons = await prisma.activePresence.findMany({
       where: { Zone_id: parseInt(zoneId) },
       include: {
-        Students: {
+        student: {
           select: {
             Student_ID: true,
             Name: true,
@@ -176,7 +176,7 @@ export const getActivePresence = async (req, res) => {
             Gender: true
           }
         },
-        Teacher: {
+        teacher: {
           select: {
             Teacher_ID: true,
             Name: true,
@@ -185,7 +185,7 @@ export const getActivePresence = async (req, res) => {
             Faculty_Type: true
           }
         },
-        Zone: {
+        zone: {
           select: {
             Zone_id: true,
             Zone_Name: true
@@ -198,8 +198,8 @@ export const getActivePresence = async (req, res) => {
     const formatted = activePersons.map(p => ({
       presenceId: p.Presence_ID,
       personType: p.PersonType,
-      person: p.Students || p.Teacher,
-      zone: p.Zone,
+      person: p.student || p.teacher,
+      zone: p.zone,
       entryTime: p.EntryTime
     }));
 
@@ -227,7 +227,7 @@ export const getAllActivePresence = async (req, res) => {
   try {
     const activePersons = await prisma.activePresence.findMany({
       include: {
-        Students: {
+        student: {
           select: {
             Student_ID: true,
             Name: true,
@@ -235,7 +235,7 @@ export const getAllActivePresence = async (req, res) => {
             Gender: true
           }
         },
-        Teacher: {
+        teacher: {
           select: {
             Teacher_ID: true,
             Name: true,
@@ -244,7 +244,7 @@ export const getAllActivePresence = async (req, res) => {
             Faculty_Type: true
           }
         },
-        Zone: {
+        zone: {
           select: {
             Zone_id: true,
             Zone_Name: true
@@ -257,8 +257,8 @@ export const getAllActivePresence = async (req, res) => {
     const formatted = activePersons.map(p => ({
       presenceId: p.Presence_ID,
       personType: p.PersonType,
-      person: p.Students || p.Teacher,
-      zone: p.Zone,
+      person: p.student || p.teacher,
+      zone: p.zone,
       entryTime: p.EntryTime
     }));
 
@@ -307,14 +307,14 @@ export const getAttendanceLogs = async (req, res) => {
       prisma.attendanceLog.findMany({
         where,
         include: {
-          Students: {
+          student: {
             select: {
               Student_ID: true,
               Name: true,
               Department: true
             }
           },
-          Teacher: {
+          teacher: {
             select: {
               Teacher_ID: true,
               Name: true,
@@ -322,7 +322,7 @@ export const getAttendanceLogs = async (req, res) => {
               Faculty_Type: true
             }
           },
-          Zone: {
+          zone: {
             select: {
               Zone_id: true,
               Zone_Name: true
@@ -339,8 +339,8 @@ export const getAttendanceLogs = async (req, res) => {
     const formatted = logs.map(log => ({
       logId: log.Log_ID,
       personType: log.PersonType,
-      person: log.Students || log.Teacher,
-      zone: log.Zone,
+      person: log.student || log.teacher,
+      zone: log.zone,
       entryTime: log.EntryTime,
       exitTime: log.ExitTime,
       duration: log.Duration

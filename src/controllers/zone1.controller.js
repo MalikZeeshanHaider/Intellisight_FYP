@@ -87,7 +87,7 @@ export const logRecognizedPerson = async (req, res) => {
           )
         },
         include: {
-          Teacher: {
+          teacher: {
             select: {
               Teacher_ID: true,
               Name: true,
@@ -95,7 +95,7 @@ export const logRecognizedPerson = async (req, res) => {
               Department: true
             }
           },
-          Students: {
+          student: {
             select: {
               Student_ID: true,
               Name: true,
@@ -104,7 +104,7 @@ export const logRecognizedPerson = async (req, res) => {
               RollNumber: true
             }
           },
-          Zone: {
+          zone: {
             select: {
               Zone_id: true,
               Zone_Name: true
@@ -264,7 +264,7 @@ export const getCurrentPersons = async (req, res) => {
         Zone_id: 1
       },
       include: {
-        Teacher: {
+        teacher: {
           select: {
             Teacher_ID: true,
             Name: true,
@@ -274,7 +274,7 @@ export const getCurrentPersons = async (req, res) => {
             Face_Picture_1: true
           }
         },
-        Students: {
+        student: {
           select: {
             Student_ID: true,
             Name: true,
@@ -285,7 +285,7 @@ export const getCurrentPersons = async (req, res) => {
             Face_Picture_1: true
           }
         },
-        Zone: {
+        zone: {
           select: {
             Zone_id: true,
             Zone_Name: true
@@ -299,7 +299,7 @@ export const getCurrentPersons = async (req, res) => {
 
     // Format response
     const formatted = currentPersons.map(entry => {
-      const person = entry.Students || entry.Teacher;
+      const person = entry.student || entry.teacher;
       const duration = Math.floor((new Date() - new Date(entry.EntryTime)) / 60000); // minutes
       
       return {
@@ -314,7 +314,7 @@ export const getCurrentPersons = async (req, res) => {
         Face_Picture: person?.Face_Picture_1,
         EntryTime: entry.EntryTime,
         Duration: duration + ' mins',
-        Zone: entry.Zone?.Zone_Name,
+        Zone: entry.zone?.Zone_Name,
         Status: 'Inside'
       };
     });
@@ -348,7 +348,7 @@ export const getZoneLogs = async (req, res) => {
         Zone_id: 1
       },
       include: {
-        Teacher: {
+        teacher: {
           select: {
             Teacher_ID: true,
             Name: true,
@@ -358,7 +358,7 @@ export const getZoneLogs = async (req, res) => {
             Face_Picture_1: true
           }
         },
-        Students: {
+        student: {
           select: {
             Student_ID: true,
             Name: true,
@@ -369,7 +369,7 @@ export const getZoneLogs = async (req, res) => {
             Face_Picture_1: true
           }
         },
-        Zone: {
+        zone: {
           select: {
             Zone_id: true,
             Zone_Name: true
@@ -389,7 +389,7 @@ export const getZoneLogs = async (req, res) => {
 
     // Format response
     const formatted = logs.map(entry => {
-      const person = entry.Students || entry.Teacher;
+      const person = entry.student || entry.teacher;
       
       return {
         Log_ID: entry.Log_ID,
@@ -404,7 +404,7 @@ export const getZoneLogs = async (req, res) => {
         EntryTime: entry.EntryTime,
         ExitTime: entry.ExitTime,
         Duration: entry.Duration ? entry.Duration + ' mins' : 'Ongoing',
-        Zone: entry.Zone?.Zone_Name,
+        Zone: entry.zone?.Zone_Name,
         CreatedAt: entry.CreatedAt
       };
     });
@@ -555,14 +555,14 @@ export const markExit = async (req, res) => {
         Presence_ID: parseInt(presenceId)
       },
       include: {
-        Students: {
+        student: {
           select: {
             Student_ID: true,
             Name: true,
             Email: true
           }
         },
-        Teacher: {
+        teacher: {
           select: {
             Teacher_ID: true,
             Name: true,
@@ -813,7 +813,7 @@ export const getTimeTableLogs = async (req, res) => {
     const logs = await prisma.attendanceLog.findMany({
       where,
       include: {
-        Teacher: {
+        teacher: {
           select: {
             Teacher_ID: true,
             Name: true,
@@ -823,7 +823,7 @@ export const getTimeTableLogs = async (req, res) => {
             Face_Picture_1: true
           }
         },
-        Students: {
+        student: {
           select: {
             Student_ID: true,
             Name: true,
@@ -834,7 +834,7 @@ export const getTimeTableLogs = async (req, res) => {
             Face_Picture_1: true
           }
         },
-        Zone: {
+        zone: {
           select: {
             Zone_id: true,
             Zone_Name: true
@@ -852,7 +852,7 @@ export const getTimeTableLogs = async (req, res) => {
 
     // Format response with calculated duration
     const formatted = logs.map(entry => {
-      const person = entry.Students || entry.Teacher;
+      const person = entry.student || entry.teacher;
       let duration = entry.Duration; // Use stored duration
       let status = 'Inside';
 
@@ -874,7 +874,7 @@ export const getTimeTableLogs = async (req, res) => {
         ExitTime: entry.ExitTime,
         Duration: duration,
         Status: status,
-        Zone: entry.Zone?.Zone_Name || 'Unknown'
+        Zone: entry.zone?.Zone_Name || 'Unknown'
       };
     });
 

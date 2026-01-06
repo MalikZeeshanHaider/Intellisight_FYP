@@ -7,18 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model ActivePresence {
-  Presence_ID Int       @id @default(autoincrement())
-  PersonType  String
-  Student_ID  Int?
-  Teacher_ID  Int?
-  Zone_id     Int
-  EntryTime   DateTime  @default(now())
-  Students    Students? @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
-  Teacher     Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
-  Zone        Zone      @relation(fields: [Zone_id], references: [Zone_id], onDelete: Cascade)
-}
-
 model Admin {
   Admin_ID Int     @id @default(autoincrement())
   Name     String?
@@ -26,6 +14,132 @@ model Admin {
   Password String?
   Role     String?
   Logs     Logs[]
+
+  @@map("Admin")
+}
+
+model PendingUsers {
+  Pending_ID       Int      @id @default(autoincrement())
+  Name             String
+  Email            String   @unique
+  Password         String
+  VerificationToken String  @unique
+  Status           String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  RequestedAt      DateTime @default(now())
+  ProcessedAt      DateTime?
+  ProcessedBy      Int?
+  RejectionReason  String?
+
+  @@map("PendingUsers")
+}
+
+model PasswordResets {
+  Reset_ID   Int      @id @default(autoincrement())
+  Email      String
+  Token      String   @unique
+  ExpiresAt  DateTime
+  CreatedAt  DateTime @default(now())
+  Used       Boolean  @default(false)
+
+  @@map("PasswordResets")
+}
+
+model Zone {
+  Zone_id        Int              @id @default(autoincrement())
+  Zone_Name      String?
+  Description    String?
+  ActivePresence ActivePresence[]
+  AttendanceLog  AttendanceLog[]
+  Camara         Camara[]
+  Logs           Logs[]
+
+  @@map("Zone")
+}
+
+model Camara {
+  Camara_Id   Int     @id @default(autoincrement())
+  Password    String?
+  Zone_id     Int?
+  Camera_Type String? @default("Entry")
+  Camera_URL  String?
+  zone        Zone?   @relation(fields: [Zone_id], references: [Zone_id])
+
+  @@map("Camara")
+}
+
+model Teacher {
+  Teacher_ID      Int                   @id @default(autoincrement())
+  Name            String?
+  Email           String?               @unique
+  CreatedAt       DateTime              @default(now())
+  Department      String?
+  Face_Picture_1  String?
+  Face_Picture_2  String?
+  Face_Picture_3  String?
+  Face_Picture_4  String?
+  Face_Picture_5  String?
+  Face_Embeddings Bytes?
+  Faculty_Type    String?
+  Gender          String?
+  UpdatedAt       DateTime              @updatedAt
+  ActivePresence  ActivePresence[]
+  AttendanceLog   AttendanceLog[]
+  FaceEmbeddings  FaceEmbeddings[]
+  Logs            Logs[]
+  ProcessedImages ProcessedFaceImages[]
+
+  @@map("Teacher")
+}
+
+model Students {
+  Student_ID      Int                   @id @default(autoincrement())
+  Name            String?
+  RollNumber      String?               @unique
+  Email           String?               @unique
+  Face_Picture_1  String?
+  Face_Picture_2  String?
+  Face_Picture_3  String?
+  Face_Picture_4  String?
+  Face_Picture_5  String?
+  Face_Embeddings Bytes?
+  CreatedAt       DateTime              @default(now())
+  UpdatedAt       DateTime              @updatedAt
+  Department      String?
+  Gender          String?
+  ActivePresence  ActivePresence[]
+  AttendanceLog   AttendanceLog[]
+  FaceEmbeddings  FaceEmbeddings[]
+  Logs            Logs[]
+  ProcessedImages ProcessedFaceImages[]
+
+  @@map("Students")
+}
+
+model UnknownFaces {
+  Unknown_ID     Int      @id @default(autoincrement())
+  Captured_Image Bytes?
+  DetectedTime   DateTime @default(now())
+  Zone_id        Int?
+  Confidence     Float?
+  Status         String?  @default("PENDING")
+  Notes          String?
+  CreatedAt      DateTime @default(now())
+
+  @@map("UnknownFaces")
+}
+
+model ActivePresence {
+  Presence_ID Int       @id @default(autoincrement())
+  PersonType  String
+  Student_ID  Int?
+  Teacher_ID  Int?
+  Zone_id     Int
+  EntryTime   DateTime  @default(now())
+  student     Students? @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
+  teacher     Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
+  zone        Zone      @relation(fields: [Zone_id], references: [Zone_id], onDelete: Cascade)
+
+  @@map("ActivePresence")
 }
 
 model AttendanceLog {
@@ -38,18 +152,28 @@ model AttendanceLog {
   ExitTime   DateTime?
   Duration   Int?
   CreatedAt  DateTime  @default(now())
-  Students   Students? @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
-  Teacher    Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
-  Zone       Zone      @relation(fields: [Zone_id], references: [Zone_id], onDelete: Cascade)
+  student    Students? @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
+  teacher    Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
+  zone       Zone      @relation(fields: [Zone_id], references: [Zone_id], onDelete: Cascade)
+
+  @@map("AttendanceLog")
 }
 
-model Camara {
-  Camara_Id   Int     @id @default(autoincrement())
-  Password    String?
-  Zone_id     Int?
-  Camera_Type String? @default("Entry")
-  Camera_URL  String?
-  Zone        Zone?   @relation(fields: [Zone_id], references: [Zone_id])
+model ProcessedFaceImages {
+  Processed_ID Int       @id @default(autoincrement())
+  PersonType   String
+  Student_ID   Int?
+  Teacher_ID   Int?
+  Image1       Bytes?
+  Image2       Bytes?
+  Image3       Bytes?
+  Image4       Bytes?
+  Image5       Bytes?
+  CreatedAt    DateTime  @default(now())
+  student      Students? @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
+  teacher      Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
+
+  @@map("ProcessedFaceImages")
 }
 
 model FaceEmbeddings {
@@ -62,9 +186,11 @@ model FaceEmbeddings {
   Embedding     Bytes
   EmbeddingJson String?
   CreatedAt     DateTime  @default(now())
-  UpdatedAt     DateTime  @default(now()) @updatedAt
-  Students      Students? @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
-  Teacher       Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
+  UpdatedAt     DateTime  @updatedAt
+  student       Students? @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
+  teacher       Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
+
+  @@map("FaceEmbeddings")
 }
 
 model Logs {
@@ -80,106 +206,4 @@ model Logs {
   Students   Students? @relation(fields: [Student_ID], references: [Student_ID])
   Teacher    Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID])
   Zone       Zone?     @relation(fields: [Zone_id], references: [Zone_id])
-}
-
-model PasswordResets {
-  Reset_ID  Int      @id @default(autoincrement())
-  Email     String
-  Token     String   @unique
-  ExpiresAt DateTime
-  CreatedAt DateTime @default(now())
-  Used      Boolean  @default(false)
-}
-
-model PendingUsers {
-  Pending_ID        Int       @id @default(autoincrement())
-  Name              String
-  Email             String    @unique
-  Password          String
-  VerificationToken String    @unique
-  Status            String    @default("PENDING")
-  RequestedAt       DateTime  @default(now())
-  ProcessedAt       DateTime?
-  ProcessedBy       Int?
-  RejectionReason   String?
-}
-
-model ProcessedFaceImages {
-  Processed_ID Int       @id @default(autoincrement())
-  PersonType   String
-  Student_ID   Int?
-  Teacher_ID   Int?
-  Image1       Bytes?
-  Image2       Bytes?
-  Image3       Bytes?
-  Image4       Bytes?
-  Image5       Bytes?
-  CreatedAt    DateTime  @default(now())
-  Students     Students? @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
-  Teacher      Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
-}
-
-model Students {
-  Student_ID          Int                   @id @default(autoincrement())
-  Name                String?
-  RollNumber          String?               @unique
-  Email               String?               @unique
-  Face_Picture_1      String?
-  Face_Picture_2      String?
-  Face_Picture_3      String?
-  Face_Picture_4      String?
-  Face_Picture_5      String?
-  Face_Embeddings     Bytes?
-  CreatedAt           DateTime              @default(now())
-  UpdatedAt           DateTime              @default(now()) @updatedAt
-  Department          String?
-  Gender              String?
-  ActivePresence      ActivePresence[]
-  AttendanceLog       AttendanceLog[]
-  FaceEmbeddings      FaceEmbeddings[]
-  Logs                Logs[]
-  ProcessedFaceImages ProcessedFaceImages[]
-}
-
-model Teacher {
-  Teacher_ID          Int                   @id @default(autoincrement())
-  Name                String?
-  Email               String?               @unique
-  CreatedAt           DateTime              @default(now())
-  Department          String?
-  Face_Picture_1      String?
-  Face_Picture_2      String?
-  Face_Picture_3      String?
-  Face_Picture_4      String?
-  Face_Picture_5      String?
-  Face_Embeddings     Bytes?
-  Faculty_Type        String?
-  Gender              String?
-  UpdatedAt           DateTime              @default(now()) @updatedAt
-  ActivePresence      ActivePresence[]
-  AttendanceLog       AttendanceLog[]
-  FaceEmbeddings      FaceEmbeddings[]
-  Logs                Logs[]
-  ProcessedFaceImages ProcessedFaceImages[]
-}
-
-model UnknownFaces {
-  Unknown_ID     Int      @id @default(autoincrement())
-  Captured_Image Bytes?
-  DetectedTime   DateTime @default(now())
-  Zone_id        Int?
-  Confidence     Float?
-  Status         String?  @default("PENDING")
-  Notes          String?
-  CreatedAt      DateTime @default(now())
-}
-
-model Zone {
-  Zone_id        Int              @id @default(autoincrement())
-  Zone_Name      String?
-  Description    String?
-  ActivePresence ActivePresence[]
-  AttendanceLog  AttendanceLog[]
-  Camara         Camara[]
-  Logs           Logs[]
 }

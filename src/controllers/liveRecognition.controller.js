@@ -301,7 +301,7 @@ export const getLiveActivePresence = async (req, res) => {
     const activePersons = await prisma.activePresence.findMany({
       where,
       include: {
-        Students: {
+        student: {
           select: {
             Student_ID: true,
             Name: true,
@@ -310,7 +310,7 @@ export const getLiveActivePresence = async (req, res) => {
             RollNumber: true
           }
         },
-        Teacher: {
+        teacher: {
           select: {
             Teacher_ID: true,
             Name: true,
@@ -319,7 +319,7 @@ export const getLiveActivePresence = async (req, res) => {
             Faculty_Type: true
           }
         },
-        Zone: {
+        zone: {
           select: {
             Zone_id: true,
             Zone_Name: true
@@ -335,8 +335,8 @@ export const getLiveActivePresence = async (req, res) => {
         presenceId: p.Presence_ID,
         personType: p.PersonType,
         personId: p.PersonType === 'Student' ? p.Student_ID : p.Teacher_ID,
-        person: p.Students || p.Teacher,
-        zone: p.Zone,
+        person: p.student || p.teacher,
+        zone: p.zone,
         entryTime: p.EntryTime,
         duration: duration + ' min',
         status: 'active'

@@ -76,15 +76,9 @@ export const detectFaces = async (input, options = {}) => {
       return [];
     }
 
-    // Check if video element is ready - more lenient
-    if (input.readyState < 2) {
+    // Check if video element is ready
+    if (input.readyState !== 4) {
       console.log('⏳ Video not ready yet, readyState:', input.readyState);
-      return [];
-    }
-    
-    // Check video dimensions
-    if (!input.videoWidth || !input.videoHeight) {
-      console.log('⏳ Video dimensions not available yet');
       return [];
     }
 
@@ -96,8 +90,8 @@ export const detectFaces = async (input, options = {}) => {
 
     // Use more sensitive detection options
     const detectionOptions = new faceapi.TinyFaceDetectorOptions({
-      inputSize: 416,        // Higher for better detection (224, 320, 416, 512)
-      scoreThreshold: 0.3    // More sensitive (0.3-0.5, lower = more sensitive)
+      inputSize: 320,        // Lower for faster detection (224, 320, 416, 512)
+      scoreThreshold: 0.4    // More sensitive (0.3-0.5, lower = more sensitive)
     });
 
     console.log('🎥 Starting face detection on video:', input.videoWidth, 'x', input.videoHeight);
@@ -246,33 +240,24 @@ const getFaceDescriptor = async (base64Image) => {
  */
 export const matchFace = (faceDescriptor, threshold = 0.6) => {
   if (!faceDescriptor || faceDescriptors.length === 0) {
-    console.log('⚠️ No face descriptor or empty database');
     return null;
   }
 
   let bestMatch = null;
   let bestDistance = Infinity;
-  let allDistances = [];
 
   for (const person of faceDescriptors) {
     const distance = faceapi.euclideanDistance(faceDescriptor, person.descriptor);
-    allDistances.push({ name: person.name, distance: distance.toFixed(3) });
     
-    if (distance < bestDistance) {
+    if (distance < bestDistance && distance < threshold) {
       bestDistance = distance;
-      if (distance < threshold) {
-        bestMatch = {
-          ...person,
-          confidence: (1 - distance).toFixed(2),
-          distance: distance.toFixed(3)
-        };
-      }
+      bestMatch = {
+        ...person,
+        confidence: (1 - distance).toFixed(2),
+        distance: distance.toFixed(3)
+      };
     }
   }
-
-  // Log distances for debugging
-  console.log('🔍 Face matching distances:', allDistances);
-  console.log(`📊 Best distance: ${bestDistance.toFixed(3)}, Threshold: ${threshold}, Match: ${bestMatch ? bestMatch.name : 'UNKNOWN'}`);
 
   return bestMatch;
 };

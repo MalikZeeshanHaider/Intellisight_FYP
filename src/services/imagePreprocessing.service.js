@@ -222,7 +222,7 @@ export const getPreprocessedImages = async () => {
   try {
     const processedImages = await prisma.processedFaceImages.findMany({
       include: {
-        Students: {
+        student: {
           select: {
             Student_ID: true,
             Name: true,
@@ -232,7 +232,7 @@ export const getPreprocessedImages = async () => {
             Face_Embeddings: true
           }
         },
-        Teacher: {
+        teacher: {
           select: {
             Teacher_ID: true,
             Name: true,

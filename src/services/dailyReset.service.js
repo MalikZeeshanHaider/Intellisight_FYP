@@ -19,9 +19,9 @@ export const resetDailyActivePresence = async () => {
     // Get all active presence records before clearing
     const activeRecords = await prisma.activePresence.findMany({
       include: {
-        Zone: true,
-        Students: true,
-        Teacher: true,
+        zone: true,
+        student: true,
+        teacher: true,
       },
     });
 

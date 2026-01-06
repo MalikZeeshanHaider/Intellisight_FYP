@@ -139,7 +139,7 @@ export const getCurrentPersonsInZone = asyncHandler(async (req, res) => {
   const zoneId = parseInt(id);
 
   // Check if zone exists
-  const zone = await prisma.Zone.findUnique({
+  const zone = await prisma.zone.findUnique({
     where: { Zone_id: zoneId },
   });
 
@@ -152,7 +152,7 @@ export const getCurrentPersonsInZone = asyncHandler(async (req, res) => {
       Zone_id: zoneId
     },
     include: {
-      Teacher: {
+      teacher: {
         select: {
           Teacher_ID: true,
           Name: true,
@@ -162,7 +162,7 @@ export const getCurrentPersonsInZone = asyncHandler(async (req, res) => {
           Face_Picture_1: true
         }
       },
-      Students: {
+      student: {
         select: {
           Student_ID: true,
           Name: true,
@@ -173,7 +173,7 @@ export const getCurrentPersonsInZone = asyncHandler(async (req, res) => {
           Face_Picture_1: true
         }
       },
-      Zone: {
+      zone: {
         select: {
           Zone_id: true,
           Zone_Name: true
