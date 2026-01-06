@@ -25,6 +25,9 @@ const Logs = () => {
   const typeDropdownRef = useRef(null);
   const limitDropdownRef = useRef(null);
 
+  // Dark mode detection
+  const isDarkMode = document.documentElement.classList.contains('dark');
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -105,8 +108,8 @@ const Logs = () => {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: '#305796' }}></div>
-          <p className="text-gray-600">Loading logs...</p>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: isDarkMode ? '#22d3ee' : '#305796' }}></div>
+          <p style={{ color: isDarkMode ? '#c0f0f0' : '#6b7280' }}>Loading logs...</p>
         </div>
       </div>
     );
@@ -118,15 +121,23 @@ const Logs = () => {
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative p-6 rounded-2xl bg-white"
-        style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)' }}
+        className="relative p-6 rounded-2xl"
+        style={{ 
+          background: isDarkMode 
+            ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+            : '#ffffff',
+          boxShadow: isDarkMode 
+            ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)'
+            : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)',
+          border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : 'none'
+        }}
       >
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold mb-2" style={{ color: '#305796' }}>
+            <h1 className="text-3xl font-bold mb-2" style={{ color: isDarkMode ? '#22d3ee' : '#305796' }}>
               Activity Logs
             </h1>
-            <p className="text-sm font-medium" style={{ color: '#6b7280' }}>
+            <p className="text-sm font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
               Zone tracking history • {logs.length} total entries
             </p>
           </div>
@@ -134,14 +145,14 @@ const Logs = () => {
           <div className="flex items-center gap-3">
             {/* Auto-update indicator */}
             {isRefreshing && (
-              <div className="flex items-center gap-2 text-sm font-medium" style={{ color: '#305796' }}>
-                <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: '#305796' }}></div>
+              <div className="flex items-center gap-2 text-sm font-medium" style={{ color: isDarkMode ? '#22d3ee' : '#305796' }}>
+                <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: isDarkMode ? '#22d3ee' : '#305796' }}></div>
                 Auto-updating...
               </div>
             )}
             
             {/* Last update time */}
-            <div className="text-xs font-medium text-gray-500">
+            <div className="text-xs font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
               Last updated: {format(lastUpdate, 'HH:mm:ss')}
             </div>
           </div>
@@ -152,23 +163,49 @@ const Logs = () => {
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="relative p-4 rounded-2xl bg-white flex items-center justify-between"
-        style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)' }}
+        className="relative p-4 rounded-2xl flex items-center justify-between"
+        style={{ 
+          background: isDarkMode 
+            ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+            : '#ffffff',
+          boxShadow: isDarkMode 
+            ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)'
+            : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)',
+          border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : 'none'
+        }}
       >
         <div className="flex items-center gap-3">
           {/* Person Type Filter - Custom Dropdown */}
           <div className="relative" ref={typeDropdownRef}>
             <button
               onClick={() => setTypeDropdownOpen(!typeDropdownOpen)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-700"
-              style={{ minWidth: '140px' }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-all"
+              style={{ 
+                minWidth: '140px',
+                backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f3f4f6',
+                color: isDarkMode ? '#c0f0f0' : '#374151',
+                border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : 'none'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.15)' : '#dbeafe';
+                e.currentTarget.style.color = isDarkMode ? '#22d3ee' : '#1d4ed8';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f3f4f6';
+                e.currentTarget.style.color = isDarkMode ? '#c0f0f0' : '#374151';
+              }}
             >
               <span>{personTypeFilter === '' ? 'All Types' : personTypeFilter === 'Student' ? 'Students Only' : 'Faculty Only'}</span>
-              <FiChevronDown className={`transition-transform ${typeDropdownOpen ? 'rotate-180' : ''}`} />
+              <FiChevronDown className={`transition-transform ${typeDropdownOpen ? 'rotate-180' : ''}`} style={{ color: isDarkMode ? '#22d3ee' : '#305796' }} />
             </button>
             
             {typeDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1 w-full min-w-[150px] bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+              <div className="absolute top-full left-0 mt-1 w-full min-w-[150px] rounded-xl shadow-lg py-1 z-50"
+                style={{ 
+                  backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.98)' : '#ffffff',
+                  border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.3)' : '1px solid #e5e7eb'
+                }}
+              >
                 {[
                   { value: '', label: 'All Types' },
                   { value: 'Student', label: 'Students Only' },
@@ -177,7 +214,15 @@ const Logs = () => {
                   <button
                     key={option.value}
                     onClick={() => { setPersonTypeFilter(option.value); setTypeDropdownOpen(false); }}
-                    className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-blue-100 hover:text-blue-700 ${personTypeFilter === option.value ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                    className="w-full text-left px-4 py-2 text-sm font-medium transition-all"
+                    style={{ 
+                      backgroundColor: personTypeFilter === option.value 
+                        ? (isDarkMode ? 'rgba(6, 182, 212, 0.2)' : '#dbeafe') 
+                        : 'transparent',
+                      color: personTypeFilter === option.value 
+                        ? (isDarkMode ? '#22d3ee' : '#1d4ed8') 
+                        : (isDarkMode ? '#c0f0f0' : '#374151')
+                    }}
                   >
                     {option.label}
                   </button>
@@ -190,20 +235,46 @@ const Logs = () => {
           <div className="relative" ref={limitDropdownRef}>
             <button
               onClick={() => setLimitDropdownOpen(!limitDropdownOpen)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-700"
-              style={{ minWidth: '150px' }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-all"
+              style={{ 
+                minWidth: '150px',
+                backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f3f4f6',
+                color: isDarkMode ? '#c0f0f0' : '#374151',
+                border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : 'none'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.15)' : '#dbeafe';
+                e.currentTarget.style.color = isDarkMode ? '#22d3ee' : '#1d4ed8';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f3f4f6';
+                e.currentTarget.style.color = isDarkMode ? '#c0f0f0' : '#374151';
+              }}
             >
               <span>Last {limit} entries</span>
-              <FiChevronDown className={`transition-transform ${limitDropdownOpen ? 'rotate-180' : ''}`} />
+              <FiChevronDown className={`transition-transform ${limitDropdownOpen ? 'rotate-180' : ''}`} style={{ color: isDarkMode ? '#22d3ee' : '#305796' }} />
             </button>
             
             {limitDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1 w-full min-w-[160px] bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+              <div className="absolute top-full left-0 mt-1 w-full min-w-[160px] rounded-xl shadow-lg py-1 z-50"
+                style={{ 
+                  backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.98)' : '#ffffff',
+                  border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.3)' : '1px solid #e5e7eb'
+                }}
+              >
                 {[25, 50, 100, 200].map((value) => (
                   <button
                     key={value}
                     onClick={() => { setLimit(value); setLimitDropdownOpen(false); }}
-                    className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-blue-100 hover:text-blue-700 ${limit === value ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                    className="w-full text-left px-4 py-2 text-sm font-medium transition-all"
+                    style={{ 
+                      backgroundColor: limit === value 
+                        ? (isDarkMode ? 'rgba(6, 182, 212, 0.2)' : '#dbeafe') 
+                        : 'transparent',
+                      color: limit === value 
+                        ? (isDarkMode ? '#22d3ee' : '#1d4ed8') 
+                        : (isDarkMode ? '#c0f0f0' : '#374151')
+                    }}
                   >
                     Last {value} entries
                   </button>
@@ -218,9 +289,18 @@ const Logs = () => {
           whileTap={{ scale: 0.98 }}
           onClick={() => fetchLogs(true)}
           className="flex items-center gap-2 px-4 py-2 text-white rounded-xl font-semibold text-sm transition-all"
-          style={{ backgroundColor: '#305796', boxShadow: '0 2px 8px rgba(48, 87, 150, 0.25)' }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#274370'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#305796'}
+          style={{ 
+            backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#305796', 
+            boxShadow: isDarkMode ? '0 0 20px rgba(6, 182, 212, 0.3)' : '0 2px 8px rgba(48, 87, 150, 0.25)' 
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 1)' : '#274370';
+            if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 30px rgba(6, 182, 212, 0.5)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#305796';
+            if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 20px rgba(6, 182, 212, 0.3)';
+          }}
         >
           <FiRefreshCw size={16} className={loading ? 'animate-spin' : ''} />
           <span>Refresh</span>
@@ -233,10 +313,13 @@ const Logs = () => {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           className="p-4 rounded-xl border flex items-start"
-          style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+          style={{ 
+            backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)', 
+            borderColor: 'rgba(239, 68, 68, 0.3)' 
+          }}
         >
           <FiAlertCircle className="mt-0.5 mr-3 flex-shrink-0" style={{ color: '#ef4444' }} size={20} />
-          <p className="text-sm font-medium" style={{ color: '#ef4444' }}>{error}</p>
+          <p className="text-sm font-medium" style={{ color: isDarkMode ? '#f87171' : '#ef4444' }}>{error}</p>
         </motion.div>
       )}
 
@@ -244,66 +327,74 @@ const Logs = () => {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-2xl overflow-hidden"
-        style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)' }}
+        className="rounded-2xl overflow-hidden"
+        style={{ 
+          background: isDarkMode 
+            ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+            : '#ffffff',
+          boxShadow: isDarkMode 
+            ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)'
+            : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)',
+          border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : 'none'
+        }}
       >
         {logs.length === 0 ? (
           <div className="text-center py-16">
-            <div className="w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: 'rgba(48, 87, 150, 0.1)' }}>
-              <FiFileText style={{ color: '#305796' }} size={40} />
+            <div className="w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.15)' : 'rgba(48, 87, 150, 0.1)' }}>
+              <FiFileText style={{ color: isDarkMode ? '#22d3ee' : '#305796' }} size={40} />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Activity Logs</h3>
-            <p className="text-gray-600">No logs found for the selected filters</p>
+            <h3 className="text-lg font-semibold mb-2" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>No Activity Logs</h3>
+            <p style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>No logs found for the selected filters</p>
           </div>
         ) : (
           <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 400px)', overflowX: 'hidden' }}>
-            <table className="w-full divide-y" style={{ borderColor: 'rgba(48, 87, 150, 0.1)' }}>
-              <thead style={{ backgroundColor: 'rgba(48, 87, 150, 0.05)' }}>
+            <table className="w-full divide-y" style={{ borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.1)' : 'rgba(48, 87, 150, 0.1)' }}>
+              <thead style={{ backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.1)' : 'rgba(48, 87, 150, 0.05)' }}>
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#305796' }}>
+                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? '#22d3ee' : '#305796' }}>
                     Person
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#305796' }}>
+                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? '#22d3ee' : '#305796' }}>
                     Type
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#305796' }}>
+                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? '#22d3ee' : '#305796' }}>
                     Zone
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#305796' }}>
+                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? '#22d3ee' : '#305796' }}>
                     Entry Time
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#305796' }}>
+                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? '#22d3ee' : '#305796' }}>
                     Exit Time
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#305796' }}>
+                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? '#22d3ee' : '#305796' }}>
                     Duration
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#305796' }}>
+                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? '#22d3ee' : '#305796' }}>
                     Status
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y" style={{ borderColor: 'rgba(48, 87, 150, 0.05)' }}>
+              <tbody className="divide-y" style={{ borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.05)' : 'rgba(48, 87, 150, 0.05)' }}>
                 {logs.map((log) => (
                   <tr 
                     key={log.TimeTable_ID} 
                     className="transition-all duration-200"
-                    style={{ cursor: 'default' }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(48, 87, 150, 0.05)'}
+                    style={{ cursor: 'default', backgroundColor: 'transparent' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.08)' : 'rgba(48, 87, 150, 0.05)'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #305796 0%, #4a7cb8 100%)' }}>
+                        <div className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center" style={{ background: isDarkMode ? 'linear-gradient(135deg, rgba(6, 182, 212, 0.8) 0%, rgba(34, 211, 238, 0.6) 100%)' : 'linear-gradient(135deg, #305796 0%, #4a7cb8 100%)' }}>
                           <span className="text-white font-semibold text-sm">
                             {log.Name?.[0] || '?'}
                           </span>
                         </div>
                         <div className="ml-4">
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-sm font-medium" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>
                             {log.Name || 'Unknown'}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#6b7280' }}>
                             {log.RollNumber || log.Email || 'N/A'}
                           </p>
                         </div>
@@ -312,16 +403,16 @@ const Logs = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         log.PersonType === 'Student' 
-                          ? 'bg-blue-100 text-blue-800' 
-                          : 'bg-green-100 text-green-800'
+                          ? (isDarkMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-800')
+                          : (isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-800')
                       }`}>
                         {log.PersonType}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>
                       {log.Zone || 'N/A'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>
                       <div className="flex items-center space-x-1">
                         <FiLogIn className="text-green-500" size={14} />
                         <span>
@@ -329,7 +420,7 @@ const Logs = () => {
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>
                       {log.ExitTime ? (
                         <div className="flex items-center space-x-1">
                           <FiLogOut className="text-red-500" size={14} />
@@ -338,24 +429,24 @@ const Logs = () => {
                           </span>
                         </div>
                       ) : (
-                        <span className="text-gray-400 italic">Still inside</span>
+                        <span style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.4)' : '#9ca3af', fontStyle: 'italic' }}>Still inside</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>
                       {log.Duration !== null ? (
                         <div className="flex items-center space-x-1">
-                          <FiClock className="text-blue-500" size={14} />
+                          <FiClock style={{ color: isDarkMode ? '#22d3ee' : '#3b82f6' }} size={14} />
                           <span className="font-medium">{log.Duration} min</span>
                         </div>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.4)' : '#9ca3af' }}>-</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         log.Status === 'Completed'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-yellow-100 text-yellow-800'
+                          ? (isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-800')
+                          : (isDarkMode ? 'bg-yellow-500/20 text-yellow-400' : 'bg-yellow-100 text-yellow-800')
                       }`}>
                         {log.Status}
                       </span>

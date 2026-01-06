@@ -11,6 +11,7 @@ import { unknownFacesAPI } from '../api/unknownFaces';
 import { studentAPI, teacherAPI } from '../api/api';
 
 const UnknownFaces = () => {
+  const isDarkMode = document.documentElement.classList.contains('dark');
   const [unknownFaces, setUnknownFaces] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -223,9 +224,15 @@ const UnknownFaces = () => {
 
   const getStatusBadge = (status) => {
     const styles = {
-      PENDING: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-      IDENTIFIED: 'bg-green-100 text-green-800 border-green-300',
-      IGNORED: 'bg-gray-100 text-gray-800 border-gray-300'
+      PENDING: isDarkMode 
+        ? 'bg-yellow-900/30 text-yellow-400 border-yellow-600/50' 
+        : 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      IDENTIFIED: isDarkMode 
+        ? 'bg-green-900/30 text-green-400 border-green-600/50' 
+        : 'bg-green-100 text-green-800 border-green-300',
+      IGNORED: isDarkMode 
+        ? 'bg-gray-800/50 text-gray-400 border-gray-600/50' 
+        : 'bg-gray-100 text-gray-800 border-gray-300'
     };
 
     return (
@@ -240,7 +247,7 @@ const UnknownFaces = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl font-display font-black" style={{ color: '#003d82' }}>
+          <h1 className="text-4xl font-display font-black" style={{ color: isDarkMode ? '#c0f0f0' : '#003d82' }}>
             Unknown Faces Log
           </h1>
         </div>
@@ -250,14 +257,23 @@ const UnknownFaces = () => {
           disabled={loading}
           className="flex items-center space-x-2 px-4 py-2 rounded-lg transition disabled:opacity-50"
           style={{
-            backgroundColor: loading ? '#e5e7eb' : '#003d82',
-            color: '#fff'
+            backgroundColor: loading 
+              ? (isDarkMode ? '#374151' : '#e5e7eb') 
+              : (isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#003d82'),
+            color: '#fff',
+            boxShadow: isDarkMode && !loading ? '0 0 20px rgba(6, 182, 212, 0.3)' : 'none'
           }}
           onMouseEnter={(e) => {
-            if (!loading) e.currentTarget.style.backgroundColor = '#305796';
+            if (!loading) {
+              e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 1)' : '#305796';
+              if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 30px rgba(6, 182, 212, 0.5)';
+            }
           }}
           onMouseLeave={(e) => {
-            if (!loading) e.currentTarget.style.backgroundColor = '#003d82';
+            if (!loading) {
+              e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#003d82';
+              if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 20px rgba(6, 182, 212, 0.3)';
+            }
           }}
         >
           <FiRefreshCw className={loading ? 'animate-spin' : ''} size={16} />
@@ -267,24 +283,46 @@ const UnknownFaces = () => {
 
       {/* Alerts */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
+        <div 
+          className="rounded-lg p-4 flex items-center justify-between"
+          style={{
+            backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2',
+            border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid #fecaca'
+          }}
+        >
           <div className="flex items-center">
-            <FiAlertCircle className="text-red-500 mr-3" size={20} />
-            <p className="text-red-700">{error}</p>
+            <FiAlertCircle className="mr-3" size={20} style={{ color: isDarkMode ? '#f87171' : '#ef4444' }} />
+            <p style={{ color: isDarkMode ? '#fca5a5' : '#b91c1c' }}>{error}</p>
           </div>
-          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
+          <button 
+            onClick={() => setError(null)} 
+            style={{ color: isDarkMode ? '#f87171' : '#ef4444' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = isDarkMode ? '#fca5a5' : '#b91c1c'}
+            onMouseLeave={(e) => e.currentTarget.style.color = isDarkMode ? '#f87171' : '#ef4444'}
+          >
             ×
           </button>
         </div>
       )}
 
       {success && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
+        <div 
+          className="rounded-lg p-4 flex items-center justify-between"
+          style={{
+            backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.1)' : '#ecfdf5',
+            border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid #a7f3d0'
+          }}
+        >
           <div className="flex items-center">
-            <FiAlertCircle className="text-green-500 mr-3" size={20} />
-            <p className="text-green-700">{success}</p>
+            <FiAlertCircle className="mr-3" size={20} style={{ color: isDarkMode ? '#34d399' : '#10b981' }} />
+            <p style={{ color: isDarkMode ? '#6ee7b7' : '#047857' }}>{success}</p>
           </div>
-          <button onClick={() => setSuccess(null)} className="text-green-500 hover:text-green-700">
+          <button 
+            onClick={() => setSuccess(null)} 
+            style={{ color: isDarkMode ? '#34d399' : '#10b981' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = isDarkMode ? '#6ee7b7' : '#047857'}
+            onMouseLeave={(e) => e.currentTarget.style.color = isDarkMode ? '#34d399' : '#10b981'}
+          >
             ×
           </button>
         </div>
@@ -292,108 +330,163 @@ const UnknownFaces = () => {
 
       {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div 
+          className="rounded-xl shadow-sm p-4"
+          style={{
+            backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
+            border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : '1px solid #e5e7eb',
+            boxShadow: isDarkMode ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)'
+          }}
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Total Unknown</p>
-              <p className="text-3xl font-bold" style={{ color: '#003d82' }}>{unknownFaces.length}</p>
+              <p className="text-sm font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>Total Unknown</p>
+              <p className="text-3xl font-bold" style={{ color: isDarkMode ? '#22d3ee' : '#003d82' }}>{unknownFaces.length}</p>
             </div>
-            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(0, 61, 130, 0.1)' }}>
-              <FiAlertCircle style={{ color: '#003d82' }} size={24} />
+            <div 
+              className="w-12 h-12 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.2)' : 'rgba(0, 61, 130, 0.1)' }}
+            >
+              <FiAlertCircle size={24} style={{ color: isDarkMode ? '#22d3ee' : '#003d82' }} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div 
+          className="rounded-xl shadow-sm p-4"
+          style={{
+            backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
+            border: isDarkMode ? '1px solid rgba(234, 179, 8, 0.2)' : '1px solid #e5e7eb',
+            boxShadow: isDarkMode ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)'
+          }}
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Pending</p>
-              <p className="text-3xl font-bold text-yellow-600">
+              <p className="text-sm font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>Pending</p>
+              <p className="text-3xl font-bold" style={{ color: isDarkMode ? '#fbbf24' : '#ca8a04' }}>
                 {unknownFaces.filter(f => f.Status === 'PENDING').length}
               </p>
             </div>
-            <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-              <FiClock className="text-yellow-600" size={24} />
+            <div 
+              className="w-12 h-12 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: isDarkMode ? 'rgba(234, 179, 8, 0.2)' : '#fef9c3' }}
+            >
+              <FiClock size={24} style={{ color: isDarkMode ? '#fbbf24' : '#ca8a04' }} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div 
+          className="rounded-xl shadow-sm p-4"
+          style={{
+            backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
+            border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid #e5e7eb',
+            boxShadow: isDarkMode ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)'
+          }}
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Identified</p>
-              <p className="text-3xl font-bold text-green-600">
+              <p className="text-sm font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>Identified</p>
+              <p className="text-3xl font-bold" style={{ color: isDarkMode ? '#34d399' : '#16a34a' }}>
                 {unknownFaces.filter(f => f.Status === 'IDENTIFIED').length}
               </p>
             </div>
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-              <FiUser className="text-green-600" size={24} />
+            <div 
+              className="w-12 h-12 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#dcfce7' }}
+            >
+              <FiUser size={24} style={{ color: isDarkMode ? '#34d399' : '#16a34a' }} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div 
+          className="rounded-xl shadow-sm p-4"
+          style={{
+            backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
+            border: isDarkMode ? '1px solid rgba(107, 114, 128, 0.2)' : '1px solid #e5e7eb',
+            boxShadow: isDarkMode ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)'
+          }}
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Ignored</p>
-              <p className="text-3xl font-bold text-gray-600">
+              <p className="text-sm font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>Ignored</p>
+              <p className="text-3xl font-bold" style={{ color: isDarkMode ? '#9ca3af' : '#4b5563' }}>
                 {unknownFaces.filter(f => f.Status === 'IGNORED').length}
               </p>
             </div>
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-              <FiTrash2 className="text-gray-600" size={24} />
+            <div 
+              className="w-12 h-12 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: isDarkMode ? 'rgba(107, 114, 128, 0.2)' : '#f3f4f6' }}
+            >
+              <FiTrash2 size={24} style={{ color: isDarkMode ? '#9ca3af' : '#4b5563' }} />
             </div>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <div 
+        className="rounded-xl shadow-sm p-4"
+        style={{
+          backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
+          border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : '1px solid #e5e7eb'
+        }}
+      >
         <div className="flex items-center space-x-2">
-          <span className="text-sm font-semibold text-gray-700">Filter:</span>
+          <span className="text-sm font-semibold" style={{ color: isDarkMode ? '#c0f0f0' : '#374151' }}>Filter:</span>
           <button
             onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition`}
+            className="px-4 py-2 rounded-lg text-sm font-medium transition"
             style={{
-              backgroundColor: filter === 'all' ? '#003d82' : '#f3f4f6',
-              color: filter === 'all' ? '#fff' : '#374151'
+              backgroundColor: filter === 'all' 
+                ? (isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#003d82') 
+                : (isDarkMode ? 'rgba(30, 41, 59, 0.8)' : '#f3f4f6'),
+              color: filter === 'all' ? '#fff' : (isDarkMode ? '#c0f0f0' : '#374151'),
+              boxShadow: filter === 'all' && isDarkMode ? '0 0 15px rgba(6, 182, 212, 0.3)' : 'none'
             }}
             onMouseEnter={(e) => {
-              if (filter !== 'all') e.currentTarget.style.backgroundColor = '#e5e7eb';
+              if (filter !== 'all') e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(30, 41, 59, 1)' : '#e5e7eb';
             }}
             onMouseLeave={(e) => {
-              if (filter !== 'all') e.currentTarget.style.backgroundColor = '#f3f4f6';
+              if (filter !== 'all') e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(30, 41, 59, 0.8)' : '#f3f4f6';
             }}
           >
             All
           </button>
           <button
             onClick={() => setFilter('pending')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              filter === 'pending'
-                ? 'bg-yellow-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className="px-4 py-2 rounded-lg text-sm font-medium transition"
+            style={{
+              backgroundColor: filter === 'pending' 
+                ? (isDarkMode ? 'rgba(234, 179, 8, 0.8)' : '#ca8a04') 
+                : (isDarkMode ? 'rgba(30, 41, 59, 0.8)' : '#f3f4f6'),
+              color: filter === 'pending' ? '#fff' : (isDarkMode ? '#c0f0f0' : '#374151')
+            }}
           >
             Pending
           </button>
           <button
             onClick={() => setFilter('identified')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              filter === 'identified'
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className="px-4 py-2 rounded-lg text-sm font-medium transition"
+            style={{
+              backgroundColor: filter === 'identified' 
+                ? (isDarkMode ? 'rgba(16, 185, 129, 0.8)' : '#16a34a') 
+                : (isDarkMode ? 'rgba(30, 41, 59, 0.8)' : '#f3f4f6'),
+              color: filter === 'identified' ? '#fff' : (isDarkMode ? '#c0f0f0' : '#374151')
+            }}
           >
             Identified
           </button>
           <button
             onClick={() => setFilter('ignored')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              filter === 'ignored'
-                ? 'bg-gray-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className="px-4 py-2 rounded-lg text-sm font-medium transition"
+            style={{
+              backgroundColor: filter === 'ignored' 
+                ? (isDarkMode ? 'rgba(107, 114, 128, 0.8)' : '#4b5563') 
+                : (isDarkMode ? 'rgba(30, 41, 59, 0.8)' : '#f3f4f6'),
+              color: filter === 'ignored' ? '#fff' : (isDarkMode ? '#c0f0f0' : '#374151')
+            }}
           >
             Ignored
           </button>
@@ -401,21 +494,30 @@ const UnknownFaces = () => {
       </div>
 
       {/* Unknown Faces Grid */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-xl font-bold mb-4" style={{ color: '#003d82' }}>Detected Faces</h2>
+      <div 
+        className="rounded-xl shadow-sm p-6"
+        style={{
+          backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
+          border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : '1px solid #e5e7eb'
+        }}
+      >
+        <h2 className="text-xl font-bold mb-4" style={{ color: isDarkMode ? '#22d3ee' : '#003d82' }}>Detected Faces</h2>
 
         {loading && unknownFaces.length === 0 ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 mb-4" style={{ borderColor: '#003d82' }}></div>
-              <p className="text-gray-600">Loading unknown faces...</p>
+              <div 
+                className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 mb-4" 
+                style={{ borderColor: isDarkMode ? '#22d3ee' : '#003d82' }}
+              ></div>
+              <p style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>Loading unknown faces...</p>
             </div>
           </div>
         ) : unknownFaces.length === 0 ? (
           <div className="text-center py-12">
-            <FiAlertCircle size={64} className="mx-auto mb-4 text-gray-300" />
-            <p className="text-gray-600 text-lg">No unknown faces detected yet</p>
-            <p className="text-gray-500 text-sm mt-2">
+            <FiAlertCircle size={64} className="mx-auto mb-4" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.3)' : '#d1d5db' }} />
+            <p className="text-lg" style={{ color: isDarkMode ? '#c0f0f0' : '#6b7280' }}>No unknown faces detected yet</p>
+            <p className="text-sm mt-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#9ca3af' }}>
               Unknown persons will appear here automatically
             </p>
           </div>
@@ -424,7 +526,13 @@ const UnknownFaces = () => {
             {unknownFaces.map((face) => (
               <div
                 key={face.Unknown_ID}
-                className="bg-gradient-to-br from-red-50 to-orange-50 rounded-lg p-4 shadow-sm hover:shadow-md transition border border-red-200"
+                className="rounded-lg p-4 shadow-sm hover:shadow-md transition"
+                style={{
+                  background: isDarkMode 
+                    ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9))'
+                    : 'linear-gradient(135deg, #fef2f2, #fff7ed)',
+                  border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid #fecaca'
+                }}
               >
                 {/* Face Image */}
                 <div className="mb-3">
@@ -432,7 +540,10 @@ const UnknownFaces = () => {
                     <img
                       src={face.CapturedImage}
                       alt="Unknown Person"
-                      className="w-full h-48 object-cover rounded-lg border-2 border-red-300 shadow"
+                      className="w-full h-48 object-cover rounded-lg shadow"
+                      style={{ 
+                        border: isDarkMode ? '2px solid rgba(239, 68, 68, 0.4)' : '2px solid #fca5a5'
+                      }}
                     />
                   ) : (
                     <div className="w-full h-48 bg-gradient-to-br from-red-400 to-orange-500 rounded-lg flex items-center justify-center">
@@ -445,39 +556,42 @@ const UnknownFaces = () => {
                 <div className="space-y-2">
                   {/* ID and Status */}
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-gray-600">
+                    <span className="text-xs font-mono" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
                       ID: {face.Unknown_ID}
                     </span>
                     {getStatusBadge(face.Status)}
                   </div>
 
                   {/* Detection Time */}
-                  <div className="flex items-center text-sm text-gray-700">
+                  <div className="flex items-center text-sm" style={{ color: isDarkMode ? '#c0f0f0' : '#374151' }}>
                     <FiClock className="mr-2" size={14} />
                     <span>{format(new Date(face.DetectedTime), 'MMM dd, yyyy HH:mm:ss')}</span>
                   </div>
 
                   {/* Zone */}
-                  <div className="text-sm text-gray-700">
+                  <div className="text-sm" style={{ color: isDarkMode ? '#c0f0f0' : '#374151' }}>
                     <span className="font-semibold">Zone:</span> Zone 1
                   </div>
 
                   {/* Confidence */}
                   {face.Confidence !== null && (
-                    <div className="text-sm text-gray-700">
+                    <div className="text-sm" style={{ color: isDarkMode ? '#c0f0f0' : '#374151' }}>
                       <span className="font-semibold">Confidence:</span> {(face.Confidence * 100).toFixed(1)}%
                     </div>
                   )}
 
                   {/* Notes */}
                   {face.Notes && (
-                    <div className="text-xs text-gray-600 italic truncate" title={face.Notes}>
+                    <div className="text-xs italic truncate" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }} title={face.Notes}>
                       {face.Notes}
                     </div>
                   )}
 
                   {/* Actions */}
-                  <div className="flex items-center space-x-2 pt-2 border-t border-red-200">
+                  <div 
+                    className="flex items-center space-x-2 pt-2"
+                    style={{ borderTop: isDarkMode ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid #fecaca' }}
+                  >
                     {/* Custom Status Dropdown */}
                     <div 
                       className="relative flex-1" 
@@ -485,33 +599,49 @@ const UnknownFaces = () => {
                     >
                       <button
                         onClick={() => setOpenDropdownId(openDropdownId === face.Unknown_ID ? null : face.Unknown_ID)}
-                        className="w-full flex items-center justify-between px-2 py-1.5 text-xs border border-gray-300 rounded bg-white cursor-pointer transition-all"
+                        className="w-full flex items-center justify-between px-2 py-1.5 text-xs rounded cursor-pointer transition-all"
                         style={{
-                          borderColor: openDropdownId === face.Unknown_ID ? '#003d82' : '#d1d5db',
+                          backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.8)' : 'white',
+                          border: isDarkMode 
+                            ? `1px solid ${openDropdownId === face.Unknown_ID ? '#22d3ee' : 'rgba(6, 182, 212, 0.3)'}`
+                            : `1px solid ${openDropdownId === face.Unknown_ID ? '#003d82' : '#d1d5db'}`,
                         }}
                         onMouseEnter={(e) => {
-                          if (openDropdownId !== face.Unknown_ID) e.currentTarget.style.borderColor = '#003d82';
+                          if (openDropdownId !== face.Unknown_ID) {
+                            e.currentTarget.style.borderColor = isDarkMode ? '#22d3ee' : '#003d82';
+                          }
                         }}
                         onMouseLeave={(e) => {
-                          if (openDropdownId !== face.Unknown_ID) e.currentTarget.style.borderColor = '#d1d5db';
+                          if (openDropdownId !== face.Unknown_ID) {
+                            e.currentTarget.style.borderColor = isDarkMode ? 'rgba(6, 182, 212, 0.3)' : '#d1d5db';
+                          }
                         }}
                       >
-                        <span className={`font-medium ${
-                          face.Status === 'PENDING' ? 'text-yellow-700' : 
-                          face.Status === 'IDENTIFIED' ? 'text-green-700' : 'text-gray-700'
-                        }`}>
+                        <span className="font-medium" style={{
+                          color: face.Status === 'PENDING' 
+                            ? (isDarkMode ? '#fbbf24' : '#a16207')
+                            : face.Status === 'IDENTIFIED' 
+                            ? (isDarkMode ? '#34d399' : '#15803d')
+                            : (isDarkMode ? '#9ca3af' : '#4b5563')
+                        }}>
                           {face.Status === 'PENDING' ? 'Pending' : 
                            face.Status === 'IDENTIFIED' ? 'Identified' : 'Ignored'}
                         </span>
                         <FiChevronDown 
                           size={12} 
                           className={`transition-transform ${openDropdownId === face.Unknown_ID ? 'rotate-180' : ''}`}
-                          style={{ color: '#6b7280' }}
+                          style={{ color: isDarkMode ? '#c0f0f0' : '#6b7280' }}
                         />
                       </button>
                       
                       {openDropdownId === face.Unknown_ID && (
-                        <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                        <div 
+                          className="absolute top-full left-0 mt-1 w-full rounded-lg shadow-lg py-1 z-50"
+                          style={{
+                            backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.98)' : 'white',
+                            border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.3)' : '1px solid #e5e7eb'
+                          }}
+                        >
                           {['PENDING', 'IDENTIFIED', 'IGNORED'].map((status) => (
                             <button
                               key={status}
@@ -519,13 +649,39 @@ const UnknownFaces = () => {
                                 handleStatusChange(face.Unknown_ID, status);
                                 setOpenDropdownId(null);
                               }}
-                              className={`w-full text-left px-3 py-1.5 text-xs font-medium transition-colors ${
-                                face.Status === status 
-                                  ? status === 'PENDING' ? 'bg-yellow-50 text-yellow-700'
-                                    : status === 'IDENTIFIED' ? 'bg-green-50 text-green-700'
-                                    : 'bg-gray-100 text-gray-700'
-                                  : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
-                              }`}
+                              className="w-full text-left px-3 py-1.5 text-xs font-medium transition-colors"
+                              style={{
+                                backgroundColor: face.Status === status 
+                                  ? (isDarkMode 
+                                    ? status === 'PENDING' ? 'rgba(234, 179, 8, 0.2)' 
+                                    : status === 'IDENTIFIED' ? 'rgba(16, 185, 129, 0.2)' 
+                                    : 'rgba(107, 114, 128, 0.2)'
+                                    : status === 'PENDING' ? '#fef9c3' 
+                                    : status === 'IDENTIFIED' ? '#dcfce7' 
+                                    : '#f3f4f6')
+                                  : 'transparent',
+                                color: face.Status === status 
+                                  ? (isDarkMode 
+                                    ? status === 'PENDING' ? '#fbbf24' 
+                                    : status === 'IDENTIFIED' ? '#34d399' 
+                                    : '#9ca3af'
+                                    : status === 'PENDING' ? '#a16207' 
+                                    : status === 'IDENTIFIED' ? '#15803d' 
+                                    : '#4b5563')
+                                  : (isDarkMode ? '#c0f0f0' : '#374151')
+                              }}
+                              onMouseEnter={(e) => {
+                                if (face.Status !== status) {
+                                  e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.1)' : '#eff6ff';
+                                  e.currentTarget.style.color = isDarkMode ? '#22d3ee' : '#1d4ed8';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (face.Status !== status) {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                  e.currentTarget.style.color = isDarkMode ? '#c0f0f0' : '#374151';
+                                }
+                              }}
                             >
                               {status === 'PENDING' ? 'Pending' : 
                                status === 'IDENTIFIED' ? 'Identified' : 'Ignored'}
@@ -539,9 +695,18 @@ const UnknownFaces = () => {
                     <button
                       onClick={() => openIdentifyModal(face)}
                       className="p-2 text-white rounded transition cursor-pointer"
-                      style={{ backgroundColor: '#10b981' }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#059669'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
+                      style={{ 
+                        backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.8)' : '#10b981',
+                        boxShadow: isDarkMode ? '0 0 10px rgba(16, 185, 129, 0.3)' : 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(16, 185, 129, 1)' : '#059669';
+                        if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.5)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(16, 185, 129, 0.8)' : '#10b981';
+                        if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 10px rgba(16, 185, 129, 0.3)';
+                      }}
                       title="Identify person"
                     >
                       <FiEdit2 size={14} />
@@ -550,10 +715,19 @@ const UnknownFaces = () => {
                     {/* Delete Button */}
                     <button
                       onClick={() => openDeleteConfirm(face)}
-                      className="p-2 bg-red-500 text-white rounded transition cursor-pointer"
-                      style={{ backgroundColor: '#ef4444' }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ef4444'}
+                      className="p-2 text-white rounded transition cursor-pointer"
+                      style={{ 
+                        backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.8)' : '#ef4444',
+                        boxShadow: isDarkMode ? '0 0 10px rgba(239, 68, 68, 0.3)' : 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(239, 68, 68, 1)' : '#dc2626';
+                        if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.5)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(239, 68, 68, 0.8)' : '#ef4444';
+                        if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 10px rgba(239, 68, 68, 0.3)';
+                      }}
                       title="Delete entry"
                     >
                       <FiTrash2 size={14} />
@@ -567,9 +741,18 @@ const UnknownFaces = () => {
       </div>
 
       {/* Auto-refresh indicator */}
-      <div className="rounded-lg p-3 flex items-center justify-center" style={{ backgroundColor: 'rgba(0, 61, 130, 0.05)', border: '1px solid rgba(0, 61, 130, 0.2)' }}>
-        <div className="flex items-center text-sm" style={{ color: '#003d82' }}>
-          <div className="w-2 h-2 rounded-full mr-2 animate-pulse" style={{ backgroundColor: '#003d82' }}></div>
+      <div 
+        className="rounded-lg p-3 flex items-center justify-center"
+        style={{ 
+          backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.1)' : 'rgba(0, 61, 130, 0.05)', 
+          border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : '1px solid rgba(0, 61, 130, 0.2)' 
+        }}
+      >
+        <div className="flex items-center text-sm" style={{ color: isDarkMode ? '#22d3ee' : '#003d82' }}>
+          <div 
+            className="w-2 h-2 rounded-full mr-2 animate-pulse" 
+            style={{ backgroundColor: isDarkMode ? '#22d3ee' : '#003d82' }}
+          ></div>
           <span>Auto-refreshing every 5 seconds</span>
         </div>
       </div>
@@ -579,7 +762,7 @@ const UnknownFaces = () => {
         <div 
           className="fixed inset-0 flex items-center justify-center z-50 p-4"
           style={{
-            background: 'rgba(0, 0, 0, 0.5)',
+            background: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
             backdropFilter: 'blur(8px)'
           }}
         >
@@ -588,10 +771,14 @@ const UnknownFaces = () => {
             animate={{ opacity: 1, scale: 1 }}
             className="rounded-2xl p-8 max-w-md w-full shadow-2xl"
             style={{
-              background: 'rgba(255, 255, 255, 0.98)',
+              background: isDarkMode 
+                ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95))'
+                : 'rgba(255, 255, 255, 0.98)',
               backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+              border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(239, 68, 68, 0.3)',
+              boxShadow: isDarkMode 
+                ? '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(239, 68, 68, 0.1)'
+                : '0 20px 60px rgba(0, 0, 0, 0.3)'
             }}
           >
             {/* Close Button */}
@@ -601,8 +788,8 @@ const UnknownFaces = () => {
                 setFaceToDelete(null);
               }}
               className="absolute top-4 right-4 p-2 rounded-full transition-colors"
-              style={{ color: '#6b7280' }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)'}
+              style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
               <FiX size={20} />
@@ -613,28 +800,34 @@ const UnknownFaces = () => {
               <div 
                 className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4"
                 style={{
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)'
+                  background: isDarkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)',
+                  border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(239, 68, 68, 0.3)'
                 }}
               >
-                <FiTrash2 className="text-3xl" style={{ color: '#dc2626' }} />
+                <FiTrash2 className="text-3xl" style={{ color: isDarkMode ? '#f87171' : '#dc2626' }} />
               </div>
 
               {/* Title */}
-              <h2 className="text-2xl font-bold mb-2" style={{ color: '#1f2937' }}>
+              <h2 className="text-2xl font-bold mb-2" style={{ color: isDarkMode ? '#c0f0f0' : '#1f2937' }}>
                 Delete Unknown Face
               </h2>
 
               {/* Message */}
-              <p className="mb-2" style={{ color: '#6b7280' }}>
+              <p className="mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
                 Are you sure you want to delete this entry?
               </p>
-              <p className="text-sm mb-6" style={{ color: '#9ca3af' }}>
+              <p className="text-sm mb-6" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#9ca3af' }}>
                 ID: {faceToDelete.Unknown_ID} • Detected: {format(new Date(faceToDelete.DetectedTime), 'MMM dd, yyyy HH:mm')}
               </p>
 
               {/* Warning */}
-              <p className="text-sm mb-6 px-4 py-2 rounded-lg" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#dc2626' }}>
+              <p 
+                className="text-sm mb-6 px-4 py-2 rounded-lg" 
+                style={{ 
+                  backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)', 
+                  color: isDarkMode ? '#f87171' : '#dc2626' 
+                }}
+              >
                 This action cannot be undone.
               </p>
 
@@ -648,15 +841,15 @@ const UnknownFaces = () => {
                   disabled={deleting}
                   className="flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-200 cursor-pointer"
                   style={{
-                    background: 'rgba(107, 114, 128, 0.1)',
-                    border: '1px solid rgba(107, 114, 128, 0.3)',
-                    color: '#4b5563'
+                    background: isDarkMode ? 'rgba(107, 114, 128, 0.2)' : 'rgba(107, 114, 128, 0.1)',
+                    border: isDarkMode ? '1px solid rgba(107, 114, 128, 0.4)' : '1px solid rgba(107, 114, 128, 0.3)',
+                    color: isDarkMode ? '#c0f0f0' : '#4b5563'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(107, 114, 128, 0.2)';
+                    e.currentTarget.style.background = isDarkMode ? 'rgba(107, 114, 128, 0.3)' : 'rgba(107, 114, 128, 0.2)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(107, 114, 128, 0.1)';
+                    e.currentTarget.style.background = isDarkMode ? 'rgba(107, 114, 128, 0.2)' : 'rgba(107, 114, 128, 0.1)';
                   }}
                 >
                   Cancel
@@ -666,24 +859,29 @@ const UnknownFaces = () => {
                   disabled={deleting}
                   className="flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
                   style={{
-                    background: deleting ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.1)',
-                    border: '1px solid rgba(239, 68, 68, 0.4)',
-                    color: '#dc2626'
+                    background: deleting 
+                      ? (isDarkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.3)')
+                      : (isDarkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)'),
+                    border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid rgba(239, 68, 68, 0.4)',
+                    color: isDarkMode ? '#f87171' : '#dc2626',
+                    boxShadow: isDarkMode ? '0 0 15px rgba(239, 68, 68, 0.2)' : 'none'
                   }}
                   onMouseEnter={(e) => {
                     if (!deleting) {
-                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                      e.currentTarget.style.background = isDarkMode ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.2)';
+                      if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.3)';
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!deleting) {
-                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                      e.currentTarget.style.background = isDarkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)';
+                      if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.2)';
                     }
                   }}
                 >
                   {deleting ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: isDarkMode ? '#f87171' : '#dc2626', borderTopColor: 'transparent' }}></div>
                       Deleting...
                     </>
                   ) : (
@@ -704,7 +902,7 @@ const UnknownFaces = () => {
         <div 
           className="fixed inset-0 flex items-center justify-center z-50 p-4"
           style={{
-            background: 'rgba(0, 0, 0, 0.5)',
+            background: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
             backdropFilter: 'blur(8px)'
           }}
         >
@@ -713,10 +911,14 @@ const UnknownFaces = () => {
             animate={{ opacity: 1, scale: 1 }}
             className="rounded-2xl p-6 max-w-lg w-full shadow-2xl"
             style={{
-              background: 'rgba(255, 255, 255, 0.98)',
+              background: isDarkMode 
+                ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95))'
+                : 'rgba(255, 255, 255, 0.98)',
               backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+              border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(16, 185, 129, 0.3)',
+              boxShadow: isDarkMode 
+                ? '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(16, 185, 129, 0.1)'
+                : '0 20px 60px rgba(0, 0, 0, 0.3)'
             }}
           >
             {/* Close Button */}
@@ -728,8 +930,8 @@ const UnknownFaces = () => {
                 setSearchQuery('');
               }}
               className="absolute top-4 right-4 p-2 rounded-full transition-colors cursor-pointer"
-              style={{ color: '#6b7280' }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)'}
+              style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
               <FiX size={20} />
@@ -740,18 +942,18 @@ const UnknownFaces = () => {
               <div 
                 className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4"
                 style={{
-                  background: 'rgba(16, 185, 129, 0.1)',
-                  border: '1px solid rgba(16, 185, 129, 0.3)'
+                  background: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.1)',
+                  border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(16, 185, 129, 0.3)'
                 }}
               >
-                <FiEdit2 className="text-3xl" style={{ color: '#10b981' }} />
+                <FiEdit2 className="text-3xl" style={{ color: isDarkMode ? '#34d399' : '#10b981' }} />
               </div>
 
               {/* Title */}
-              <h2 className="text-2xl font-bold mb-2" style={{ color: '#1f2937' }}>
+              <h2 className="text-2xl font-bold mb-2" style={{ color: isDarkMode ? '#c0f0f0' : '#1f2937' }}>
                 Identify Unknown Face
               </h2>
-              <p className="text-sm" style={{ color: '#6b7280' }}>
+              <p className="text-sm" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
                 Link this face to a registered student or faculty member
               </p>
             </div>
@@ -762,15 +964,15 @@ const UnknownFaces = () => {
                 <img
                   src={faceToIdentify.CapturedImage}
                   alt="Unknown Face"
-                  className="w-24 h-24 object-cover rounded-xl border-2"
-                  style={{ borderColor: 'rgba(16, 185, 129, 0.3)' }}
+                  className="w-24 h-24 object-cover rounded-xl"
+                  style={{ border: isDarkMode ? '2px solid rgba(16, 185, 129, 0.4)' : '2px solid rgba(16, 185, 129, 0.3)' }}
                 />
               </div>
             )}
 
             {/* Person Type Dropdown */}
             <div className="mb-4">
-              <label className="block text-sm font-semibold mb-2" style={{ color: '#374151' }}>
+              <label className="block text-sm font-semibold mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#374151' }}>
                 Person Type
               </label>
               <div className="relative" ref={personTypeDropdownRef}>
@@ -778,26 +980,34 @@ const UnknownFaces = () => {
                   onClick={() => setPersonTypeDropdownOpen(!personTypeDropdownOpen)}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium text-sm border transition-all cursor-pointer"
                   style={{
-                    borderColor: personTypeDropdownOpen ? '#10b981' : '#d1d5db',
-                    backgroundColor: '#fff'
+                    borderColor: personTypeDropdownOpen 
+                      ? (isDarkMode ? '#34d399' : '#10b981')
+                      : (isDarkMode ? 'rgba(16, 185, 129, 0.3)' : '#d1d5db'),
+                    backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.8)' : '#fff'
                   }}
                   onMouseEnter={(e) => {
-                    if (!personTypeDropdownOpen) e.currentTarget.style.borderColor = '#10b981';
+                    if (!personTypeDropdownOpen) e.currentTarget.style.borderColor = isDarkMode ? '#34d399' : '#10b981';
                   }}
                   onMouseLeave={(e) => {
-                    if (!personTypeDropdownOpen) e.currentTarget.style.borderColor = '#d1d5db';
+                    if (!personTypeDropdownOpen) e.currentTarget.style.borderColor = isDarkMode ? 'rgba(16, 185, 129, 0.3)' : '#d1d5db';
                   }}
                 >
-                  <span style={{ color: '#374151' }}>{identifyPersonType}</span>
+                  <span style={{ color: isDarkMode ? '#c0f0f0' : '#374151' }}>{identifyPersonType}</span>
                   <FiChevronDown 
                     size={16} 
                     className={`transition-transform ${personTypeDropdownOpen ? 'rotate-180' : ''}`}
-                    style={{ color: '#6b7280' }}
+                    style={{ color: isDarkMode ? '#34d399' : '#6b7280' }}
                   />
                 </button>
                 
                 {personTypeDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                  <div 
+                    className="absolute top-full left-0 mt-1 w-full rounded-xl shadow-lg py-1 z-50"
+                    style={{
+                      backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.98)' : 'white',
+                      border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid #e5e7eb'
+                    }}
+                  >
                     {['Student', 'Faculty'].map((type) => (
                       <button
                         key={type}
@@ -807,11 +1017,27 @@ const UnknownFaces = () => {
                           setSearchQuery('');
                           setPersonTypeDropdownOpen(false);
                         }}
-                        className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${
-                          identifyPersonType === type 
-                            ? 'bg-green-50 text-green-700'
-                            : 'text-gray-700 hover:bg-green-50 hover:text-green-700'
-                        }`}
+                        className="w-full text-left px-4 py-2.5 text-sm font-medium transition-colors"
+                        style={{
+                          backgroundColor: identifyPersonType === type 
+                            ? (isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#dcfce7')
+                            : 'transparent',
+                          color: identifyPersonType === type 
+                            ? (isDarkMode ? '#34d399' : '#15803d')
+                            : (isDarkMode ? '#c0f0f0' : '#374151')
+                        }}
+                        onMouseEnter={(e) => {
+                          if (identifyPersonType !== type) {
+                            e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(16, 185, 129, 0.1)' : '#dcfce7';
+                            e.currentTarget.style.color = isDarkMode ? '#34d399' : '#15803d';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (identifyPersonType !== type) {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = isDarkMode ? '#c0f0f0' : '#374151';
+                          }
+                        }}
                       >
                         {type}
                       </button>
@@ -823,7 +1049,7 @@ const UnknownFaces = () => {
 
             {/* Person Selection Dropdown */}
             <div className="mb-6">
-              <label className="block text-sm font-semibold mb-2" style={{ color: '#374151' }}>
+              <label className="block text-sm font-semibold mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#374151' }}>
                 Select {identifyPersonType}
               </label>
               <div className="relative" ref={personDropdownRef}>
@@ -831,36 +1057,49 @@ const UnknownFaces = () => {
                   onClick={() => setPersonDropdownOpen(!personDropdownOpen)}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium text-sm border transition-all cursor-pointer"
                   style={{
-                    borderColor: personDropdownOpen ? '#10b981' : '#d1d5db',
-                    backgroundColor: '#fff'
+                    borderColor: personDropdownOpen 
+                      ? (isDarkMode ? '#34d399' : '#10b981')
+                      : (isDarkMode ? 'rgba(16, 185, 129, 0.3)' : '#d1d5db'),
+                    backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.8)' : '#fff'
                   }}
                   onMouseEnter={(e) => {
-                    if (!personDropdownOpen) e.currentTarget.style.borderColor = '#10b981';
+                    if (!personDropdownOpen) e.currentTarget.style.borderColor = isDarkMode ? '#34d399' : '#10b981';
                   }}
                   onMouseLeave={(e) => {
-                    if (!personDropdownOpen) e.currentTarget.style.borderColor = '#d1d5db';
+                    if (!personDropdownOpen) e.currentTarget.style.borderColor = isDarkMode ? 'rgba(16, 185, 129, 0.3)' : '#d1d5db';
                   }}
                 >
-                  <span style={{ color: selectedPersonId ? '#374151' : '#9ca3af' }}>
+                  <span style={{ color: selectedPersonId ? (isDarkMode ? '#c0f0f0' : '#374151') : '#9ca3af' }}>
                     {getSelectedPersonName()}
                   </span>
                   <FiChevronDown 
                     size={16} 
                     className={`transition-transform ${personDropdownOpen ? 'rotate-180' : ''}`}
-                    style={{ color: '#6b7280' }}
+                    style={{ color: isDarkMode ? '#34d399' : '#6b7280' }}
                   />
                 </button>
                 
                 {personDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50 max-h-60 overflow-hidden">
+                  <div 
+                    className="absolute top-full left-0 mt-1 w-full rounded-xl shadow-lg py-1 z-50 max-h-60 overflow-hidden"
+                    style={{
+                      backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.98)' : 'white',
+                      border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid #e5e7eb'
+                    }}
+                  >
                     {/* Search Input */}
-                    <div className="px-3 py-2 border-b border-gray-100">
+                    <div className="px-3 py-2" style={{ borderBottom: isDarkMode ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid #f3f4f6' }}>
                       <input
                         type="text"
                         placeholder={`Search ${identifyPersonType.toLowerCase()}...`}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-green-500"
+                        className="w-full px-3 py-2 text-sm rounded-lg focus:outline-none"
+                        style={{
+                          backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
+                          border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid #e5e7eb',
+                          color: isDarkMode ? '#c0f0f0' : '#374151'
+                        }}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </div>
@@ -868,7 +1107,7 @@ const UnknownFaces = () => {
                     {/* Person List */}
                     <div className="max-h-40 overflow-y-auto">
                       {getFilteredPersons().length === 0 ? (
-                        <p className="px-4 py-3 text-sm text-gray-500 text-center">
+                        <p className="px-4 py-3 text-sm text-center" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#9ca3af' }}>
                           No {identifyPersonType.toLowerCase()} found
                         </p>
                       ) : (
@@ -884,14 +1123,30 @@ const UnknownFaces = () => {
                                 setPersonDropdownOpen(false);
                                 setSearchQuery('');
                               }}
-                              className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${
-                                selectedPersonId === personId.toString()
-                                  ? 'bg-green-50 text-green-700'
-                                  : 'text-gray-700 hover:bg-green-50 hover:text-green-700'
-                              }`}
+                              className="w-full text-left px-4 py-2.5 text-sm font-medium transition-colors"
+                              style={{
+                                backgroundColor: selectedPersonId === personId.toString()
+                                  ? (isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#dcfce7')
+                                  : 'transparent',
+                                color: selectedPersonId === personId.toString()
+                                  ? (isDarkMode ? '#34d399' : '#15803d')
+                                  : (isDarkMode ? '#c0f0f0' : '#374151')
+                              }}
+                              onMouseEnter={(e) => {
+                                if (selectedPersonId !== personId.toString()) {
+                                  e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(16, 185, 129, 0.1)' : '#dcfce7';
+                                  e.currentTarget.style.color = isDarkMode ? '#34d399' : '#15803d';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (selectedPersonId !== personId.toString()) {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                  e.currentTarget.style.color = isDarkMode ? '#c0f0f0' : '#374151';
+                                }
+                              }}
                             >
                               <span className="font-semibold">{person.Name}</span>
-                              <span className="text-gray-400 ml-2">ID: {personId}</span>
+                              <span style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#9ca3af', marginLeft: '8px' }}>ID: {personId}</span>
                             </button>
                           );
                         })
@@ -914,15 +1169,15 @@ const UnknownFaces = () => {
                 disabled={identifying}
                 className="flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-200 cursor-pointer"
                 style={{
-                  background: 'rgba(107, 114, 128, 0.1)',
-                  border: '1px solid rgba(107, 114, 128, 0.3)',
-                  color: '#4b5563'
+                  background: isDarkMode ? 'rgba(107, 114, 128, 0.2)' : 'rgba(107, 114, 128, 0.1)',
+                  border: isDarkMode ? '1px solid rgba(107, 114, 128, 0.4)' : '1px solid rgba(107, 114, 128, 0.3)',
+                  color: isDarkMode ? '#c0f0f0' : '#4b5563'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(107, 114, 128, 0.2)';
+                  e.currentTarget.style.background = isDarkMode ? 'rgba(107, 114, 128, 0.3)' : 'rgba(107, 114, 128, 0.2)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(107, 114, 128, 0.1)';
+                  e.currentTarget.style.background = isDarkMode ? 'rgba(107, 114, 128, 0.2)' : 'rgba(107, 114, 128, 0.1)';
                 }}
               >
                 Cancel
@@ -932,25 +1187,30 @@ const UnknownFaces = () => {
                 disabled={identifying || !selectedPersonId}
                 className="flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
                 style={{
-                  background: (!selectedPersonId || identifying) ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.1)',
-                  border: '1px solid rgba(16, 185, 129, 0.4)',
-                  color: '#059669',
-                  opacity: (!selectedPersonId || identifying) ? 0.6 : 1
+                  background: (!selectedPersonId || identifying) 
+                    ? (isDarkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.3)')
+                    : (isDarkMode ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.1)'),
+                  border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.5)' : '1px solid rgba(16, 185, 129, 0.4)',
+                  color: isDarkMode ? '#34d399' : '#059669',
+                  opacity: (!selectedPersonId || identifying) ? 0.6 : 1,
+                  boxShadow: isDarkMode && selectedPersonId && !identifying ? '0 0 15px rgba(16, 185, 129, 0.2)' : 'none'
                 }}
                 onMouseEnter={(e) => {
                   if (selectedPersonId && !identifying) {
-                    e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)';
+                    e.currentTarget.style.background = isDarkMode ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.2)';
+                    if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.3)';
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (selectedPersonId && !identifying) {
-                    e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
+                    e.currentTarget.style.background = isDarkMode ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.1)';
+                    if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.2)';
                   }
                 }}
               >
                 {identifying ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: isDarkMode ? '#34d399' : '#10b981', borderTopColor: 'transparent' }}></div>
                     Identifying...
                   </>
                 ) : (

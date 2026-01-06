@@ -3,6 +3,7 @@ import { FiX, FiUpload, FiTrash2, FiChevronDown } from 'react-icons/fi';
 import { teacherAPI } from '../api/api';
 
 const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
+    const isDarkMode = document.documentElement.classList.contains('dark');
     const [formData, setFormData] = useState({
         Name: '',
         Email: '',
@@ -156,14 +157,39 @@ const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
     const uploadedCount = Object.values(facePictures).filter(Boolean).length;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-teacher-modal-scrollbar">
+        <div 
+            className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            style={{
+                background: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
+                backdropFilter: 'blur(8px)'
+            }}
+        >
+            <div 
+                className="rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-teacher-modal-scrollbar"
+                style={{
+                    background: isDarkMode 
+                        ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95))'
+                        : 'white',
+                    border: isDarkMode ? '1px solid rgba(52, 211, 153, 0.3)' : 'none',
+                    boxShadow: isDarkMode 
+                        ? '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(52, 211, 153, 0.1)'
+                        : '0 20px 60px rgba(0, 0, 0, 0.3)'
+                }}
+            >
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h2 className="text-2xl font-bold" style={{ color: '#247e5bff' }}>Edit Faculty</h2>
+                <div 
+                    className="flex items-center justify-between p-6"
+                    style={{ 
+                        borderBottom: isDarkMode ? '1px solid rgba(52, 211, 153, 0.2)' : '1px solid #e5e7eb'
+                    }}
+                >
+                    <h2 className="text-2xl font-bold" style={{ color: isDarkMode ? '#34d399' : '#247e5bff' }}>Edit Faculty</h2>
                     <button
                         onClick={onClose}
-                        className="text-gray-500 hover:text-gray-700 transition"
+                        className="transition"
+                        style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = isDarkMode ? '#c0f0f0' : '#374151'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280'}
                     >
                         <FiX size={24} />
                     </button>
@@ -173,7 +199,7 @@ const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     {/* Name */}
                     <div>
-                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#1e293b' }}>
                             Name <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -184,20 +210,26 @@ const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
                             required
                             className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
                             style={{
-                                background: 'rgba(255, 255, 255, 0.8)',
-                                border: '2px solid rgba(148, 163, 184, 0.3)',
-                                color: '#0F172A',
-                                transition: 'border-color 0.15s ease'
+                                background: isDarkMode ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                                border: isDarkMode ? '2px solid rgba(52, 211, 153, 0.3)' : '2px solid rgba(148, 163, 184, 0.3)',
+                                color: isDarkMode ? '#c0f0f0' : '#0F172A',
+                                transition: 'border-color 0.15s ease, box-shadow 0.15s ease'
                             }}
                             placeholder="Enter faculty name"
-                            onFocus={(e) => e.target.style.borderColor = '#247e5bff'}
-                            onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
+                            onFocus={(e) => {
+                                e.target.style.borderColor = isDarkMode ? '#34d399' : '#247e5bff';
+                                if (isDarkMode) e.target.style.boxShadow = '0 0 15px rgba(52, 211, 153, 0.3)';
+                            }}
+                            onBlur={(e) => {
+                                e.target.style.borderColor = isDarkMode ? 'rgba(52, 211, 153, 0.3)' : 'rgba(148, 163, 184, 0.3)';
+                                e.target.style.boxShadow = 'none';
+                            }}
                         />
                     </div>
 
                     {/* Email */}
                     <div>
-                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#1e293b' }}>
                             Email <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -208,20 +240,26 @@ const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
                             required
                             className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
                             style={{
-                                background: 'rgba(255, 255, 255, 0.8)',
-                                border: '2px solid rgba(148, 163, 184, 0.3)',
-                                color: '#0F172A',
-                                transition: 'border-color 0.15s ease'
+                                background: isDarkMode ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                                border: isDarkMode ? '2px solid rgba(52, 211, 153, 0.3)' : '2px solid rgba(148, 163, 184, 0.3)',
+                                color: isDarkMode ? '#c0f0f0' : '#0F172A',
+                                transition: 'border-color 0.15s ease, box-shadow 0.15s ease'
                             }}
                             placeholder="faculty@example.com"
-                            onFocus={(e) => e.target.style.borderColor = '#247e5bff'}
-                            onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
+                            onFocus={(e) => {
+                                e.target.style.borderColor = isDarkMode ? '#34d399' : '#247e5bff';
+                                if (isDarkMode) e.target.style.boxShadow = '0 0 15px rgba(52, 211, 153, 0.3)';
+                            }}
+                            onBlur={(e) => {
+                                e.target.style.borderColor = isDarkMode ? 'rgba(52, 211, 153, 0.3)' : 'rgba(148, 163, 184, 0.3)';
+                                e.target.style.boxShadow = 'none';
+                            }}
                         />
                     </div>
 
                     {/* Gender - Custom Dropdown */}
                     <div>
-                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#1e293b' }}>
                             Gender
                         </label>
                         <div className="relative" ref={genderDropdownRef}>
@@ -230,17 +268,24 @@ const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
                                 onClick={() => setGenderDropdownOpen(!genderDropdownOpen)}
                                 className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none flex items-center justify-between"
                                 style={{
-                                    background: 'rgba(255, 255, 255, 0.8)',
-                                    border: '2px solid rgba(148, 163, 184, 0.3)',
-                                    color: formData.Gender ? '#0F172A' : '#9CA3AF'
+                                    background: isDarkMode ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                                    border: isDarkMode ? '2px solid rgba(52, 211, 153, 0.3)' : '2px solid rgba(148, 163, 184, 0.3)',
+                                    color: formData.Gender ? (isDarkMode ? '#c0f0f0' : '#0F172A') : '#9CA3AF'
                                 }}
                             >
                                 <span>{formData.Gender || 'Select gender'}</span>
-                                <FiChevronDown className={`transition-transform ${genderDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#247e5b' }} />
+                                <FiChevronDown className={`transition-transform ${genderDropdownOpen ? 'rotate-180' : ''}`} style={{ color: isDarkMode ? '#34d399' : '#247e5b' }} />
                             </button>
                             
                             {genderDropdownOpen && (
-                                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                                <div 
+                                    className="absolute top-full left-0 mt-1 w-full rounded-xl shadow-lg py-1 z-50"
+                                    style={{
+                                        background: isDarkMode ? 'rgba(30, 41, 59, 0.98)' : 'white',
+                                        border: isDarkMode ? '1px solid rgba(52, 211, 153, 0.3)' : '1px solid #e5e7eb',
+                                        boxShadow: isDarkMode ? '0 10px 40px rgba(0, 0, 0, 0.5)' : '0 10px 40px rgba(0, 0, 0, 0.15)'
+                                    }}
+                                >
                                     {['Male', 'Female', 'Other'].map((gender) => (
                                         <button
                                             key={gender}
@@ -249,7 +294,27 @@ const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
                                                 setFormData({ ...formData, Gender: gender });
                                                 setGenderDropdownOpen(false);
                                             }}
-                                            className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-green-100 hover:text-green-700 ${formData.Gender === gender ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
+                                            className="w-full text-left px-4 py-2 text-sm font-medium transition-colors"
+                                            style={{
+                                                backgroundColor: formData.Gender === gender 
+                                                    ? (isDarkMode ? 'rgba(52, 211, 153, 0.2)' : '#dcfce7')
+                                                    : 'transparent',
+                                                color: formData.Gender === gender 
+                                                    ? (isDarkMode ? '#34d399' : '#15803d')
+                                                    : (isDarkMode ? '#c0f0f0' : '#374151')
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (formData.Gender !== gender) {
+                                                    e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(52, 211, 153, 0.1)' : '#dcfce7';
+                                                    e.currentTarget.style.color = isDarkMode ? '#34d399' : '#15803d';
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (formData.Gender !== gender) {
+                                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                                    e.currentTarget.style.color = isDarkMode ? '#c0f0f0' : '#374151';
+                                                }
+                                            }}
                                         >
                                             {gender}
                                         </button>
@@ -261,7 +326,7 @@ const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
 
                     {/* Faculty Type - Custom Dropdown */}
                     <div>
-                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#1e293b' }}>
                             Faculty Type
                         </label>
                         <div className="relative" ref={facultyDropdownRef}>
@@ -270,17 +335,24 @@ const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
                                 onClick={() => setFacultyDropdownOpen(!facultyDropdownOpen)}
                                 className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none flex items-center justify-between"
                                 style={{
-                                    background: 'rgba(255, 255, 255, 0.8)',
-                                    border: '2px solid rgba(148, 163, 184, 0.3)',
-                                    color: formData.Faculty_Type ? '#0F172A' : '#9CA3AF'
+                                    background: isDarkMode ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                                    border: isDarkMode ? '2px solid rgba(52, 211, 153, 0.3)' : '2px solid rgba(148, 163, 184, 0.3)',
+                                    color: formData.Faculty_Type ? (isDarkMode ? '#c0f0f0' : '#0F172A') : '#9CA3AF'
                                 }}
                             >
                                 <span>{formData.Faculty_Type || 'Select faculty type'}</span>
-                                <FiChevronDown className={`transition-transform ${facultyDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#247e5b' }} />
+                                <FiChevronDown className={`transition-transform ${facultyDropdownOpen ? 'rotate-180' : ''}`} style={{ color: isDarkMode ? '#34d399' : '#247e5b' }} />
                             </button>
                             
                             {facultyDropdownOpen && (
-                                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                                <div 
+                                    className="absolute top-full left-0 mt-1 w-full rounded-xl shadow-lg py-1 z-50"
+                                    style={{
+                                        background: isDarkMode ? 'rgba(30, 41, 59, 0.98)' : 'white',
+                                        border: isDarkMode ? '1px solid rgba(52, 211, 153, 0.3)' : '1px solid #e5e7eb',
+                                        boxShadow: isDarkMode ? '0 10px 40px rgba(0, 0, 0, 0.5)' : '0 10px 40px rgba(0, 0, 0, 0.15)'
+                                    }}
+                                >
                                     {['Permanent', 'Visiting'].map((type) => (
                                         <button
                                             key={type}
@@ -289,7 +361,27 @@ const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
                                                 setFormData({ ...formData, Faculty_Type: type });
                                                 setFacultyDropdownOpen(false);
                                             }}
-                                            className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-green-100 hover:text-green-700 ${formData.Faculty_Type === type ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
+                                            className="w-full text-left px-4 py-2 text-sm font-medium transition-colors"
+                                            style={{
+                                                backgroundColor: formData.Faculty_Type === type 
+                                                    ? (isDarkMode ? 'rgba(52, 211, 153, 0.2)' : '#dcfce7')
+                                                    : 'transparent',
+                                                color: formData.Faculty_Type === type 
+                                                    ? (isDarkMode ? '#34d399' : '#15803d')
+                                                    : (isDarkMode ? '#c0f0f0' : '#374151')
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (formData.Faculty_Type !== type) {
+                                                    e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(52, 211, 153, 0.1)' : '#dcfce7';
+                                                    e.currentTarget.style.color = isDarkMode ? '#34d399' : '#15803d';
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (formData.Faculty_Type !== type) {
+                                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                                    e.currentTarget.style.color = isDarkMode ? '#c0f0f0' : '#374151';
+                                                }
+                                            }}
                                         >
                                             {type}
                                         </button>
@@ -302,7 +394,7 @@ const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
                     {/* Department (conditional) */}
                     {formData.Faculty_Type === 'Permanent' && (
                         <div>
-                            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
+                            <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#1e293b' }}>
                                 Department <span className="text-red-500">*</span>
                             </label>
                             <input
@@ -313,24 +405,30 @@ const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
                                 required
                                 className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
                                 style={{
-                                    background: 'rgba(255, 255, 255, 0.8)',
-                                    border: '2px solid rgba(148, 163, 184, 0.3)',
-                                    color: '#0F172A',
-                                    transition: 'border-color 0.15s ease'
+                                    background: isDarkMode ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                                    border: isDarkMode ? '2px solid rgba(52, 211, 153, 0.3)' : '2px solid rgba(148, 163, 184, 0.3)',
+                                    color: isDarkMode ? '#c0f0f0' : '#0F172A',
+                                    transition: 'border-color 0.15s ease, box-shadow 0.15s ease'
                                 }}
                                 placeholder="Enter department"
-                                onFocus={(e) => e.target.style.borderColor = '#247e5bff'}
-                                onBlur={(e) => e.target.style.borderColor = 'rgba(148, 163, 184, 0.3)'}
+                                onFocus={(e) => {
+                                    e.target.style.borderColor = isDarkMode ? '#34d399' : '#247e5bff';
+                                    if (isDarkMode) e.target.style.boxShadow = '0 0 15px rgba(52, 211, 153, 0.3)';
+                                }}
+                                onBlur={(e) => {
+                                    e.target.style.borderColor = isDarkMode ? 'rgba(52, 211, 153, 0.3)' : 'rgba(148, 163, 184, 0.3)';
+                                    e.target.style.boxShadow = 'none';
+                                }}
                             />
                         </div>
                     )}
 
                     {/* Face Pictures Upload */}
                     <div>
-                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#1e293b' }}>
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#1e293b' }}>
                             Face Pictures (1-5 images)
                         </label>
-                        <p className="text-xs text-gray-500 mb-3">
+                        <p className="text-xs mb-3" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#6b7280' }}>
                             {uploadedCount}/5 images uploaded. Leave unchanged to keep existing pictures.
                         </p>
 
@@ -355,7 +453,10 @@ const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
                                                 <img
                                                     src={picture}
                                                     alt={`Picture ${num}`}
-                                                    className="w-full h-32 object-cover rounded-lg border-2 border-gray-300"
+                                                    className="w-full h-32 object-cover rounded-lg"
+                                                    style={{ 
+                                                        border: isDarkMode ? '2px solid rgba(52, 211, 153, 0.3)' : '2px solid #d1d5db'
+                                                    }}
                                                 />
                                                 <button
                                                     type="button"
@@ -371,10 +472,16 @@ const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
                                         ) : (
                                             <label
                                                 htmlFor={`editTeacherImageUpload${num}`}
-                                                className="cursor-pointer flex flex-col items-center justify-center h-32 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 transition"
+                                                className="cursor-pointer flex flex-col items-center justify-center h-32 border-2 border-dashed rounded-lg transition"
+                                                style={{
+                                                    borderColor: isDarkMode ? 'rgba(52, 211, 153, 0.3)' : '#d1d5db',
+                                                    backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.5)' : 'transparent'
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.borderColor = isDarkMode ? '#34d399' : '#22c55e'}
+                                                onMouseLeave={(e) => e.currentTarget.style.borderColor = isDarkMode ? 'rgba(52, 211, 153, 0.3)' : '#d1d5db'}
                                             >
-                                                <FiUpload size={24} className="text-gray-400 mb-1" />
-                                                <span className="text-xs text-gray-600">
+                                                <FiUpload size={24} style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#9ca3af', marginBottom: '4px' }} />
+                                                <span className="text-xs" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
                                                     Picture {num}
                                                 </span>
                                             </label>
@@ -387,9 +494,15 @@ const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
 
                     {/* Error Message */}
                     {error && (
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                            <p className="text-red-800 font-semibold mb-1">Validation failed</p>
-                            <p className="text-red-600 text-sm">{error}</p>
+                        <div 
+                            className="rounded-lg p-4"
+                            style={{
+                                backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2',
+                                border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid #fecaca'
+                            }}
+                        >
+                            <p className="font-semibold mb-1" style={{ color: isDarkMode ? '#f87171' : '#991b1b' }}>Validation failed</p>
+                            <p className="text-sm" style={{ color: isDarkMode ? '#fca5a5' : '#dc2626' }}>{error}</p>
                         </div>
                     )}
 
@@ -400,12 +513,18 @@ const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
                             onClick={onClose}
                             className="px-6 py-2 rounded-xl text-sm font-semibold transition-all"
                             style={{
-                                border: '2px solid #e5e7eb',
-                                color: '#6b7280',
-                                background: '#ffffff'
+                                border: isDarkMode ? '2px solid rgba(52, 211, 153, 0.3)' : '2px solid #e5e7eb',
+                                color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280',
+                                background: isDarkMode ? 'transparent' : '#ffffff'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(52, 211, 153, 0.1)' : '#f9fafb';
+                                e.currentTarget.style.borderColor = isDarkMode ? 'rgba(52, 211, 153, 0.5)' : '#e5e7eb';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = isDarkMode ? 'transparent' : '#ffffff';
+                                e.currentTarget.style.borderColor = isDarkMode ? 'rgba(52, 211, 153, 0.3)' : '#e5e7eb';
+                            }}
                         >
                             Cancel
                         </button>
@@ -415,13 +534,20 @@ const EditTeacherModal = ({ isOpen, onClose, onSuccess, teacher }) => {
                             className={`px-6 py-2 text-white rounded-xl text-sm font-semibold transition-all ${
                                 loading ? 'opacity-50 cursor-not-allowed' : ''
                             }`}
-                            style={{ backgroundColor: '#247e5bff' }}
+                            style={{ 
+                                backgroundColor: isDarkMode ? 'rgba(52, 211, 153, 0.8)' : '#247e5bff',
+                                boxShadow: isDarkMode ? '0 0 20px rgba(52, 211, 153, 0.3)' : 'none'
+                            }}
                             onMouseEnter={(e) => {
                                 if (!loading) {
-                                    e.currentTarget.style.backgroundColor = '#1f6e4f';
+                                    e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(52, 211, 153, 1)' : '#1f6e4f';
+                                    if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 30px rgba(52, 211, 153, 0.5)';
                                 }
                             }}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#247e5bff'}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(52, 211, 153, 0.8)' : '#247e5bff';
+                                if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 20px rgba(52, 211, 153, 0.3)';
+                            }}
                         >
                             {loading ? 'Updating...' : 'Update Faculty'}
                         </button>

@@ -16,6 +16,7 @@ import { unknownFacesAPI } from '../api/unknownFaces';
 import * as faceRecognition from '../utils/faceRecognition';
 
 const Zone1 = () => {
+  const isDarkMode = document.documentElement.classList.contains('dark');
   // State
   const [faceDatabase, setFaceDatabase] = useState({ students: [], teachers: [] });
   const [currentPersons, setCurrentPersons] = useState([]);
@@ -559,37 +560,54 @@ const Zone1 = () => {
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700"
+        className="relative rounded-xl shadow-sm p-6"
+        style={{
+          backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
+          border: isDarkMode ? '1px solid rgba(0, 255, 255, 0.2)' : '1px solid #e5e7eb'
+        }}
       >
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-display font-black mb-2" style={{ color: '#003d82' }}>
+            <h1 className="text-4xl font-display font-black mb-2" style={{ color: isDarkMode ? '#c0f0f0' : '#003d82' }}>
               Zone 1 Live Tracking
             </h1>
           </div>
 
           <div className="flex items-center space-x-3">            {/* Database Stats Display */}
-            <div className="rounded-xl px-5 py-2.5 shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            <div 
+              className="rounded-xl px-5 py-2.5 shadow-sm"
+              style={{
+                backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.9)' : 'white',
+                border: isDarkMode ? '1px solid rgba(0, 255, 255, 0.2)' : '1px solid #e5e7eb'
+              }}
+            >
               <div className="flex items-center space-x-4">
                 <div className="text-center">
-                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Students</p>
-                  <p className="text-xl font-bold" style={{ color: '#003d82' }}>{faceDatabase.students?.length || 0}</p>
+                  <p className="text-xs font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>Students</p>
+                  <p className="text-xl font-bold" style={{ color: isDarkMode ? '#00ffff' : '#003d82' }}>{faceDatabase.students?.length || 0}</p>
                 </div>
-                <div className="w-px h-8 bg-gray-300 dark:bg-gray-600"></div>
+                <div className="w-px h-8" style={{ backgroundColor: isDarkMode ? 'rgba(0, 255, 255, 0.2)' : '#d1d5db' }}></div>
                 <div className="text-center">
-                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Teachers</p>
-                  <p className="text-xl font-bold" style={{ color: '#003d82' }}>{faceDatabase.teachers?.length || 0}</p>
+                  <p className="text-xs font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>Teachers</p>
+                  <p className="text-xl font-bold" style={{ color: isDarkMode ? '#00ffff' : '#003d82' }}>{faceDatabase.teachers?.length || 0}</p>
                 </div>
-                <div className="w-px h-8 bg-gray-300 dark:bg-gray-600"></div>
+                <div className="w-px h-8" style={{ backgroundColor: isDarkMode ? 'rgba(0, 255, 255, 0.2)' : '#d1d5db' }}></div>
                 <div className="text-center">
-                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Total</p>
-                  <p className="text-xl font-bold" style={{ color: '#003d82' }}>{(faceDatabase.students?.length || 0) + (faceDatabase.teachers?.length || 0)}</p>
+                  <p className="text-xs font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>Total</p>
+                  <p className="text-xl font-bold" style={{ color: isDarkMode ? '#00ffff' : '#003d82' }}>{(faceDatabase.students?.length || 0) + (faceDatabase.teachers?.length || 0)}</p>
                 </div>
               </div>
-              <p className="text-[10px] text-center mt-1 text-gray-500 dark:text-gray-400">📸 Images Loaded for Matching</p>
+              <p className="text-[10px] text-center mt-1" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#9ca3af' }}>📸 Images Loaded for Matching</p>
             </div>
           
-            <div className="flex items-center space-x-2 px-4 py-2 rounded-xl border" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)', color: '#10b981' }}>
+            <div 
+              className="flex items-center space-x-2 px-4 py-2 rounded-xl border"
+              style={{ 
+                backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)', 
+                borderColor: 'rgba(16, 185, 129, 0.3)', 
+                color: isDarkMode ? '#34d399' : '#10b981' 
+              }}
+            >
               <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
               <span className="font-semibold">Auto Detection Active</span>
             </div>
@@ -600,9 +618,24 @@ const Zone1 = () => {
               onClick={handleReEnroll}
               disabled={isReEnrolling}
               className={`flex items-center space-x-2 px-4 py-2 rounded-xl font-semibold transition ${isReEnrolling ? 'opacity-50 cursor-not-allowed' : ''}`}
-              style={{ backgroundColor: '#003d82', color: '#fff' }}
-              onMouseEnter={(e) => { if (!isReEnrolling) e.currentTarget.style.backgroundColor = '#305796'; }}
-              onMouseLeave={(e) => { if (!isReEnrolling) e.currentTarget.style.backgroundColor = '#003d82'; }}
+              style={{ 
+                backgroundColor: isDarkMode ? 'rgba(0, 255, 255, 0.15)' : '#003d82', 
+                color: isDarkMode ? '#00ffff' : '#fff',
+                border: isDarkMode ? '1px solid rgba(0, 255, 255, 0.4)' : 'none',
+                boxShadow: isDarkMode ? '0 0 15px rgba(0, 255, 255, 0.2)' : 'none'
+              }}
+              onMouseEnter={(e) => { 
+                if (!isReEnrolling) {
+                  e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(0, 255, 255, 0.25)' : '#305796';
+                  if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 20px rgba(0, 255, 255, 0.3)';
+                }
+              }}
+              onMouseLeave={(e) => { 
+                if (!isReEnrolling) {
+                  e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(0, 255, 255, 0.15)' : '#003d82';
+                  if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 15px rgba(0, 255, 255, 0.2)';
+                }
+              }}
             >
               <FiRefreshCw size={16} className={isReEnrolling ? 'animate-spin' : ''} />
               <span>{isReEnrolling ? 'Re-enrolling...' : 'Restart & Re-enroll'}</span>
@@ -616,11 +649,15 @@ const Zone1 = () => {
         <motion.div 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-xl p-4 flex items-start justify-between border" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+          className="rounded-xl p-4 flex items-start justify-between"
+          style={{ 
+            backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.1)', 
+            border: '1px solid rgba(239, 68, 68, 0.3)' 
+          }}
         >
           <div className="flex items-start flex-1">
-            <FiAlertCircle className="text-red-500 dark:text-red-400 mt-0.5 mr-3 flex-shrink-0" size={20} />
-            <p className="text-red-700 dark:text-red-300">{error}</p>
+            <FiAlertCircle className="mt-0.5 mr-3 flex-shrink-0" style={{ color: isDarkMode ? '#f87171' : '#ef4444' }} size={20} />
+            <p style={{ color: isDarkMode ? '#fca5a5' : '#dc2626' }}>{error}</p>
           </div>
           <div className="flex items-center gap-2">
             {error.includes('Model loading failed') && (
@@ -640,7 +677,7 @@ const Zone1 = () => {
               whileTap={{ scale: 0.9 }}
               onClick={() => setError(null)}
             >
-              <FiX className="text-red-500 dark:text-red-400" />
+              <FiX style={{ color: isDarkMode ? '#f87171' : '#ef4444' }} />
             </motion.button>
           </div>
         </motion.div>
@@ -650,18 +687,22 @@ const Zone1 = () => {
         <motion.div 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-xl p-4 flex items-start justify-between border" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}
+          className="rounded-xl p-4 flex items-start justify-between"
+          style={{ 
+            backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.1)', 
+            border: '1px solid rgba(16, 185, 129, 0.3)' 
+          }}
         >
           <div className="flex items-start">
-            <FiCheckCircle className="text-green-500 dark:text-green-400 mt-0.5 mr-3 flex-shrink-0" size={20} />
-            <p className="text-green-700 dark:text-green-300">{success}</p>
+            <FiCheckCircle className="mt-0.5 mr-3 flex-shrink-0" style={{ color: isDarkMode ? '#34d399' : '#10b981' }} size={20} />
+            <p style={{ color: isDarkMode ? '#6ee7b7' : '#059669' }}>{success}</p>
           </div>
           <motion.button 
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => setSuccess(null)}
           >
-            <FiX className="text-green-500 dark:text-green-400" />
+            <FiX style={{ color: isDarkMode ? '#34d399' : '#10b981' }} />
           </motion.button>
         </motion.div>
       )}
@@ -670,26 +711,37 @@ const Zone1 = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <motion.div 
           whileHover={{ scale: 1.02 }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700"
+          className="rounded-xl shadow-sm p-4"
+          style={{
+            backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
+            border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid #e5e7eb'
+          }}
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">Known in Zone</p>
-              <p className="text-3xl font-bold text-green-600">{stats.knownInZone}</p>
+              <p className="text-sm font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>Known in Zone</p>
+              <p className="text-3xl font-bold" style={{ color: isDarkMode ? '#34d399' : '#059669' }}>{stats.knownInZone}</p>
             </div>
-            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
-              <FiCheckCircle className="text-green-600 dark:text-green-400" size={24} />
+            <div 
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.1)' }}
+            >
+              <FiCheckCircle style={{ color: isDarkMode ? '#34d399' : '#059669' }} size={24} />
             </div>
           </div>
         </motion.div>
 
         <motion.div 
           whileHover={{ scale: 1.02 }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700"
+          className="rounded-xl shadow-sm p-4"
+          style={{
+            backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
+            border: isDarkMode ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid #e5e7eb'
+          }}
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">Unknown in Zone</p>
+              <p className="text-sm font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>Unknown in Zone</p>
               <p className="text-3xl font-bold" style={{ color: '#d97706' }}>{stats.unknownInZone}</p>
             </div>
             <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(217, 119, 6, 0.1)' }}>
@@ -700,26 +752,37 @@ const Zone1 = () => {
 
         <motion.div 
           whileHover={{ scale: 1.02 }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700"
+          className="rounded-xl shadow-sm p-4"
+          style={{
+            backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
+            border: isDarkMode ? '1px solid rgba(0, 255, 255, 0.3)' : '1px solid #e5e7eb'
+          }}
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">Total Recognized</p>
-              <p className="text-3xl font-bold" style={{ color: '#003d82' }}>{stats.knownInZone + stats.unknownInZone}</p>
+              <p className="text-sm font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>Total Recognized</p>
+              <p className="text-3xl font-bold" style={{ color: isDarkMode ? '#00ffff' : '#003d82' }}>{stats.knownInZone + stats.unknownInZone}</p>
             </div>
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(0, 61, 130, 0.1)' }}>
-              <FiCheckCircle style={{ color: '#003d82' }} size={24} />
+            <div 
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: isDarkMode ? 'rgba(0, 255, 255, 0.1)' : 'rgba(0, 61, 130, 0.1)' }}
+            >
+              <FiCheckCircle style={{ color: isDarkMode ? '#00ffff' : '#003d82' }} size={24} />
             </div>
           </div>
         </motion.div>
 
         <motion.div 
           whileHover={{ scale: 1.02 }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700"
+          className="rounded-xl shadow-sm p-4"
+          style={{
+            backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
+            border: isDarkMode ? '1px solid rgba(107, 155, 209, 0.3)' : '1px solid #e5e7eb'
+          }}
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">Total Unknown</p>
+              <p className="text-sm font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>Total Unknown</p>
               <p className="text-3xl font-bold" style={{ color: '#6b9bd1' }}>{stats.totalUnknown}</p>
             </div>
             <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(107, 155, 209, 0.1)' }}>
@@ -731,38 +794,6 @@ const Zone1 = () => {
 
       {/* Main Content - Camera Feeds */}
       <div className="space-y-6">
-        {/* Auto Detection Info Banner */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm"
-        >
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0">
-              <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
-                <FiCheckCircle className="text-green-600" size={20} />
-              </div>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-2">🎥 Automatic Face Recognition Active</h3>
-              <p className="text-gray-700 dark:text-gray-300 text-sm mb-2">
-                The system is continuously monitoring all cameras. When someone stands in front of a camera, 
-                their face will be automatically detected and recognized within 3 seconds.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
-                <div className="flex items-center space-x-2 text-sm">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-gray-600 dark:text-gray-400"><strong className="text-green-600 dark:text-green-400">Entry Camera:</strong> Adds to Active Presence</span>
-                </div>
-                <div className="flex items-center space-x-2 text-sm">
-                  <div className="w-2 h-2" style={{ backgroundColor: '#d97706' }} className="rounded-full"></div>
-                  <span className="text-gray-600 dark:text-gray-400"><strong style={{ color: '#d97706' }}>Exit Camera:</strong> Logs Attendance & Duration</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
         {/* Add Camera Button */}
         <div className="flex justify-end">
           <motion.button
@@ -770,9 +801,20 @@ const Zone1 = () => {
             whileTap={{ scale: 0.95 }}
             onClick={() => setShowAddCameraModal(true)}
             className="flex items-center space-x-2 px-4 py-2 rounded-xl font-semibold transition"
-            style={{ backgroundColor: '#003d82', color: '#fff' }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#305796'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#003d82'}
+            style={{ 
+              backgroundColor: isDarkMode ? 'rgba(0, 255, 255, 0.15)' : '#003d82', 
+              color: isDarkMode ? '#00ffff' : '#fff',
+              border: isDarkMode ? '1px solid rgba(0, 255, 255, 0.4)' : 'none',
+              boxShadow: isDarkMode ? '0 0 15px rgba(0, 255, 255, 0.2)' : 'none'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(0, 255, 255, 0.25)' : '#305796';
+              if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 20px rgba(0, 255, 255, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(0, 255, 255, 0.15)' : '#003d82';
+              if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 15px rgba(0, 255, 255, 0.2)';
+            }}
           >
             <FiCheckCircle size={16} />
             <span>Add Camera</span>
@@ -785,8 +827,6 @@ const Zone1 = () => {
             const detections = cameraDetections[camera.id] || [];
             const matches = cameraMatches[camera.id] || [];
             const cameraColorBg = camera.type === 'Entry' ? 'bg-green-500' : 'bg-orange-500';
-            const cameraColorBorder = camera.type === 'Entry' ? 'border-green-500/30' : 'border-orange-500/30';
-            const cameraColorShadow = camera.type === 'Entry' ? 'shadow-green-500/20' : 'shadow-orange-500/20';
             
             return (
               <motion.div 
@@ -796,12 +836,18 @@ const Zone1 = () => {
                 className="space-y-2"
               >
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center">
+                  <h3 className="text-lg font-semibold flex items-center" style={{ color: isDarkMode ? '#c0f0f0' : '#1f2937' }}>
                     <span className={`w-3 h-3 ${cameraColorBg} rounded-full mr-2 animate-pulse`}></span>
                     {camera.label}
                   </h3>
                   <div className="flex items-center space-x-3">
-                    <span className="text-sm px-3 py-1 rounded-xl font-medium" style={{ backgroundColor: 'rgba(0, 61, 130, 0.1)', color: '#003d82' }}>
+                    <span 
+                      className="text-sm px-3 py-1 rounded-xl font-medium"
+                      style={{ 
+                        backgroundColor: isDarkMode ? 'rgba(0, 255, 255, 0.1)' : 'rgba(0, 61, 130, 0.1)', 
+                        color: isDarkMode ? '#00ffff' : '#003d82' 
+                      }}
+                    >
                       {detections.length} face(s)
                     </span>
                     {cameras.filter(c => c.enabled).length > 1 && (
@@ -809,7 +855,7 @@ const Zone1 = () => {
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => removeCamera(camera.id)}
-                        className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                        style={{ color: isDarkMode ? '#f87171' : '#dc2626' }}
                         title="Remove camera"
                       >
                         <FiX size={20} />
@@ -835,7 +881,11 @@ const Zone1 = () => {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700"
+          className="rounded-xl shadow-sm"
+          style={{
+            backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
+            border: isDarkMode ? '1px solid rgba(0, 255, 255, 0.2)' : '1px solid #e5e7eb'
+          }}
         >
           <ZoneLogs 
             knownLogs={logs} 
@@ -850,15 +900,28 @@ const Zone1 = () => {
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          className="fixed inset-0 flex items-center justify-center z-50"
+          style={{
+            background: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(8px)'
+          }}
         >
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 border border-gray-200 dark:border-gray-700 shadow-xl"
+            className="rounded-xl p-6 max-w-md w-full mx-4 shadow-xl"
+            style={{
+              background: isDarkMode 
+                ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95))'
+                : 'white',
+              border: isDarkMode ? '1px solid rgba(0, 255, 255, 0.3)' : '1px solid #e5e7eb',
+              boxShadow: isDarkMode 
+                ? '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 255, 255, 0.1)'
+                : '0 20px 60px rgba(0, 0, 0, 0.3)'
+            }}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold" style={{ color: '#003d82' }}>
+              <h3 className="text-xl font-bold" style={{ color: isDarkMode ? '#c0f0f0' : '#003d82' }}>
                 Add New Camera
               </h3>
               <motion.button 
@@ -866,13 +929,13 @@ const Zone1 = () => {
                 whileTap={{ scale: 0.9 }}
                 onClick={() => setShowAddCameraModal(false)}
               >
-                <FiX className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" size={24} />
+                <FiX size={24} style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }} />
               </motion.button>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#374151' }}>
                   Camera Label
                 </label>
                 <input
@@ -880,28 +943,43 @@ const Zone1 = () => {
                   value={newCamera.label}
                   onChange={(e) => setNewCamera({ ...newCamera, label: e.target.value })}
                   placeholder="e.g., Entry Camera, Exit Camera"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-xl focus:outline-none text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400"
-                  style={{ focusRingColor: '#003d82' }}
+                  className="w-full px-3 py-2 rounded-xl focus:outline-none"
+                  style={{
+                    backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.8)' : 'white',
+                    border: isDarkMode ? '1px solid rgba(0, 255, 255, 0.3)' : '1px solid #d1d5db',
+                    color: isDarkMode ? '#c0f0f0' : '#1f2937'
+                  }}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#374151' }}>
                   Camera Type
                 </label>
                 <select
                   value={newCamera.type}
                   onChange={(e) => setNewCamera({ ...newCamera, type: e.target.value })}
-                  className="custom-zones-dropdown w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-xl focus:outline-none text-gray-800 dark:text-gray-200"
+                  className="w-full px-3 py-2 rounded-xl focus:outline-none"
+                  style={{
+                    backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.8)' : 'white',
+                    border: isDarkMode ? '1px solid rgba(0, 255, 255, 0.3)' : '1px solid #d1d5db',
+                    color: isDarkMode ? '#c0f0f0' : '#1f2937'
+                  }}
                 >
                   <option value="Entry">Entry (Adds to Active Presence)</option>
                   <option value="Exit">Exit (Logs to Attendance)</option>
                 </select>
               </div>
 
-              <div className="rounded-xl p-3 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                  <strong style={{ color: '#003d82' }}>Entry Camera:</strong> Detects people entering and adds them to active presence.<br />
+              <div 
+                className="rounded-xl p-3"
+                style={{
+                  backgroundColor: isDarkMode ? 'rgba(0, 255, 255, 0.05)' : '#f9fafb',
+                  border: isDarkMode ? '1px solid rgba(0, 255, 255, 0.15)' : '1px solid #e5e7eb'
+                }}
+              >
+                <p className="text-sm" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#374151' }}>
+                  <strong style={{ color: isDarkMode ? '#00ffff' : '#003d82' }}>Entry Camera:</strong> Detects people entering and adds them to active presence.<br />
                   <strong style={{ color: '#6b9bd1' }}>Exit Camera:</strong> Detects people leaving and logs their attendance.
                 </p>
               </div>
@@ -912,7 +990,12 @@ const Zone1 = () => {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setShowAddCameraModal(false)}
-                className="px-4 py-2 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 font-semibold transition"
+                className="px-4 py-2 rounded-xl font-semibold transition"
+                style={{
+                  background: isDarkMode ? 'rgba(107, 114, 128, 0.2)' : 'transparent',
+                  border: isDarkMode ? '1px solid rgba(107, 114, 128, 0.4)' : '2px solid #d1d5db',
+                  color: isDarkMode ? '#c0f0f0' : '#4b5563'
+                }}
               >
                 Cancel
               </motion.button>
@@ -921,9 +1004,12 @@ const Zone1 = () => {
                 whileTap={{ scale: 0.95 }}
                 onClick={addCamera}
                 className="px-4 py-2 rounded-xl font-semibold transition"
-                style={{ backgroundColor: '#003d82', color: '#fff' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#305796'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#003d82'}
+                style={{ 
+                  backgroundColor: isDarkMode ? 'rgba(0, 255, 255, 0.2)' : '#003d82', 
+                  color: isDarkMode ? '#00ffff' : '#fff',
+                  border: isDarkMode ? '1px solid rgba(0, 255, 255, 0.5)' : 'none',
+                  boxShadow: isDarkMode ? '0 0 15px rgba(0, 255, 255, 0.2)' : 'none'
+                }}
               >
                 Add Camera
               </motion.button>
@@ -933,33 +1019,44 @@ const Zone1 = () => {
       )}
 
       {/* Bottom: Live Detection Info */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
-        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Live Detection Status</h2>
+      <div 
+        className="rounded-xl shadow-sm p-6"
+        style={{
+          backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
+          border: isDarkMode ? '1px solid rgba(0, 255, 255, 0.2)' : '1px solid #e5e7eb'
+        }}
+      >
+        <h2 className="text-xl font-bold mb-4" style={{ color: isDarkMode ? '#c0f0f0' : '#1f2937' }}>Live Detection Status</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
+          <div 
+            className="p-4 rounded-xl"
+            style={{
+              backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.05)',
+              border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(16, 185, 129, 0.2)'
+            }}
+          >
             <div className="flex items-center space-x-3 mb-2">
               <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-              <h3 className="font-semibold text-green-800 dark:text-green-300">Known Persons Detected</h3>
+              <h3 className="font-semibold" style={{ color: isDarkMode ? '#34d399' : '#047857' }}>Known Persons Detected</h3>
             </div>
-            <p className="text-3xl font-bold text-green-600">{stats.knownInZone}</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">People recognized from database</p>
+            <p className="text-3xl font-bold" style={{ color: isDarkMode ? '#34d399' : '#059669' }}>{stats.knownInZone}</p>
+            <p className="text-sm mt-1" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#6b7280' }}>People recognized from database</p>
           </div>
           
-          <div className="p-4 rounded-xl border" style={{ backgroundColor: 'rgba(217, 119, 6, 0.1)', borderColor: 'rgba(217, 119, 6, 0.3)' }}>
+          <div 
+            className="p-4 rounded-xl"
+            style={{ 
+              backgroundColor: isDarkMode ? 'rgba(217, 119, 6, 0.1)' : 'rgba(217, 119, 6, 0.05)', 
+              border: isDarkMode ? '1px solid rgba(217, 119, 6, 0.3)' : '1px solid rgba(217, 119, 6, 0.2)' 
+            }}
+          >
             <div className="flex items-center space-x-3 mb-2">
               <div className="w-3 h-3 rounded-full animate-pulse" style={{ backgroundColor: '#d97706' }}></div>
               <h3 className="font-semibold" style={{ color: '#d97706' }}>Unknown Persons Detected</h3>
             </div>
             <p className="text-3xl font-bold" style={{ color: '#d97706' }}>{stats.unknownInZone}</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Faces not in database</p>
+            <p className="text-sm mt-1" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#6b7280' }}>Faces not in database</p>
           </div>
-        </div>
-        
-        <div className="mt-4 p-3 rounded-xl border" style={{ backgroundColor: 'rgba(0, 61, 130, 0.05)', borderColor: 'rgba(0, 61, 130, 0.2)' }}>
-          <p className="text-sm" style={{ color: '#003d82' }}>
-            <strong>Note:</strong> Counts update in real-time based on current camera detections.
-            Green boxes = Known persons | Orange boxes = Unknown persons
-          </p>
         </div>
       </div>
     </div>
