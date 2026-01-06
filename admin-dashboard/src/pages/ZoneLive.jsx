@@ -97,6 +97,44 @@ const ZoneLive = () => {
     }
   };
 
+  // Start all cameras for the zone
+  const startZoneCameras = async () => {
+    try {
+      const response = await fetch(`http://localhost:5001/zones/${zoneId}/start_all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await response.json();
+      if (data.success) {
+        console.log(`Started cameras for zone ${zoneId}:`, data);
+      }
+    } catch (err) {
+      console.error('Failed to start zone cameras:', err);
+    }
+  };
+
+  // Start a single camera
+  const startCamera = async (cameraId, cameraUrl, cameraType) => {
+    try {
+      const response = await fetch('http://localhost:5001/cameras/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          camera_id: cameraId,
+          camera_url: cameraUrl,
+          camera_type: cameraType,
+          zone_id: parseInt(zoneId)
+        })
+      });
+      const data = await response.json();
+      console.log(`Camera ${cameraId} start result:`, data);
+      return data.success;
+    } catch (err) {
+      console.error(`Failed to start camera ${cameraId}:`, err);
+      return false;
+    }
+  };
+
   useEffect(() => {
     fetchZoneData();
     checkServiceStatus();
@@ -108,6 +146,14 @@ const ZoneLive = () => {
     
     return () => clearInterval(statusInterval);
   }, [zoneId]);
+
+  // Auto-start cameras when service is online and cameras are loaded
+  useEffect(() => {
+    if (serviceOnline && cameras.length > 0) {
+      // Start all cameras for this zone
+      startZoneCameras();
+    }
+  }, [serviceOnline, cameras.length, zoneId]);
 
   // Refresh data
   const handleRefresh = async () => {
@@ -394,19 +440,27 @@ const ZoneLive = () => {
 
               {/* Live Video Stream */}
               <div className="relative bg-black aspect-video">
-                <img
-                  src={`http://localhost:5001/stream/${camera.Camara_Id}`}
-                  alt={`Camera ${camera.Camara_Id}`}
-                  className="w-full h-full object-contain"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'flex';
-                  }}
-                />
-                <div className="hidden absolute inset-0 flex-col items-center justify-center bg-gray-900 text-white">
+                {cameraStatuses[camera.Camara_Id]?.is_connected ? (
+                  <img
+                    src={`http://localhost:5001/stream/${camera.Camara_Id}?t=${Date.now()}`}
+                    alt={`Camera ${camera.Camara_Id}`}
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div className={`${cameraStatuses[camera.Camara_Id]?.is_connected ? 'hidden' : 'flex'} absolute inset-0 flex-col items-center justify-center bg-gray-900 text-white`}>
                   <FiVideo size={48} className="mb-4 opacity-50" />
                   <p className="text-sm opacity-75">Camera Offline</p>
                   <p className="text-xs opacity-50 mt-2">Check connection</p>
+                  <button
+                    onClick={() => startCamera(camera.Camara_Id, camera.Camera_URL, camera.Camera_Type)}
+                    className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition"
+                  >
+                    Retry Connection
+                  </button>
                 </div>
               </div>
 

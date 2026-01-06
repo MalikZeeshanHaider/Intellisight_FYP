@@ -24,7 +24,7 @@ set PROJECT_DIR=%~dp0
 cd /d "%PROJECT_DIR%"
 
 REM Set environment variables
-set DATABASE_URL=postgresql://postgres:zainab@localhost:5000/FYP_Intellisight?schema=public
+set DATABASE_URL=postgresql://postgres:ozair@localhost:5000/FYP_Intellisight?schema=public
 set NODE_ENV=development
 set PORT=3000
 

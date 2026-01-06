@@ -549,6 +549,7 @@ def cameras_status():
             'zone_id': camera.zone_id,
             'camera_type': camera.camera_type,
             'is_running': camera.is_running,
+            'is_connected': camera.is_running,  # Alias for frontend compatibility
             'fps': camera.fps_counter.get_fps(),
             'frame_count': camera.frame_count,
             'faces_detected': len(camera.cached_faces),
@@ -703,9 +704,9 @@ def initialize():
     db_handler = DatabaseHandler()
     print("✓ Database connected")
     
-    # DISABLED: Auto-start cameras (too slow at startup, cameras are started manually or by frontend)
-    # print("\n[*] Auto-starting all cameras from database...")
-    # auto_start_all_cameras()
+    # Auto-start all cameras from database
+    print("\n[*] Auto-starting all cameras from database...")
+    auto_start_all_cameras()
     
     print("="*70)
     print("Service ready! API: http://0.0.0.0:5001")
