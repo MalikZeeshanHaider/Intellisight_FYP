@@ -136,21 +136,21 @@ def get_euclidean_distance(emb1, emb2):
     return np.linalg.norm(np.array(emb1) - np.array(emb2))
 
 
-def find_best_match(embedding, embeddings_data, threshold=0.8):
+def find_best_match(embedding, embeddings_data, threshold=10.0):
     """
     OPTIMIZED: Find the best matching person for an embedding
-    Uses averaging across multiple embeddings per person for better accuracy
+    Uses minimum distance across multiple embeddings per person
     
-    FaceNet euclidean distance thresholds:
-    - 0.0 - 0.4: Very high confidence match
-    - 0.4 - 0.6: Good confidence match  
-    - 0.6 - 0.8: Acceptable match
-    - > 0.8: Likely different person
+    FaceNet euclidean distance thresholds (unnormalized 128D embeddings):
+    - 0.0 - 5.0: Very high confidence match
+    - 5.0 - 8.0: Good confidence match  
+    - 8.0 - 10.0: Acceptable match
+    - > 10.0: Likely different person
     
     Args:
         embedding: Face embedding to match (128D FaceNet)
         embeddings_data: List of dicts with 'person' and 'embedding' keys
-        threshold: Maximum distance to consider a match (default 0.8)
+        threshold: Maximum distance to consider a match (default 10.0)
         
     Returns:
         tuple: (person_name, distance) or ("Unknown", distance)
@@ -180,7 +180,7 @@ def find_best_match(embedding, embeddings_data, threshold=0.8):
     if not person_distances:
         return "Unknown", float('inf')
     
-    # Find person with best (minimum) average distance
+    # Find person with best (minimum) distance
     best_person = None
     min_best_distance = float('inf')
     

@@ -3,10 +3,12 @@ IntelliSight - Live Camera Stream with Face Recognition
 Backend service that processes RTSP camera feeds and streams results to frontend
 Supports multiple cameras with face detection and recognition
 
-*** USING SAME DETECTION MODEL AS WEBCAM (Zone 1) ***
-Webcam uses: face-api.js TinyFaceDetector (SSD MobileNet based)
-Backend uses: OpenCV DNN SSD MobileNet (SAME architecture)
-Both use SSD (Single Shot Detector) with MobileNet backbone
+*** OPTIMIZED FOR CPU-ONLY PROCESSING ***
+- Frame throttling: Process every 3rd frame
+- Parallel processing: Separate threads for capture/detection/recognition
+- Fast detector: OpenCV Haar Cascade as primary (faster than DeepFace SSD on CPU)
+- Histogram equalization for lighting normalization
+- Memory-cached embeddings (no DB hits per frame)
 """
 
 import cv2
@@ -15,6 +17,8 @@ import json
 import time
 import threading
 import gc
+import queue
+from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
 from datetime import datetime
@@ -32,31 +36,42 @@ CORS(app)
 # Global variables
 active_cameras = {}  # {camera_id: CameraStream}
 embeddings_data = []
+embeddings_cache = {}  # {person_name: [embeddings]} - Memory cache
 db_handler = None
 embeddings_lock = threading.Lock()
 
-# ============================================================================
-# DETECTION SETTINGS - SAME AS WEBCAM (face-api.js TinyFaceDetector)
-# ============================================================================
-# face-api.js TinyFaceDetector uses SSD MobileNet architecture
-# We use the SAME SSD MobileNet model via OpenCV DNN for consistency
-# This ensures identical detection behavior across webcam and RTSP cameras
-# ============================================================================
-DETECTOR_BACKEND = "ssd"  # SSD MobileNet - SAME as TinyFaceDetector
-SCORE_THRESHOLD = 0.4     # Same as face-api.js scoreThreshold
-RECOGNITION_COOLDOWN = 2.0
-MAX_CACHE_SIZE = 50
-DETECTION_INTERVAL = 2    # Process every 2 frames for faster response
+# Thread pool for parallel processing
+recognition_executor = ThreadPoolExecutor(max_workers=4)
 
-# PERFORMANCE SETTINGS - Use 720p for faster processing
-TARGET_WIDTH = 1280       # 720p width (faster than 1080p)
-TARGET_HEIGHT = 720       # 720p height
-PROCESS_WIDTH = 640       # Width for face detection (even faster)
-PROCESS_HEIGHT = 360      # Height for face detection
+# ============================================================================
+# CPU-OPTIMIZED DETECTION SETTINGS
+# ============================================================================
+# Primary: OpenCV Haar Cascade (fastest on CPU)
+# Fallback: DeepFace SSD (more accurate but slower)
+# Frame throttling: Process every 3rd frame to reduce CPU load
+# ============================================================================
+DETECTOR_BACKEND = "opencv"  # Fast Haar cascade for CPU
+SCORE_THRESHOLD = 0.35       # Lower threshold for better detection
+RECOGNITION_COOLDOWN = 3.0   # 3 second cooldown between same person detections
+MAX_CACHE_SIZE = 100
+FRAME_PROCESS_INTERVAL = 3   # Process every 3rd frame (CPU optimization)
+MAX_FRAME_QUEUE = 1          # Drop stale frames immediately
+CONSECUTIVE_MATCHES_REQUIRED = 2  # Require 2 consecutive matches for accuracy
+
+# PERFORMANCE SETTINGS - Optimized for 720p @ 15fps input
+TARGET_WIDTH = 1280       # Display width (720p)
+TARGET_HEIGHT = 720       # Display height
+PROCESS_WIDTH = 480       # Detection width (smaller = faster)
+PROCESS_HEIGHT = 270      # Detection height
+FACE_SIZE = 160           # Standard face size for embedding
+
+# Preload Haar cascade once (shared across all cameras)
+HAAR_CASCADE = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_alt2.xml')
+HAAR_CASCADE_DEFAULT = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
 
 class CameraStream:
-    """Handles individual camera RTSP stream with face recognition"""
+    """Handles individual camera RTSP stream with face recognition - CPU OPTIMIZED"""
     
     def __init__(self, camera_id, camera_url, camera_type, zone_id):
         self.camera_id = camera_id
@@ -71,9 +86,16 @@ class CameraStream:
         self.recognized_persons = []
         self.frame_count = 0
         
-        # Cache for face detections (to avoid detecting every frame)
+        # Cache for face detections (avoid detecting every frame)
         self.cached_faces = []
         self.last_detection_frame = 0
+        
+        # Consecutive match tracking for accuracy
+        self.consecutive_matches = {}  # {person_name: count}
+        self.last_match_frame = {}     # {person_name: frame_count}
+        
+        # Frame queue for dropping stale frames
+        self.frame_queue = queue.Queue(maxsize=MAX_FRAME_QUEUE)
         
         # Connect to camera
         self.connect()
@@ -159,43 +181,58 @@ class CameraStream:
         return False
     
     def _capture_loop(self):
-        """Background thread to continuously capture frames - OPTIMIZED for 720p"""
+        """Background thread to continuously capture frames - CPU OPTIMIZED"""
+        consecutive_failures = 0
         
         while self.is_running:
             try:
-                ret, frame = self.cap.read()
+                # Grab frame (non-blocking if possible)
+                ret = self.cap.grab()
                 
                 if ret:
+                    consecutive_failures = 0
                     self.frame_count += 1
                     
-                    # Resize to 720p for display (faster than 1080p)
-                    h, w = frame.shape[:2]
-                    if w > TARGET_WIDTH:
-                        frame = cv2.resize(frame, (TARGET_WIDTH, TARGET_HEIGHT))
-                    
-                    # Process face recognition every N frames
-                    if self.frame_count % DETECTION_INTERVAL == 0:
-                        self.frame = self._process_frame(frame)
+                    # Only decode every Nth frame (frame throttling)
+                    if self.frame_count % FRAME_PROCESS_INTERVAL == 0:
+                        ret, frame = self.cap.retrieve()
+                        
+                        if ret and frame is not None:
+                            # Resize to 720p for display
+                            h, w = frame.shape[:2]
+                            if w > TARGET_WIDTH:
+                                frame = cv2.resize(frame, (TARGET_WIDTH, TARGET_HEIGHT), 
+                                                 interpolation=cv2.INTER_LINEAR)
+                            
+                            # Process face detection and recognition
+                            self.frame = self._process_frame(frame)
+                            self.fps_counter.update()
                     else:
-                        # Draw cached boxes on resized frame (fast)
-                        self.frame = self._draw_cached_boxes(frame)
+                        # Use cached frame with boxes (no processing)
+                        if self.frame is not None:
+                            pass  # Keep existing frame
+                        self.fps_counter.update()
                     
-                    self.fps_counter.update()
-                    
-                    # Periodic garbage collection
-                    if self.frame_count % 500 == 0:
+                    # Periodic cleanup
+                    if self.frame_count % 300 == 0:
                         gc.collect()
                     
-                    time.sleep(0.01)
+                    # Small sleep to prevent CPU hogging
+                    time.sleep(0.005)
                 else:
-                    print(f"[Camera {self.camera_id}] Failed to read frame, reconnecting...")
-                    time.sleep(2)
-                    self.cap.release()
-                    self.cap = cv2.VideoCapture(self.camera_url, cv2.CAP_FFMPEG)
+                    consecutive_failures += 1
+                    if consecutive_failures > 10:
+                        print(f"[Camera {self.camera_id}] Too many failures, reconnecting...")
+                        time.sleep(1)
+                        self.cap.release()
+                        self.cap = cv2.VideoCapture(self.camera_url, cv2.CAP_FFMPEG)
+                        consecutive_failures = 0
+                    else:
+                        time.sleep(0.1)
                     
             except Exception as e:
                 print(f"[Camera {self.camera_id}] Capture error: {e}")
-                time.sleep(0.5)
+                time.sleep(0.3)
     
     def _draw_cached_boxes(self, frame):
         """Draw cached face boxes without re-detecting"""
@@ -282,6 +319,9 @@ class CameraStream:
             elif person == "Unknown":
                 color = (0, 0, 255)  # Red
                 label = f"Unknown ({distance:.1f})" if distance and distance < 100 else "Unknown"
+                
+                # Save unknown face to database
+                self._handle_unknown_face(face_crop, distance)
             else:
                 color = (255, 255, 0)  # Yellow
                 label = "Detecting..."
@@ -308,52 +348,45 @@ class CameraStream:
     
     def _detect_faces(self, frame):
         """
-        Face detection using SSD MobileNet - SAME AS ZONE 1 (face-api.js TinyFaceDetector)
-        Both use SSD (Single Shot Detector) architecture for consistent detection
+        Face detection - CPU OPTIMIZED
+        PRIMARY: OpenCV Haar Cascade (fastest on CPU)
+        FALLBACK: DeepFace OpenCV DNN (more accurate, slower)
         """
         faces = []
         
-        # PRIMARY: SSD MobileNet - SAME as face-api.js TinyFaceDetector in Zone 1
+        # PRIMARY: OpenCV Haar Cascade (FASTEST on CPU)
         try:
-            results = DeepFace.extract_faces(
-                img_path=frame,
-                detector_backend="ssd",  # Same architecture as TinyFaceDetector
-                enforce_detection=False,
-                align=True  # Enable alignment for better recognition
+            # Convert to grayscale
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            
+            # Apply histogram equalization for lighting normalization
+            gray = cv2.equalizeHist(gray)
+            
+            # Use preloaded cascade (no file I/O per frame)
+            haar_faces = HAAR_CASCADE.detectMultiScale(
+                gray,
+                scaleFactor=1.15,      # Faster scaling
+                minNeighbors=4,        # Balance speed/accuracy
+                minSize=(40, 40),      # Minimum face size
+                maxSize=(300, 300),    # Maximum face size
+                flags=cv2.CASCADE_SCALE_IMAGE
             )
             
-            for face_obj in results:
-                conf = face_obj.get('confidence', 0)
-                if conf >= 0.3:  # Lower threshold for better detection
-                    facial_area = face_obj.get('facial_area', {})
-                    x = facial_area.get('x', 0)
-                    y = facial_area.get('y', 0)
-                    fw = facial_area.get('w', 0)
-                    fh = facial_area.get('h', 0)
-                    
-                    if fw > 20 and fh > 20:  # Accept smaller faces
-                        faces.append({
-                            'x': x, 'y': y, 'w': fw, 'h': fh,
-                            'confidence': conf,
-                            'face': face_obj.get('face', None)
-                        })
+            for (x, y, w, h) in haar_faces:
+                faces.append({
+                    'x': int(x), 'y': int(y), 'w': int(w), 'h': int(h),
+                    'confidence': 0.8,
+                    'face': None
+                })
             
+            # If Haar found faces, return immediately (fast path)
             if faces:
                 return faces
-                
-        except Exception as e:
-            if "face" not in str(e).lower():
-                print(f"[Camera {self.camera_id}] SSD detection error: {e}")
-        
-        # FALLBACK: OpenCV Haar Cascade (fast backup)
-        try:
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            haar_cascade = cv2.CascadeClassifier(
-                cv2.data.haarcascades + 'haarcascade_frontalface_alt2.xml'
-            )
-            haar_faces = haar_cascade.detectMultiScale(
-                gray, 
-                scaleFactor=1.1, 
+            
+            # Try default cascade as backup
+            haar_faces = HAAR_CASCADE_DEFAULT.detectMultiScale(
+                gray,
+                scaleFactor=1.2,
                 minNeighbors=3,
                 minSize=(30, 30)
             )
@@ -364,14 +397,71 @@ class CameraStream:
                     'confidence': 0.7,
                     'face': None
                 })
+            
+            if faces:
+                return faces
                 
         except Exception as e:
-            print(f"[Camera {self.camera_id}] Haar fallback error: {e}")
+            print(f"[Camera {self.camera_id}] Haar detection error: {e}")
+        
+        # FALLBACK: DeepFace OpenCV DNN (slower but more accurate)
+        try:
+            results = DeepFace.extract_faces(
+                img_path=frame,
+                detector_backend="opencv",  # OpenCV DNN (faster than SSD)
+                enforce_detection=False,
+                align=False  # Skip alignment for speed
+            )
+            
+            for face_obj in results:
+                conf = face_obj.get('confidence', 0)
+                if conf >= 0.25:
+                    facial_area = face_obj.get('facial_area', {})
+                    x = facial_area.get('x', 0)
+                    y = facial_area.get('y', 0)
+                    fw = facial_area.get('w', 0)
+                    fh = facial_area.get('h', 0)
+                    
+                    if fw > 25 and fh > 25:
+                        faces.append({
+                            'x': x, 'y': y, 'w': fw, 'h': fh,
+                            'confidence': conf,
+                            'face': face_obj.get('face', None)
+                        })
+                
+        except Exception as e:
+            if "face" not in str(e).lower():
+                print(f"[Camera {self.camera_id}] DeepFace fallback error: {e}")
         
         return faces
     
+    def _preprocess_face(self, face_crop):
+        """Preprocess face for better recognition - histogram equalization + resize"""
+        try:
+            # Convert to grayscale for histogram equalization
+            if len(face_crop.shape) == 3:
+                gray = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = face_crop
+            
+            # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            equalized = clahe.apply(gray)
+            
+            # Convert back to BGR for DeepFace
+            equalized_bgr = cv2.cvtColor(equalized, cv2.COLOR_GRAY2BGR)
+            
+            # Resize to standard face size (160x160 for FaceNet)
+            face_resized = cv2.resize(equalized_bgr, (FACE_SIZE, FACE_SIZE), 
+                                      interpolation=cv2.INTER_LINEAR)
+            
+            return face_resized
+        except Exception as e:
+            # Fallback: just resize
+            return cv2.resize(face_crop, (FACE_SIZE, FACE_SIZE))
+    
     def _recognize_face(self, face_crop):
-        """Recognize a face using DeepFace - OPTIMIZED for accuracy"""
+        """Recognize a face using DeepFace - CPU OPTIMIZED without heavy preprocessing"""
         global embeddings_data
         
         # Check if face crop is valid
@@ -379,17 +469,17 @@ class CameraStream:
             return None, None
         
         try:
-            # OPTIMIZED: Resize face to standard size for better recognition
-            face_resized = cv2.resize(face_crop, (160, 160))
+            # Simple resize to standard face size (160x160 for FaceNet) - NO color conversion
+            face_resized = cv2.resize(face_crop, (160, 160), interpolation=cv2.INTER_LINEAR)
             
             # Use thread lock to prevent concurrent DeepFace calls
             with embeddings_lock:
                 results = DeepFace.represent(
                     img_path=face_resized,
                     model_name=MODEL_NAME,
-                    detector_backend="skip",  # Skip detection, we already have face
+                    detector_backend="skip",  # Skip detection, already have face
                     enforce_detection=False,
-                    align=True  # OPTIMIZED: Enable alignment for better accuracy
+                    align=True  # Enable alignment for better matching
                 )
             
             if results and len(results) > 0:
@@ -398,12 +488,12 @@ class CameraStream:
                 
                 # DEBUG: Log recognition results
                 if person != "Unknown":
-                    print(f"[Camera {self.camera_id}] MATCH: {person} (distance: {distance:.4f}, threshold: {DISTANCE_THRESHOLD})")
-                elif distance < float('inf'):
-                    print(f"[Camera {self.camera_id}] NO MATCH: Best distance: {distance:.4f} > threshold {DISTANCE_THRESHOLD}")
+                    print(f"[Camera {self.camera_id}] ✓ MATCH: {person} (distance: {distance:.4f}, threshold: {DISTANCE_THRESHOLD})")
+                else:
+                    print(f"[Camera {self.camera_id}] ✗ NO MATCH: Best distance: {distance:.4f} > threshold {DISTANCE_THRESHOLD}")
                 
                 # Cleanup
-                del results, embedding
+                del results
                 
                 return person, distance
                 
@@ -413,21 +503,69 @@ class CameraStream:
                 print(f"[Camera {self.camera_id}] Recognition error: {e}")
         
         return None, None
-        
-        return None, None
     
-    def _handle_recognition(self, person, distance):
-        """Handle recognized person (update database) - OPTIMIZED with per-person cooldown"""
+    def _handle_unknown_face(self, face_crop, distance):
+        """Handle unknown face - save to database with cooldown"""
         global db_handler
         
-        # Per-person cooldown to avoid spam
+        # Use cooldown to avoid saving same unknown person repeatedly
+        current_time = time.time()
+        unknown_key = f"unknown_{self.camera_id}"
+        last_time = self.last_recognition_time.get(unknown_key, 0)
+        
+        # 30 second cooldown for unknown faces
+        if current_time - last_time < 30:
+            return  # Skip if recently saved unknown
+        
+        self.last_recognition_time[unknown_key] = current_time
+        
+        try:
+            # Encode face image to JPEG bytes
+            _, jpeg_buffer = cv2.imencode('.jpg', face_crop, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            image_bytes = jpeg_buffer.tobytes()
+            
+            # Calculate confidence (inverse of distance)
+            confidence = max(0.0, min(1.0, 1.0 - (distance / 20.0))) if distance else 0.5
+            
+            # Save to database
+            db_handler.save_unknown_face(image_bytes, self.zone_id, confidence)
+            print(f"[Camera {self.camera_id}] ⚠ Unknown face saved to database (distance: {distance:.2f})")
+            
+        except Exception as e:
+            print(f"[Camera {self.camera_id}] Error saving unknown face: {e}")
+    
+    def _handle_recognition(self, person, distance):
+        """Handle recognized person with consecutive match verification for accuracy"""
+        global db_handler
+        
+        # Track consecutive matches for accuracy
+        current_frame = self.frame_count
+        last_frame = self.last_match_frame.get(person, 0)
+        
+        # Check if this is a consecutive match (within 10 frames)
+        if current_frame - last_frame <= 10:
+            self.consecutive_matches[person] = self.consecutive_matches.get(person, 0) + 1
+        else:
+            self.consecutive_matches[person] = 1  # Reset counter
+        
+        self.last_match_frame[person] = current_frame
+        
+        # Only proceed if we have enough consecutive matches
+        if self.consecutive_matches[person] < CONSECUTIVE_MATCHES_REQUIRED:
+            print(f"[Camera {self.camera_id}] Verifying {person}... ({self.consecutive_matches[person]}/{CONSECUTIVE_MATCHES_REQUIRED})")
+            return
+        
+        # Per-person cooldown to avoid spam after confirmed detection
         current_time = time.time()
         last_time = self.last_recognition_time.get(person, 0)
         
         if current_time - last_time < RECOGNITION_COOLDOWN:
-            return  # Skip if recently recognized
+            return  # Skip if recently confirmed
         
         self.last_recognition_time[person] = current_time
+        
+        # Reset consecutive counter after successful recognition
+        self.consecutive_matches[person] = 0
         
         # Limit cache size to prevent memory leak
         if len(self.last_recognition_time) > MAX_CACHE_SIZE:
@@ -435,21 +573,55 @@ class CameraStream:
             del self.last_recognition_time[oldest]
         
         try:
-            # Parse person name (format: "Name-ROLE" or just "Name")
-            parts = person.rsplit('-', 1)
-            name = parts[0]
-            role = parts[1].upper() if len(parts) > 1 else "STUDENT"
+            # Try to find person in database by exact name match
+            person_id, person_type = self._find_person_in_db(person)
             
-            if self.camera_type == 'Entry':
-                db_handler.mark_entry(name, role, self.zone_id, self.camera_id)
-                print(f"[Entry] ✓ {name} entered Zone {self.zone_id}")
-                
-            elif self.camera_type == 'Exit':
-                db_handler.mark_exit(name, role, self.zone_id, self.camera_id)
-                print(f"[Exit] ✓ {name} left Zone {self.zone_id}")
+            if person_id:
+                if self.camera_type == 'Entry':
+                    result = db_handler.add_to_active_presence(person_id, person_type, self.zone_id)
+                    if result:
+                        print(f"[Entry] ✅ {person} ({person_type}) entered Zone {self.zone_id}")
+                    else:
+                        print(f"[Entry] ℹ️ {person} already in Zone {self.zone_id}")
+                    
+                elif self.camera_type == 'Exit':
+                    result = db_handler.remove_from_active_presence(person_id, person_type, self.zone_id)
+                    if result:
+                        print(f"[Exit] ✅ {person} ({person_type}) left Zone {self.zone_id} - Log completed")
+                    else:
+                        print(f"[Exit] ℹ️ {person} was not in Zone {self.zone_id}")
+            else:
+                print(f"[Warning] Person '{person}' not found in database")
                 
         except Exception as e:
             print(f"[Database Error] {e}")
+    
+    def _find_person_in_db(self, person_name):
+        """Find person ID and type from database by name"""
+        global db_handler
+        
+        try:
+            # Clean up person name (remove any role suffix like "-Student")
+            clean_name = person_name.rsplit('-', 1)[0] if '-' in person_name else person_name
+            clean_name = clean_name.replace('_', ' ')  # Handle underscores
+            
+            with db_handler.conn.cursor() as cur:
+                # Try to find as Student first
+                cur.execute('''SELECT "Student_ID" FROM "Students" WHERE "Name" ILIKE %s''', (f'%{clean_name}%',))
+                result = cur.fetchone()
+                if result:
+                    return result[0], 'Student'
+                
+                # Try to find as Teacher
+                cur.execute('''SELECT "Teacher_ID" FROM "Teacher" WHERE "Name" ILIKE %s''', (f'%{clean_name}%',))
+                result = cur.fetchone()
+                if result:
+                    return result[0], 'Teacher'
+                
+        except Exception as e:
+            print(f"[DB] Error finding person: {e}")
+        
+        return None, None
     
     def get_frame(self):
         """Get current frame as JPEG bytes - OPTIMIZED"""

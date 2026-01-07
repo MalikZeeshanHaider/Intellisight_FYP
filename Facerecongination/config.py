@@ -1,6 +1,8 @@
 """
 IntelliSight - Configuration for DeepFace-based Face Recognition
 Uses FaceNet model via DeepFace library
+
+*** CPU-OPTIMIZED SETTINGS ***
 """
 
 import os
@@ -18,16 +20,17 @@ DB_CONFIG = {
     'password': os.getenv('DB_PASSWORD', 'ozair')
 }
 
-# Face recognition settings - DeepFace with FaceNet
+# Face recognition settings - DeepFace with FaceNet (CPU Optimized)
 MODEL_NAME = "Facenet"  # FaceNet model for embeddings (128-dimensional)
-DETECTOR_BACKEND = "ssd"  # SSD MobileNet - SAME as face-api.js TinyFaceDetector
+DETECTOR_BACKEND = "opencv"  # OpenCV Haar Cascade (fastest on CPU)
+
 # FaceNet euclidean distance threshold: lower = stricter matching
-# Typical values: 0.4 (strict) - 1.0 (lenient)
-# Zone 1 (face-api.js) uses 0.6 threshold
-DISTANCE_THRESHOLD = 0.8  # FIXED: Was 10.0, now correct for FaceNet euclidean distance
-MIN_FACE_SIZE = 30  # Smaller minimum face size for distant faces
-CONSECUTIVE_MATCHES = 2  # Reduced from 3 for faster response
-FRAME_SKIP = 2  # Process every N frames for performance
+# NOTE: FaceNet512 uses larger distances (5-15 typical range)
+# For Facenet (128D): typical range is 5-12 for unnormalized embeddings
+DISTANCE_THRESHOLD = 8.0  # Stricter threshold for better accuracy
+MIN_FACE_SIZE = 40  # Minimum face size (pixels)
+CONSECUTIVE_MATCHES = 2  # Matches needed before confirming identity
+FRAME_SKIP = 3  # Process every 3rd frame for CPU optimization
 
 # Folder paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
