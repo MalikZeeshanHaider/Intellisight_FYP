@@ -199,12 +199,14 @@ const Cameras = () => {
     return acc;
   }, {});
 
+  const isDarkMode = document.documentElement.classList.contains('dark');
+
   if (loading && cameras.length === 0) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: '#305796' }}></div>
-          <p className="text-gray-600 mt-4 font-medium">Loading cameras...</p>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: isDarkMode ? '#22d3ee' : '#305796' }}></div>
+          <p className="mt-4 font-medium" style={{ color: isDarkMode ? '#c0f0f0' : '#6b7280' }}>Loading cameras...</p>
         </div>
       </div>
     );
@@ -216,15 +218,23 @@ const Cameras = () => {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative p-6 rounded-2xl bg-white"
-        style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)' }}
+        className="relative p-6 rounded-2xl"
+        style={{ 
+          background: isDarkMode 
+            ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+            : '#ffffff',
+          border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : 'none',
+          boxShadow: isDarkMode 
+            ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)'
+            : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+        }}
       >
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold mb-2" style={{ color: '#305796' }}>
+            <h1 className="text-3xl font-bold mb-2" style={{ color: isDarkMode ? '#22d3ee' : '#305796' }}>
               Cameras
             </h1>
-            <p className="text-sm font-medium" style={{ color: '#6b7280' }}>
+            <p className="text-sm font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
               Manage zone cameras
             </p>
           </div>
@@ -235,7 +245,18 @@ const Cameras = () => {
               whileTap={{ scale: 0.98 }}
               onClick={() => setShowAddModal(true)}
               className="flex items-center gap-2 px-4 py-2 text-white rounded-xl"
-              style={{ backgroundColor: '#305796', boxShadow: '0 2px 8px rgba(48, 87, 150, 0.25)' }}
+              style={{ 
+                backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#305796', 
+                boxShadow: isDarkMode ? '0 0 20px rgba(6, 182, 212, 0.4)' : '0 2px 8px rgba(48, 87, 150, 0.25)' 
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(34, 211, 238, 0.9)' : '#274370';
+                if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 30px rgba(34, 211, 238, 0.5)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#305796';
+                if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 20px rgba(6, 182, 212, 0.4)';
+              }}
             >
               <FiPlus size={16} />
               <span>Add Camera</span>
@@ -246,14 +267,18 @@ const Cameras = () => {
               whileTap={{ scale: 0.98 }}
               onClick={fetchData}
               className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all"
-              style={{ backgroundColor: '#f3f4f6', color: '#6b7280' }}
+              style={{ 
+                backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f3f4f6', 
+                color: isDarkMode ? '#c0f0f0' : '#6b7280',
+                border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.3)' : 'none'
+              }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(48, 87, 150, 0.1)';
-                e.currentTarget.style.color = '#305796';
+                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.2)' : 'rgba(48, 87, 150, 0.1)';
+                e.currentTarget.style.color = isDarkMode ? '#22d3ee' : '#305796';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#f3f4f6';
-                e.currentTarget.style.color = '#6b7280';
+                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f3f4f6';
+                e.currentTarget.style.color = isDarkMode ? '#c0f0f0' : '#6b7280';
               }}
             >
               <FiRefreshCw size={16} />
@@ -269,7 +294,10 @@ const Cameras = () => {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           className="p-4 rounded-xl border flex items-start"
-          style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+          style={{ 
+            backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)', 
+            borderColor: 'rgba(239, 68, 68, 0.3)' 
+          }}
         >
           <FiAlertCircle className="mt-0.5 mr-3 flex-shrink-0" style={{ color: '#ef4444' }} size={20} />
           <p className="text-sm font-medium" style={{ color: '#ef4444' }}>{error}</p>
@@ -292,20 +320,31 @@ const Cameras = () => {
               key={zone.Zone_id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-2xl p-6"
-              style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)' }}
+              className="rounded-2xl p-6"
+              style={{ 
+                background: isDarkMode 
+                  ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+                  : '#ffffff',
+                border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : 'none',
+                boxShadow: isDarkMode 
+                  ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)'
+                  : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
+              }}
             >
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: '#305796' }}
+                  style={{ 
+                    backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#305796',
+                    boxShadow: isDarkMode ? '0 0 15px rgba(6, 182, 212, 0.4)' : 'none'
+                  }}
                 >
                   <FiMapPin className="text-white" size={20} />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
+                  <h2 className="text-2xl font-bold" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>
                     {zone.Zone_Name}
                   </h2>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
                     {zoneCameras.length} camera{zoneCameras.length !== 1 ? 's' : ''}
                   </p>
                 </div>
@@ -315,8 +354,8 @@ const Cameras = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Entry Camera */}
                 <div>
-                  <h3 className="text-lg font-bold mb-3 flex items-center gap-2 text-gray-900">
-                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  <h3 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>
+                    <div className="w-3 h-3 rounded-full bg-green-500" style={{ boxShadow: isDarkMode ? '0 0 8px rgba(34, 197, 94, 0.5)' : 'none' }}></div>
                     Entry Camera
                   </h3>
                   {entryCameras.length > 0 ? (
@@ -326,20 +365,26 @@ const Cameras = () => {
                         camera={camera} 
                         onEdit={handleOpenEdit}
                         onDelete={handleOpenDelete}
+                        isDarkMode={isDarkMode}
                       />
                     ))
                   ) : (
-                    <div className="bg-gray-50 rounded-xl p-4 text-center border-2 border-dashed border-gray-300">
-                      <FiVideo size={32} className="mx-auto mb-2 opacity-30 text-gray-400" />
-                      <p className="text-sm text-gray-600">No entry camera configured</p>
+                    <div className="rounded-xl p-4 text-center border-2 border-dashed" 
+                      style={{ 
+                        backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.6)' : '#f9fafb',
+                        borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.2)' : '#d1d5db'
+                      }}
+                    >
+                      <FiVideo size={32} className="mx-auto mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.3)' : '#9ca3af' }} />
+                      <p className="text-sm" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#6b7280' }}>No entry camera configured</p>
                     </div>
                   )}
                 </div>
 
                 {/* Exit Camera */}
                 <div>
-                  <h3 className="text-lg font-bold mb-3 flex items-center gap-2 text-gray-900">
-                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  <h3 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>
+                    <div className="w-3 h-3 rounded-full bg-red-500" style={{ boxShadow: isDarkMode ? '0 0 8px rgba(239, 68, 68, 0.5)' : 'none' }}></div>
                     Exit Camera
                   </h3>
                   {exitCameras.length > 0 ? (
@@ -349,12 +394,18 @@ const Cameras = () => {
                         camera={camera} 
                         onEdit={handleOpenEdit}
                         onDelete={handleOpenDelete}
+                        isDarkMode={isDarkMode}
                       />
                     ))
                   ) : (
-                    <div className="bg-gray-50 rounded-xl p-4 text-center border-2 border-dashed border-gray-300">
-                      <FiVideo size={32} className="mx-auto mb-2 opacity-30 text-gray-400" />
-                      <p className="text-sm text-gray-600">No exit camera configured</p>
+                    <div className="rounded-xl p-4 text-center border-2 border-dashed" 
+                      style={{ 
+                        backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.6)' : '#f9fafb',
+                        borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.2)' : '#d1d5db'
+                      }}
+                    >
+                      <FiVideo size={32} className="mx-auto mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.3)' : '#9ca3af' }} />
+                      <p className="text-sm" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#6b7280' }}>No exit camera configured</p>
                     </div>
                   )}
                 </div>
@@ -379,46 +430,83 @@ const Cameras = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border"
-              style={{ borderColor: 'rgba(48, 87, 150, 0.2)' }}
+              className="w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border"
+              style={{ 
+                background: isDarkMode 
+                  ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95))'
+                  : '#ffffff',
+                borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.3)' : 'rgba(48, 87, 150, 0.2)',
+                boxShadow: isDarkMode ? '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(6, 182, 212, 0.15)' : '0 20px 60px rgba(0, 0, 0, 0.2)'
+              }}
             >
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h2 className="text-2xl font-bold text-gray-900">
+              <div className="flex items-center justify-between p-6" style={{ borderBottom: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : '1px solid #e5e7eb' }}>
+                <h2 className="text-2xl font-bold" style={{ color: isDarkMode ? '#22d3ee' : '#111827' }}>
                   Add Camera
                 </h2>
                 <button
                   onClick={() => !isCreating && setShowAddModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition"
+                  className="p-2 rounded-lg transition"
+                  style={{ 
+                    backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
+                    color: isDarkMode ? '#f87171' : '#6b7280'
+                  }}
                   disabled={isCreating}
                 >
-                  <FiX size={20} className="text-gray-500" />
+                  <FiX size={20} />
                 </button>
               </div>
 
               <div className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-700">
+                  <label className="block text-sm font-semibold mb-2" style={{ color: isDarkMode ? '#c0f0f0' : '#374151' }}>
                     Zone *
                   </label>
                   <div className="relative" ref={addZoneDropdownRef}>
                     <button
                       type="button"
                       onClick={() => setAddZoneDropdownOpen(!addZoneDropdownOpen)}
-                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border-2 border-gray-200 outline-none text-left flex items-center justify-between"
-                      style={{ color: newCamera.Zone_id ? '#111827' : '#9CA3AF' }}
+                      className="w-full px-4 py-3 rounded-xl border-2 outline-none text-left flex items-center justify-between"
+                      style={{ 
+                        backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f9fafb',
+                        borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.3)' : '#e5e7eb',
+                        color: newCamera.Zone_id ? (isDarkMode ? '#c0f0f0' : '#111827') : (isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#9CA3AF')
+                      }}
                     >
                       <span>{newCamera.Zone_id ? zones.find(z => z.Zone_id.toString() === newCamera.Zone_id.toString())?.Zone_Name || 'Select Zone' : 'Select Zone'}</span>
-                      <FiChevronDown className={`transition-transform ${addZoneDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#ea580c' }} />
+                      <FiChevronDown className={`transition-transform ${addZoneDropdownOpen ? 'rotate-180' : ''}`} style={{ color: isDarkMode ? '#22d3ee' : '#ea580c' }} />
                     </button>
                     
                     {addZoneDropdownOpen && (
-                      <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50 max-h-48 overflow-y-auto">
+                      <div className="absolute top-full left-0 mt-1 w-full rounded-xl shadow-lg border py-1 z-50 max-h-48 overflow-y-auto"
+                        style={{ 
+                          backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.98)' : '#ffffff',
+                          borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.3)' : '#e5e7eb'
+                        }}
+                      >
                         {zones.map((zone) => (
                           <button
                             key={zone.Zone_id}
                             type="button"
                             onClick={() => { setNewCamera({ ...newCamera, Zone_id: zone.Zone_id }); setAddZoneDropdownOpen(false); }}
-                            className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-orange-100 hover:text-orange-700 ${newCamera.Zone_id?.toString() === zone.Zone_id.toString() ? 'bg-orange-50 text-orange-700' : 'text-gray-700'}`}
+                            className="w-full text-left px-4 py-2 text-sm font-medium transition-all"
+                            style={{ 
+                              backgroundColor: newCamera.Zone_id?.toString() === zone.Zone_id.toString() 
+                                ? (isDarkMode ? 'rgba(6, 182, 212, 0.2)' : '#dbeafe') 
+                                : 'transparent',
+                              color: newCamera.Zone_id?.toString() === zone.Zone_id.toString() 
+                                ? (isDarkMode ? '#22d3ee' : '#1d4ed8') 
+                                : (isDarkMode ? '#c0f0f0' : '#374151')
+                            }}
+                            onMouseEnter={(e) => {
+                              if (newCamera.Zone_id?.toString() !== zone.Zone_id.toString()) {
+                                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.1)' : '#f3f4f6';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (newCamera.Zone_id?.toString() !== zone.Zone_id.toString()) {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }
+                            }}
                           >
                             {zone.Zone_Name}
                           </button>
@@ -429,27 +517,55 @@ const Cameras = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-700">
+                  <label className="block text-sm font-semibold mb-2" style={{ color: isDarkMode ? '#c0f0f0' : '#374151' }}>
                     Camera Type *
                   </label>
                   <div className="relative" ref={addTypeDropdownRef}>
                     <button
                       type="button"
                       onClick={() => setAddTypeDropdownOpen(!addTypeDropdownOpen)}
-                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border-2 border-gray-200 outline-none text-left flex items-center justify-between text-gray-900"
+                      className="w-full px-4 py-3 rounded-xl border-2 outline-none text-left flex items-center justify-between"
+                      style={{ 
+                        backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f9fafb',
+                        borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.3)' : '#e5e7eb',
+                        color: isDarkMode ? '#c0f0f0' : '#111827'
+                      }}
                     >
                       <span>{newCamera.Camera_Type}</span>
-                      <FiChevronDown className={`transition-transform ${addTypeDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#ea580c' }} />
+                      <FiChevronDown className={`transition-transform ${addTypeDropdownOpen ? 'rotate-180' : ''}`} style={{ color: isDarkMode ? '#22d3ee' : '#ea580c' }} />
                     </button>
                     
                     {addTypeDropdownOpen && (
-                      <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                      <div className="absolute top-full left-0 mt-1 w-full rounded-xl shadow-lg border py-1 z-50"
+                        style={{ 
+                          backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.98)' : '#ffffff',
+                          borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.3)' : '#e5e7eb'
+                        }}
+                      >
                         {['Entry', 'Exit', 'Both'].map((type) => (
                           <button
                             key={type}
                             type="button"
                             onClick={() => { setNewCamera({ ...newCamera, Camera_Type: type }); setAddTypeDropdownOpen(false); }}
-                            className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-orange-100 hover:text-orange-700 ${newCamera.Camera_Type === type ? 'bg-orange-50 text-orange-700' : 'text-gray-700'}`}
+                            className="w-full text-left px-4 py-2 text-sm font-medium transition-all"
+                            style={{ 
+                              backgroundColor: newCamera.Camera_Type === type 
+                                ? (isDarkMode ? 'rgba(6, 182, 212, 0.2)' : '#dbeafe') 
+                                : 'transparent',
+                              color: newCamera.Camera_Type === type 
+                                ? (isDarkMode ? '#22d3ee' : '#1d4ed8') 
+                                : (isDarkMode ? '#c0f0f0' : '#374151')
+                            }}
+                            onMouseEnter={(e) => {
+                              if (newCamera.Camera_Type !== type) {
+                                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.1)' : '#f3f4f6';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (newCamera.Camera_Type !== type) {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }
+                            }}
                           >
                             {type}
                           </button>
@@ -460,7 +576,7 @@ const Cameras = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-700">
+                  <label className="block text-sm font-semibold mb-2" style={{ color: isDarkMode ? '#c0f0f0' : '#374151' }}>
                     RTSP URL
                   </label>
                   <input
@@ -468,23 +584,34 @@ const Cameras = () => {
                     value={newCamera.Camera_URL}
                     onChange={(e) => setNewCamera({ ...newCamera, Camera_URL: e.target.value })}
                     placeholder="rtsp://username:password@192.168.1.100/stream"
-                    className="w-full px-4 py-3 rounded-xl bg-gray-50 border-2 border-gray-200 outline-none transition text-gray-900"
-                    style={{ borderColor: 'rgba(48, 87, 150, 0.3)' }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#305796'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(48, 87, 150, 0.3)'}
+                    className="w-full px-4 py-3 rounded-xl border-2 outline-none transition"
+                    style={{ 
+                      backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f9fafb',
+                      borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.3)' : 'rgba(48, 87, 150, 0.3)',
+                      color: isDarkMode ? '#c0f0f0' : '#111827',
+                      transition: 'border-color 0.3s ease, box-shadow 0.3s ease'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = isDarkMode ? '#22d3ee' : '#305796';
+                      if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 15px rgba(6, 182, 212, 0.3)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = isDarkMode ? 'rgba(6, 182, 212, 0.3)' : 'rgba(48, 87, 150, 0.3)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                   />
                   <div className="mt-2 space-y-1">
-                    <p className="text-xs text-gray-600">
+                    <p className="text-xs" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
                       <strong>With port:</strong> rtsp://user:pass@192.168.1.100:554/cam/realmonitor?channel=1
                     </p>
-                    <p className="text-xs text-gray-600">
+                    <p className="text-xs" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
                       <strong>Without port:</strong> rtsp://admin:ozair123@192.168.10.4/cam/realmonitor?channel=1&subtype=0
                     </p>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-700">
+                  <label className="block text-sm font-semibold mb-2" style={{ color: isDarkMode ? '#c0f0f0' : '#374151' }}>
                     Password
                   </label>
                   <input
@@ -492,21 +619,37 @@ const Cameras = () => {
                     value={newCamera.Password}
                     onChange={(e) => setNewCamera({ ...newCamera, Password: e.target.value })}
                     placeholder="Camera password"
-                    className="w-full px-4 py-3 rounded-xl bg-gray-50 border-2 border-gray-200 outline-none transition text-gray-900"
-                    style={{ borderColor: 'rgba(48, 87, 150, 0.3)' }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#305796'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(48, 87, 150, 0.3)'}
+                    className="w-full px-4 py-3 rounded-xl border-2 outline-none transition"
+                    style={{ 
+                      backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f9fafb',
+                      borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.3)' : 'rgba(48, 87, 150, 0.3)',
+                      color: isDarkMode ? '#c0f0f0' : '#111827',
+                      transition: 'border-color 0.3s ease, box-shadow 0.3s ease'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = isDarkMode ? '#22d3ee' : '#305796';
+                      if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 15px rgba(6, 182, 212, 0.3)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = isDarkMode ? 'rgba(6, 182, 212, 0.3)' : 'rgba(48, 87, 150, 0.3)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                   />
                 </div>
               </div>
 
-              <div className="flex gap-3 p-6 border-t border-gray-200">
+              <div className="flex gap-3 p-6" style={{ borderTop: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : '1px solid #e5e7eb' }}>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => setShowAddModal(false)}
                   disabled={isCreating}
-                  className="flex-1 px-4 py-3 rounded-xl font-semibold border-2 border-gray-300 hover:bg-gray-100 transition disabled:opacity-50 text-gray-700"
+                  className="flex-1 px-4 py-3 rounded-xl font-semibold border-2 transition disabled:opacity-50"
+                  style={{ 
+                    backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'transparent',
+                    borderColor: isDarkMode ? 'rgba(192, 240, 240, 0.3)' : '#d1d5db',
+                    color: isDarkMode ? '#c0f0f0' : '#374151'
+                  }}
                 >
                   Cancel
                 </motion.button>
@@ -517,8 +660,8 @@ const Cameras = () => {
                   disabled={isCreating}
                   className="flex-1 px-4 py-3 rounded-xl font-semibold text-white disabled:opacity-50"
                   style={{
-                    backgroundColor: '#305796',
-                    boxShadow: '0 4px 20px rgba(48, 87, 150, 0.3)'
+                    backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#305796',
+                    boxShadow: isDarkMode ? '0 0 20px rgba(6, 182, 212, 0.4)' : '0 4px 20px rgba(48, 87, 150, 0.3)'
                   }}
                 >
                   {isCreating ? 'Creating...' : 'Create Camera'}
@@ -544,46 +687,73 @@ const Cameras = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border"
-              style={{ borderColor: 'rgba(48, 87, 150, 0.2)' }}
+              className="w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border"
+              style={{ 
+                background: isDarkMode 
+                  ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95))'
+                  : '#ffffff',
+                borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.3)' : 'rgba(48, 87, 150, 0.2)',
+                boxShadow: isDarkMode ? '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(6, 182, 212, 0.15)' : '0 20px 60px rgba(0, 0, 0, 0.2)'
+              }}
             >
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h2 className="text-2xl font-bold text-gray-900">
+              <div className="flex items-center justify-between p-6" style={{ borderBottom: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : '1px solid #e5e7eb' }}>
+                <h2 className="text-2xl font-bold" style={{ color: isDarkMode ? '#22d3ee' : '#111827' }}>
                   Edit Camera
                 </h2>
                 <button
                   onClick={() => !isUpdating && setShowEditModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition"
+                  className="p-2 rounded-lg transition"
+                  style={{ 
+                    backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
+                    color: isDarkMode ? '#f87171' : '#6b7280'
+                  }}
                   disabled={isUpdating}
                 >
-                  <FiX size={20} className="text-gray-500" />
+                  <FiX size={20} />
                 </button>
               </div>
 
               <div className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-700">
+                  <label className="block text-sm font-semibold mb-2" style={{ color: isDarkMode ? '#c0f0f0' : '#374151' }}>
                     Zone *
                   </label>
                   <div className="relative" ref={editZoneDropdownRef}>
                     <button
                       type="button"
                       onClick={() => setEditZoneDropdownOpen(!editZoneDropdownOpen)}
-                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border-2 border-gray-200 outline-none text-left flex items-center justify-between"
-                      style={{ color: editingCamera.Zone_id ? '#111827' : '#9CA3AF' }}
+                      className="w-full px-4 py-3 rounded-xl border-2 outline-none text-left flex items-center justify-between"
+                      style={{ 
+                        backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f9fafb',
+                        borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.3)' : '#e5e7eb',
+                        color: editingCamera.Zone_id ? (isDarkMode ? '#c0f0f0' : '#111827') : (isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#9CA3AF')
+                      }}
                     >
                       <span>{editingCamera.Zone_id ? zones.find(z => z.Zone_id.toString() === editingCamera.Zone_id.toString())?.Zone_Name || 'Select Zone' : 'Select Zone'}</span>
-                      <FiChevronDown className={`transition-transform ${editZoneDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#ea580c' }} />
+                      <FiChevronDown className={`transition-transform ${editZoneDropdownOpen ? 'rotate-180' : ''}`} style={{ color: isDarkMode ? '#22d3ee' : '#ea580c' }} />
                     </button>
                     
                     {editZoneDropdownOpen && (
-                      <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50 max-h-48 overflow-y-auto">
+                      <div className="absolute top-full left-0 mt-1 w-full rounded-xl shadow-lg border py-1 z-50 max-h-48 overflow-y-auto"
+                        style={{ 
+                          backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.98)' : '#ffffff',
+                          borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.3)' : '#e5e7eb'
+                        }}
+                      >
                         {zones.map((zone) => (
                           <button
                             key={zone.Zone_id}
                             type="button"
                             onClick={() => { setEditingCamera({ ...editingCamera, Zone_id: zone.Zone_id }); setEditZoneDropdownOpen(false); }}
-                            className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-orange-100 hover:text-orange-700 ${editingCamera.Zone_id?.toString() === zone.Zone_id.toString() ? 'bg-orange-50 text-orange-700' : 'text-gray-700'}`}
+                            className="w-full text-left px-4 py-2 text-sm font-medium transition-all"
+                            style={{ 
+                              backgroundColor: editingCamera.Zone_id?.toString() === zone.Zone_id.toString() 
+                                ? (isDarkMode ? 'rgba(6, 182, 212, 0.2)' : '#dbeafe') 
+                                : 'transparent',
+                              color: editingCamera.Zone_id?.toString() === zone.Zone_id.toString() 
+                                ? (isDarkMode ? '#22d3ee' : '#1d4ed8') 
+                                : (isDarkMode ? '#c0f0f0' : '#374151')
+                            }}
                           >
                             {zone.Zone_Name}
                           </button>
@@ -594,27 +764,45 @@ const Cameras = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-700">
+                  <label className="block text-sm font-semibold mb-2" style={{ color: isDarkMode ? '#c0f0f0' : '#374151' }}>
                     Camera Type *
                   </label>
                   <div className="relative" ref={editTypeDropdownRef}>
                     <button
                       type="button"
                       onClick={() => setEditTypeDropdownOpen(!editTypeDropdownOpen)}
-                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border-2 border-gray-200 outline-none text-left flex items-center justify-between text-gray-900"
+                      className="w-full px-4 py-3 rounded-xl border-2 outline-none text-left flex items-center justify-between"
+                      style={{ 
+                        backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f9fafb',
+                        borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.3)' : '#e5e7eb',
+                        color: isDarkMode ? '#c0f0f0' : '#111827'
+                      }}
                     >
                       <span>{editingCamera.Camera_Type}</span>
-                      <FiChevronDown className={`transition-transform ${editTypeDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#ea580c' }} />
+                      <FiChevronDown className={`transition-transform ${editTypeDropdownOpen ? 'rotate-180' : ''}`} style={{ color: isDarkMode ? '#22d3ee' : '#ea580c' }} />
                     </button>
                     
                     {editTypeDropdownOpen && (
-                      <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                      <div className="absolute top-full left-0 mt-1 w-full rounded-xl shadow-lg border py-1 z-50"
+                        style={{ 
+                          backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.98)' : '#ffffff',
+                          borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.3)' : '#e5e7eb'
+                        }}
+                      >
                         {['Entry', 'Exit', 'Both'].map((type) => (
                           <button
                             key={type}
                             type="button"
                             onClick={() => { setEditingCamera({ ...editingCamera, Camera_Type: type }); setEditTypeDropdownOpen(false); }}
-                            className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-orange-100 hover:text-orange-700 ${editingCamera.Camera_Type === type ? 'bg-orange-50 text-orange-700' : 'text-gray-700'}`}
+                            className="w-full text-left px-4 py-2 text-sm font-medium transition-all"
+                            style={{ 
+                              backgroundColor: editingCamera.Camera_Type === type 
+                                ? (isDarkMode ? 'rgba(6, 182, 212, 0.2)' : '#dbeafe') 
+                                : 'transparent',
+                              color: editingCamera.Camera_Type === type 
+                                ? (isDarkMode ? '#22d3ee' : '#1d4ed8') 
+                                : (isDarkMode ? '#c0f0f0' : '#374151')
+                            }}
                           >
                             {type}
                           </button>
@@ -625,7 +813,7 @@ const Cameras = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-700">
+                  <label className="block text-sm font-semibold mb-2" style={{ color: isDarkMode ? '#c0f0f0' : '#374151' }}>
                     RTSP URL
                   </label>
                   <input
@@ -633,23 +821,34 @@ const Cameras = () => {
                     value={editingCamera.Camera_URL || ''}
                     onChange={(e) => setEditingCamera({ ...editingCamera, Camera_URL: e.target.value })}
                     placeholder="rtsp://username:password@192.168.1.100/stream"
-                    className="w-full px-4 py-3 rounded-xl bg-gray-50 border-2 border-gray-200 outline-none transition text-gray-900"
-                    style={{ borderColor: 'rgba(48, 87, 150, 0.3)' }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#305796'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(48, 87, 150, 0.3)'}
+                    className="w-full px-4 py-3 rounded-xl border-2 outline-none transition"
+                    style={{ 
+                      backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f9fafb',
+                      borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.3)' : 'rgba(48, 87, 150, 0.3)',
+                      color: isDarkMode ? '#c0f0f0' : '#111827',
+                      transition: 'border-color 0.3s ease, box-shadow 0.3s ease'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = isDarkMode ? '#22d3ee' : '#305796';
+                      if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 15px rgba(6, 182, 212, 0.3)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = isDarkMode ? 'rgba(6, 182, 212, 0.3)' : 'rgba(48, 87, 150, 0.3)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                   />
                   <div className="mt-2 space-y-1">
-                    <p className="text-xs text-gray-600">
+                    <p className="text-xs" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
                       <strong>With port:</strong> rtsp://user:pass@IP:554/cam/realmonitor?channel=1
                     </p>
-                    <p className="text-xs text-gray-600">
+                    <p className="text-xs" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
                       <strong>Without port:</strong> rtsp://admin:ozair123@192.168.10.4/cam/realmonitor?channel=1&subtype=0
                     </p>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-700">
+                  <label className="block text-sm font-semibold mb-2" style={{ color: isDarkMode ? '#c0f0f0' : '#374151' }}>
                     Password
                   </label>
                   <input
@@ -657,21 +856,37 @@ const Cameras = () => {
                     value={editingCamera.Password || ''}
                     onChange={(e) => setEditingCamera({ ...editingCamera, Password: e.target.value })}
                     placeholder="Camera password"
-                    className="w-full px-4 py-3 rounded-xl bg-gray-50 border-2 border-gray-200 outline-none transition text-gray-900"
-                    style={{ borderColor: 'rgba(48, 87, 150, 0.3)' }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#305796'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(48, 87, 150, 0.3)'}
+                    className="w-full px-4 py-3 rounded-xl border-2 outline-none transition"
+                    style={{ 
+                      backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : '#f9fafb',
+                      borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.3)' : 'rgba(48, 87, 150, 0.3)',
+                      color: isDarkMode ? '#c0f0f0' : '#111827',
+                      transition: 'border-color 0.3s ease, box-shadow 0.3s ease'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = isDarkMode ? '#22d3ee' : '#305796';
+                      if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 15px rgba(6, 182, 212, 0.3)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = isDarkMode ? 'rgba(6, 182, 212, 0.3)' : 'rgba(48, 87, 150, 0.3)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                   />
                 </div>
               </div>
 
-              <div className="flex gap-3 p-6 border-t border-gray-200">
+              <div className="flex gap-3 p-6" style={{ borderTop: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : '1px solid #e5e7eb' }}>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => setShowEditModal(false)}
                   disabled={isUpdating}
-                  className="flex-1 px-4 py-3 rounded-xl font-semibold border-2 border-gray-300 hover:bg-gray-100 transition disabled:opacity-50 text-gray-700"
+                  className="flex-1 px-4 py-3 rounded-xl font-semibold border-2 transition disabled:opacity-50"
+                  style={{ 
+                    backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'transparent',
+                    borderColor: isDarkMode ? 'rgba(192, 240, 240, 0.3)' : '#d1d5db',
+                    color: isDarkMode ? '#c0f0f0' : '#374151'
+                  }}
                 >
                   Cancel
                 </motion.button>
@@ -682,8 +897,8 @@ const Cameras = () => {
                   disabled={isUpdating}
                   className="flex-1 px-4 py-3 rounded-xl font-semibold text-white disabled:opacity-50"
                   style={{
-                    backgroundColor: '#305796',
-                    boxShadow: '0 4px 20px rgba(48, 87, 150, 0.3)'
+                    backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#305796',
+                    boxShadow: isDarkMode ? '0 0 20px rgba(6, 182, 212, 0.4)' : '0 4px 20px rgba(48, 87, 150, 0.3)'
                   }}
                 >
                   {isUpdating ? 'Updating...' : 'Update Camera'}
@@ -709,40 +924,58 @@ const Cameras = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border"
-              style={{ borderColor: 'rgba(239, 68, 68, 0.2)' }}
+              className="w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border"
+              style={{ 
+                background: isDarkMode 
+                  ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95))'
+                  : '#ffffff',
+                borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.2)',
+                boxShadow: isDarkMode ? '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(239, 68, 68, 0.15)' : '0 20px 60px rgba(0, 0, 0, 0.2)'
+              }}
             >
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h2 className="text-2xl font-bold text-red-600">
+              <div className="flex items-center justify-between p-6" style={{ borderBottom: isDarkMode ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid #e5e7eb' }}>
+                <h2 className="text-2xl font-bold text-red-500">
                   Delete Camera
                 </h2>
                 <button
                   onClick={() => !isDeleting && setShowDeleteModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition"
+                  className="p-2 rounded-lg transition"
+                  style={{ 
+                    backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
+                    color: isDarkMode ? '#f87171' : '#6b7280'
+                  }}
                   disabled={isDeleting}
                 >
-                  <FiX size={20} className="text-gray-500" />
+                  <FiX size={20} />
                 </button>
               </div>
 
               <div className="p-6">
-                <p className="text-lg mb-4 text-gray-900">
+                <p className="text-lg mb-4" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>
                   Are you sure you want to delete this camera?
                 </p>
-                <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-4">
-                  <p className="text-sm text-red-600">
+                <div className="rounded-lg p-4" style={{ 
+                  backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.05)',
+                  borderLeft: '4px solid #ef4444'
+                }}>
+                  <p className="text-sm" style={{ color: isDarkMode ? '#f87171' : '#dc2626' }}>
                     ⚠️ This action cannot be undone.
                   </p>
                 </div>
               </div>
 
-              <div className="flex gap-3 p-6 border-t border-gray-200">
+              <div className="flex gap-3 p-6" style={{ borderTop: isDarkMode ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid #e5e7eb' }}>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => setShowDeleteModal(false)}
                   disabled={isDeleting}
-                  className="flex-1 px-4 py-3 rounded-xl font-semibold border-2 border-gray-300 hover:bg-gray-100 transition disabled:opacity-50 text-gray-700"
+                  className="flex-1 px-4 py-3 rounded-xl font-semibold border-2 transition disabled:opacity-50"
+                  style={{ 
+                    backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'transparent',
+                    borderColor: isDarkMode ? 'rgba(192, 240, 240, 0.3)' : '#d1d5db',
+                    color: isDarkMode ? '#c0f0f0' : '#374151'
+                  }}
                 >
                   Cancel
                 </motion.button>
@@ -754,7 +987,7 @@ const Cameras = () => {
                   className="flex-1 px-4 py-3 rounded-xl font-semibold text-white disabled:opacity-50"
                   style={{
                     backgroundColor: '#ef4444',
-                    boxShadow: '0 4px 20px rgba(239, 68, 68, 0.3)'
+                    boxShadow: isDarkMode ? '0 0 20px rgba(239, 68, 68, 0.4)' : '0 4px 20px rgba(239, 68, 68, 0.3)'
                   }}
                 >
                   {isDeleting ? 'Deleting...' : 'Delete Camera'}
@@ -769,30 +1002,34 @@ const Cameras = () => {
 };
 
 // Camera Card Component
-const CameraCard = ({ camera, onEdit, onDelete }) => {
+const CameraCard = ({ camera, onEdit, onDelete, isDarkMode }) => {
   return (
     <motion.div
       whileHover={{ scale: 1.02 }}
-      className="bg-white rounded-xl p-4 border-2 border-gray-200 mb-3"
+      className="rounded-xl p-4 border-2 mb-3"
+      style={{ 
+        backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.6)' : '#ffffff',
+        borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.2)' : '#e5e7eb'
+      }}
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
-          <FiVideo style={{ color: '#305796' }} size={20} />
-          <span className="font-bold text-sm text-gray-900">
+          <FiVideo style={{ color: isDarkMode ? '#22d3ee' : '#305796' }} size={20} />
+          <span className="font-bold text-sm" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>
             Camera #{camera.Camara_Id}
           </span>
         </div>
         <div className={`px-2 py-1 rounded-lg text-xs font-bold ${
           camera.Camera_Type === 'Entry' 
-            ? 'bg-green-500/20 text-green-600' 
-            : 'bg-red-500/20 text-red-600'
+            ? (isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-500/20 text-green-600')
+            : (isDarkMode ? 'bg-red-500/20 text-red-400' : 'bg-red-500/20 text-red-600')
         }`}>
           {camera.Camera_Type}
         </div>
       </div>
       
       {camera.Camera_URL && (
-        <p className="text-xs mb-2 font-mono truncate text-gray-600">
+        <p className="text-xs mb-2 font-mono truncate" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
           {camera.Camera_URL}
         </p>
       )}
@@ -803,9 +1040,17 @@ const CameraCard = ({ camera, onEdit, onDelete }) => {
           whileTap={{ scale: 0.98 }}
           onClick={() => onEdit(camera)}
           className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all"
-          style={{ backgroundColor: 'rgba(48, 87, 150, 0.1)', color: '#305796' }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(48, 87, 150, 0.2)'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(48, 87, 150, 0.1)'}
+          style={{ 
+            backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.15)' : 'rgba(48, 87, 150, 0.1)', 
+            color: isDarkMode ? '#22d3ee' : '#305796',
+            border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : 'none'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.25)' : 'rgba(48, 87, 150, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.15)' : 'rgba(48, 87, 150, 0.1)';
+          }}
         >
           <FiEdit2 size={14} />
           <span>Edit</span>
@@ -815,9 +1060,17 @@ const CameraCard = ({ camera, onEdit, onDelete }) => {
           whileTap={{ scale: 0.98 }}
           onClick={() => onDelete(camera)}
           className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all"
-          style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
+          style={{ 
+            backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)', 
+            color: '#ef4444',
+            border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.2)' : 'none'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)';
+          }}
         >
           <FiTrash2 size={14} />
           <span>Delete</span>

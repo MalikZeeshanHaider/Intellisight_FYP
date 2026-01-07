@@ -108,10 +108,10 @@ const Settings = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl font-display font-black" style={{ color: isDarkMode ? '#00ffff' : '#003d82' }}>
+          <h1 className="text-4xl font-display font-black" style={{ color: isDarkMode ? '#c0f0f0' : '#003d82' }}>
             Settings
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
+          <p className="mt-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
             Manage your application preferences and configuration
           </p>
         </div>

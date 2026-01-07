@@ -17,6 +17,9 @@ export default function AttendanceLogs() {
   const [showAllLogs, setShowAllLogs] = useState(false);
   const DISPLAY_LIMIT = 4;
   
+  // Dark mode detection
+  const isDarkMode = document.documentElement.classList.contains('dark');
+  
   // Filters
   const [filters, setFilters] = useState({
     zoneId: '',
@@ -131,7 +134,7 @@ export default function AttendanceLogs() {
             animate={{ opacity: 1, y: 0 }}
             className="text-4xl font-display font-black relative"
             style={{
-              color: '#003d82'
+              color: isDarkMode ? '#c0f0f0' : '#003d82'
             }}
           >
             Attendance Logs
@@ -145,20 +148,20 @@ export default function AttendanceLogs() {
           disabled={logs.length === 0}
           className="px-6 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
-            backgroundColor: '#003d82',
+            backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#003d82',
             color: '#fff',
-            boxShadow: '0 4px 12px rgba(0, 61, 130, 0.3)'
+            boxShadow: isDarkMode ? '0 0 20px rgba(6, 182, 212, 0.3)' : '0 4px 12px rgba(0, 61, 130, 0.3)'
           }}
           onMouseEnter={(e) => {
             if (logs.length > 0) {
-              e.currentTarget.style.backgroundColor = '#305796';
-              e.currentTarget.style.boxShadow = '0 6px 20px rgba(48, 87, 150, 0.4)';
+              e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 1)' : '#305796';
+              e.currentTarget.style.boxShadow = isDarkMode ? '0 0 30px rgba(6, 182, 212, 0.5)' : '0 6px 20px rgba(48, 87, 150, 0.4)';
             }
           }}
           onMouseLeave={(e) => {
             if (logs.length > 0) {
-              e.currentTarget.style.backgroundColor = '#003d82';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 61, 130, 0.3)';
+              e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#003d82';
+              e.currentTarget.style.boxShadow = isDarkMode ? '0 0 20px rgba(6, 182, 212, 0.3)' : '0 4px 12px rgba(0, 61, 130, 0.3)';
             }
           }}
         >
@@ -175,14 +178,14 @@ export default function AttendanceLogs() {
         className="relative p-6 rounded-2xl overflow-visible border mt-8"
         style={{
           zIndex: 50,
-          background: document.documentElement.classList.contains('dark')
-            ? 'rgba(13, 27, 36, 0.6)'
+          background: isDarkMode
+            ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
             : 'rgba(255, 255, 255, 0.95)',
-          borderColor: document.documentElement.classList.contains('dark')
-            ? 'rgba(48, 87, 150, 0.2)'
+          borderColor: isDarkMode
+            ? 'rgba(6, 182, 212, 0.2)'
             : 'rgba(0, 61, 130, 0.15)',
-          boxShadow: document.documentElement.classList.contains('dark')
-            ? '0 4px 16px rgba(0, 0, 0, 0.2)'
+          boxShadow: isDarkMode
+            ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)'
             : '0 2px 8px rgba(0, 61, 130, 0.08)'
         }}
       >
@@ -190,22 +193,22 @@ export default function AttendanceLogs() {
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center"
             style={{
-              backgroundColor: '#003d82',
-              boxShadow: '0 4px 12px rgba(0, 61, 130, 0.25)'
+              backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#003d82',
+              boxShadow: isDarkMode ? '0 0 15px rgba(6, 182, 212, 0.4)' : '0 4px 12px rgba(0, 61, 130, 0.25)'
             }}
           >
             <FiFilter className="text-white" size={18} />
           </div>
-          <h3 className="text-xl font-display font-bold" style={{ color: 'var(--text-main)' }}>
+          <h3 className="text-xl font-display font-bold" style={{ color: isDarkMode ? '#c0f0f0' : 'var(--text-main)' }}>
             Filter Logs
           </h3>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative z-50">
           <div className="relative" style={{ zIndex: 54 }}>
-            <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-soft)' }}>
+            <label className="block text-sm font-semibold mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : 'var(--text-soft)' }}>
               <div className="flex items-center gap-2">
-                <FiMapPin size={14} style={{ color: '#305796' }} />
+                <FiMapPin size={14} style={{ color: isDarkMode ? '#22d3ee' : '#305796' }} />
                 Zone
               </div>
             </label>
@@ -224,9 +227,9 @@ export default function AttendanceLogs() {
           </div>
 
           <div className="relative" style={{ zIndex: 53 }}>
-            <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-soft)' }}>
+            <label className="block text-sm font-semibold mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : 'var(--text-soft)' }}>
               <div className="flex items-center gap-2">
-                <FiUsers size={14} style={{ color: '#305796' }} />
+                <FiUsers size={14} style={{ color: isDarkMode ? '#22d3ee' : '#305796' }} />
                 Person Type
               </div>
             </label>
@@ -242,9 +245,9 @@ export default function AttendanceLogs() {
             />
           </div>
           <div className="relative" style={{ zIndex: 52 }}>
-            <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-soft)' }}>
+            <label className="block text-sm font-semibold mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : 'var(--text-soft)' }}>
               <div className="flex items-center gap-2">
-                <FiClock size={14} style={{ color: '#003d82' }} />
+                <FiClock size={14} style={{ color: isDarkMode ? '#22d3ee' : '#003d82' }} />
                 Start Date
               </div>
             </label>
@@ -254,26 +257,26 @@ export default function AttendanceLogs() {
               onChange={(e) => handleFilterChange('startDate', e.target.value)}
               className="w-full px-4 py-3 rounded-xl transition-all duration-300 focus:outline-none font-medium"
               style={{
-                background: 'transparent',
-                border: '2px solid rgba(0, 61, 130, 0.2)',
-                color: 'var(--text-main)',
+                background: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'transparent',
+                border: isDarkMode ? '2px solid rgba(6, 182, 212, 0.3)' : '2px solid rgba(0, 61, 130, 0.2)',
+                color: isDarkMode ? '#c0f0f0' : 'var(--text-main)',
                 boxShadow: '0 2px 4px rgba(0, 61, 130, 0.05)'
               }}
               onFocus={(e) => {
-                e.target.style.borderColor = '#003d82';
-                e.target.style.boxShadow = '0 0 0 3px rgba(0, 61, 130, 0.1)';
+                e.target.style.borderColor = isDarkMode ? '#22d3ee' : '#003d82';
+                e.target.style.boxShadow = isDarkMode ? '0 0 15px rgba(6, 182, 212, 0.3)' : '0 0 0 3px rgba(0, 61, 130, 0.1)';
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = 'rgba(0, 61, 130, 0.2)';
+                e.target.style.borderColor = isDarkMode ? 'rgba(6, 182, 212, 0.3)' : 'rgba(0, 61, 130, 0.2)';
                 e.target.style.boxShadow = '0 2px 4px rgba(0, 61, 130, 0.05)';
               }}
             />
           </div>
 
           <div className="relative" style={{ zIndex: 51 }}>
-            <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-soft)' }}>
+            <label className="block text-sm font-semibold mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : 'var(--text-soft)' }}>
               <div className="flex items-center gap-2">
-                <FiClock size={14} style={{ color: '#003d82' }} />
+                <FiClock size={14} style={{ color: isDarkMode ? '#22d3ee' : '#003d82' }} />
                 End Date
               </div>
             </label>
@@ -283,17 +286,17 @@ export default function AttendanceLogs() {
               onChange={(e) => handleFilterChange('endDate', e.target.value)}
               className="w-full px-4 py-3 rounded-xl transition-all duration-300 focus:outline-none font-medium"
               style={{
-                background: 'transparent',
-                border: '2px solid rgba(0, 61, 130, 0.2)',
-                color: 'var(--text-main)',
+                background: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'transparent',
+                border: isDarkMode ? '2px solid rgba(6, 182, 212, 0.3)' : '2px solid rgba(0, 61, 130, 0.2)',
+                color: isDarkMode ? '#c0f0f0' : 'var(--text-main)',
                 boxShadow: '0 2px 4px rgba(0, 61, 130, 0.05)'
               }}
               onFocus={(e) => {
-                e.target.style.borderColor = '#003d82';
-                e.target.style.boxShadow = '0 0 0 3px rgba(0, 61, 130, 0.1)';
+                e.target.style.borderColor = isDarkMode ? '#22d3ee' : '#003d82';
+                e.target.style.boxShadow = isDarkMode ? '0 0 15px rgba(6, 182, 212, 0.3)' : '0 0 0 3px rgba(0, 61, 130, 0.1)';
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = 'rgba(0, 61, 130, 0.2)';
+                e.target.style.borderColor = isDarkMode ? 'rgba(6, 182, 212, 0.3)' : 'rgba(0, 61, 130, 0.2)';
                 e.target.style.boxShadow = '0 2px 4px rgba(0, 61, 130, 0.05)';
               }}
             />
@@ -334,24 +337,24 @@ export default function AttendanceLogs() {
         className="rounded-2xl overflow-hidden border relative mt-8"
         style={{
           zIndex: 10,
-          background: document.documentElement.classList.contains('dark')
-            ? 'rgba(13, 27, 36, 0.6)'
+          background: isDarkMode
+            ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
             : 'rgba(255, 255, 255, 0.95)',
-          borderColor: document.documentElement.classList.contains('dark')
-            ? 'rgba(48, 87, 150, 0.2)'
+          borderColor: isDarkMode
+            ? 'rgba(6, 182, 212, 0.2)'
             : 'rgba(0, 61, 130, 0.15)',
-          boxShadow: document.documentElement.classList.contains('dark')
-            ? '0 4px 16px rgba(0, 0, 0, 0.2)'
+          boxShadow: isDarkMode
+            ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)'
             : '0 2px 8px rgba(0, 61, 130, 0.08)'
         }}
       >
         {/* Table Header with Show All Button */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 sm:px-6 py-4 gap-3" style={{ 
-          background: document.documentElement.classList.contains('dark')
-            ? 'rgba(48, 87, 150, 0.1)'
+          background: isDarkMode
+            ? 'rgba(6, 182, 212, 0.1)'
             : 'rgba(0, 61, 130, 0.05)'
         }}>
-          <h3 className="text-base sm:text-lg font-semibold" style={{ color: 'var(--text-main)' }}>
+          <h3 className="text-base sm:text-lg font-semibold" style={{ color: isDarkMode ? '#c0f0f0' : 'var(--text-main)' }}>
             Attendance Records
           </h3>
           {logs.length > DISPLAY_LIMIT && (
@@ -361,11 +364,11 @@ export default function AttendanceLogs() {
               onClick={() => setShowAllLogs(!showAllLogs)}
               className="flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors"
               style={{
-                backgroundColor: document.documentElement.classList.contains('dark')
-                  ? 'rgba(48, 87, 150, 0.2)'
+                backgroundColor: isDarkMode
+                  ? 'rgba(6, 182, 212, 0.15)'
                   : 'rgba(0, 61, 130, 0.08)',
-                color: '#003d82',
-                border: '1px solid rgba(0, 61, 130, 0.2)'
+                color: isDarkMode ? '#22d3ee' : '#003d82',
+                border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.3)' : '1px solid rgba(0, 61, 130, 0.2)'
               }}
             >
               {showAllLogs ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
@@ -378,32 +381,32 @@ export default function AttendanceLogs() {
           <table className="min-w-full">
             <thead>
               <tr style={{ 
-                background: document.documentElement.classList.contains('dark')
-                  ? 'rgba(48, 87, 150, 0.1)'
+                background: isDarkMode
+                  ? 'rgba(6, 182, 212, 0.1)'
                   : 'rgba(0, 61, 130, 0.05)'
               }}>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? '#22d3ee' : 'var(--text-soft)' }}>
                   <div className="flex items-center gap-1 sm:gap-2">
-                    <FiMapPin style={{ color: '#305796' }} className="hidden sm:block" size={14} />
+                    <FiMapPin style={{ color: isDarkMode ? '#22d3ee' : '#305796' }} className="hidden sm:block" size={14} />
                     Zone
                   </div>
                 </th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>Name</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider hidden md:table-cell" style={{ color: 'var(--text-soft)' }}>Type</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider hidden lg:table-cell" style={{ color: 'var(--text-soft)' }}>Department</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-soft)' }}>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? '#22d3ee' : 'var(--text-soft)' }}>Name</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider hidden md:table-cell" style={{ color: isDarkMode ? '#22d3ee' : 'var(--text-soft)' }}>Type</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider hidden lg:table-cell" style={{ color: isDarkMode ? '#22d3ee' : 'var(--text-soft)' }}>Department</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? '#22d3ee' : 'var(--text-soft)' }}>
                   <div className="flex items-center gap-1 sm:gap-2">
-                    <FiClock style={{ color: '#305796' }} className="hidden sm:block" size={14} />
+                    <FiClock style={{ color: isDarkMode ? '#22d3ee' : '#305796' }} className="hidden sm:block" size={14} />
                     Entry
                   </div>
                 </th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider hidden sm:table-cell" style={{ color: 'var(--text-soft)' }}>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider hidden sm:table-cell" style={{ color: isDarkMode ? '#22d3ee' : 'var(--text-soft)' }}>
                   <div className="flex items-center gap-2">
-                    <FiClock style={{ color: '#305796' }} size={14} />
+                    <FiClock style={{ color: isDarkMode ? '#22d3ee' : '#305796' }} size={14} />
                     Exit
                   </div>
                 </th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider hidden sm:table-cell" style={{ color: 'var(--text-soft)' }}>Duration</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold uppercase tracking-wider hidden sm:table-cell" style={{ color: isDarkMode ? '#22d3ee' : 'var(--text-soft)' }}>Duration</th>
               </tr>
             </thead>
             <tbody>
@@ -416,8 +419,8 @@ export default function AttendanceLogs() {
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                         className="w-16 h-16 rounded-xl flex items-center justify-center"
                         style={{
-                          backgroundColor: '#003d82',
-                          boxShadow: '0 4px 16px rgba(0, 61, 130, 0.3)'
+                          backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#003d82',
+                          boxShadow: isDarkMode ? '0 0 20px rgba(6, 182, 212, 0.4)' : '0 4px 16px rgba(0, 61, 130, 0.3)'
                         }}
                       >
                         <FiClock className="text-white" size={28} />
@@ -425,13 +428,13 @@ export default function AttendanceLogs() {
                       <div>
                         <motion.p 
                           className="text-base font-semibold mb-1"
-                          style={{ color: 'var(--text-main)' }}
+                          style={{ color: isDarkMode ? '#c0f0f0' : 'var(--text-main)' }}
                           animate={{ opacity: [0.5, 1, 0.5] }}
                           transition={{ duration: 1.5, repeat: Infinity }}
                         >
                           Loading attendance logs...
                         </motion.p>
-                        <p className="text-sm" style={{ color: 'var(--text-soft)' }}>
+                        <p className="text-sm" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : 'var(--text-soft)' }}>
                           Please wait while we fetch the data
                         </p>
                       </div>
@@ -447,21 +450,21 @@ export default function AttendanceLogs() {
                         animate={{ scale: 1, opacity: 1 }}
                         className="w-20 h-20 rounded-xl flex items-center justify-center"
                         style={{
-                          background: document.documentElement.classList.contains('dark')
-                            ? 'rgba(48, 87, 150, 0.1)'
+                          background: isDarkMode
+                            ? 'rgba(6, 182, 212, 0.15)'
                             : 'rgba(0, 61, 130, 0.05)',
-                          border: document.documentElement.classList.contains('dark')
-                            ? '2px solid rgba(48, 87, 150, 0.3)'
+                          border: isDarkMode
+                            ? '2px solid rgba(6, 182, 212, 0.3)'
                             : '2px solid rgba(0, 61, 130, 0.2)'
                         }}
                       >
-                        <FiClock size={40} style={{ color: '#305796', opacity: 0.5 }} />
+                        <FiClock size={40} style={{ color: isDarkMode ? '#22d3ee' : '#305796', opacity: 0.5 }} />
                       </motion.div>
                       <div>
-                        <p className="font-bold text-xl mb-2" style={{ color: 'var(--text-main)' }}>
+                        <p className="font-bold text-xl mb-2" style={{ color: isDarkMode ? '#c0f0f0' : 'var(--text-main)' }}>
                           No attendance logs found
                         </p>
-                        <p className="text-sm" style={{ color: 'var(--text-soft)' }}>
+                        <p className="text-sm" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : 'var(--text-soft)' }}>
                           Try adjusting your filters or check back later
                         </p>
                       </div>
@@ -483,13 +486,13 @@ export default function AttendanceLogs() {
                         transition={{ delay: index * 0.03 }}
                         className="transition-all duration-300 cursor-pointer"
                         style={{ 
-                          borderBottom: document.documentElement.classList.contains('dark')
-                            ? '1px solid rgba(48, 87, 150, 0.1)'
+                          borderBottom: isDarkMode
+                            ? '1px solid rgba(6, 182, 212, 0.1)'
                             : '1px solid rgba(0, 61, 130, 0.08)'
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.background = document.documentElement.classList.contains('dark')
-                            ? 'rgba(48, 87, 150, 0.08)'
+                          e.currentTarget.style.background = isDarkMode
+                            ? 'rgba(6, 182, 212, 0.08)'
                             : 'rgba(0, 61, 130, 0.03)';
                           e.currentTarget.style.transform = 'translateX(4px)';
                         }}
@@ -504,13 +507,13 @@ export default function AttendanceLogs() {
                               whileHover={{ scale: 1.1, rotate: 5 }}
                               className="w-10 h-10 rounded-xl flex items-center justify-center"
                               style={{
-                                backgroundColor: '#003d82',
-                                boxShadow: '0 4px 12px rgba(0, 61, 130, 0.25)'
+                                backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#003d82',
+                                boxShadow: isDarkMode ? '0 0 15px rgba(6, 182, 212, 0.4)' : '0 4px 12px rgba(0, 61, 130, 0.25)'
                               }}
                             >
                               <FiMapPin className="text-white" size={16} />
                             </motion.div>
-                            <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                            <span className="text-sm font-semibold" style={{ color: isDarkMode ? '#c0f0f0' : 'var(--text-main)' }}>
                               {log.zone?.Zone_Name || '-'}
                             </span>
                           </div>
@@ -531,7 +534,7 @@ export default function AttendanceLogs() {
                               {person?.Name?.charAt(0) || '?'}
                             </div>
                             <div>
-                              <span className="block text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                              <span className="block text-sm font-semibold" style={{ color: isDarkMode ? '#c0f0f0' : 'var(--text-main)' }}>
                                 {person?.Name || 'Unknown'}
                               </span>
                             </div>
@@ -542,10 +545,10 @@ export default function AttendanceLogs() {
                             className="px-3 py-1.5 rounded-full text-xs font-bold"
                             style={{
                               background: isStudent 
-                                ? (document.documentElement.classList.contains('dark')
+                                ? (isDarkMode
                                   ? 'rgba(6, 182, 212, 0.2)'
                                   : 'rgba(6, 182, 212, 0.1)')
-                                : (document.documentElement.classList.contains('dark')
+                                : (isDarkMode
                                   ? 'rgba(16, 185, 129, 0.2)'
                                   : 'rgba(16, 185, 129, 0.1)'),
                               color: isStudent ? '#06b6d4' : '#10b981',
@@ -555,20 +558,20 @@ export default function AttendanceLogs() {
                             {log.personType}
                           </span>
                         </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium hidden lg:table-cell" style={{ color: 'var(--text-soft)' }}>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium hidden lg:table-cell" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : 'var(--text-soft)' }}>
                           {person?.Department || '-'}
                         </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold" style={{ color: isDarkMode ? '#c0f0f0' : 'var(--text-main)' }}>
                           {formatDateTime(log.entryTime)}
                         </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold hidden sm:table-cell" style={{ color: 'var(--text-main)' }}>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold hidden sm:table-cell" style={{ color: isDarkMode ? '#c0f0f0' : 'var(--text-main)' }}>
                           {formatDateTime(log.exitTime)}
                         </td>
                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                           <span className="text-sm font-bold px-3 py-1 rounded-lg" style={{ 
-                            color: '#003d82',
-                            background: document.documentElement.classList.contains('dark')
-                              ? 'rgba(48, 87, 150, 0.15)'
+                            color: isDarkMode ? '#22d3ee' : '#003d82',
+                            background: isDarkMode
+                              ? 'rgba(6, 182, 212, 0.15)'
                               : 'rgba(0, 61, 130, 0.08)'
                           }}>
                             {formatDuration(log.duration)}
@@ -588,18 +591,18 @@ export default function AttendanceLogs() {
           <div
             className="px-6 py-5 flex items-center justify-between"
             style={{
-              background: document.documentElement.classList.contains('dark')
-                ? 'rgba(48, 87, 150, 0.05)'
+              background: isDarkMode
+                ? 'rgba(6, 182, 212, 0.05)'
                 : 'rgba(0, 61, 130, 0.03)',
-              borderTop: document.documentElement.classList.contains('dark')
-                ? '1px solid rgba(48, 87, 150, 0.2)'
+              borderTop: isDarkMode
+                ? '1px solid rgba(6, 182, 212, 0.2)'
                 : '1px solid rgba(0, 61, 130, 0.15)'
             }}
           >
-            <div className="text-sm font-semibold" style={{ color: 'var(--text-soft)' }}>
-              Showing <span style={{ color: '#003d82' }} className="font-bold">{pagination.offset + 1}</span> to{' '}
-              <span style={{ color: '#003d82' }} className="font-bold">{Math.min(pagination.offset + pagination.limit, pagination.total)}</span> of{' '}
-              <span style={{ color: '#003d82' }} className="font-bold">{pagination.total}</span> results
+            <div className="text-sm font-semibold" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : 'var(--text-soft)' }}>
+              Showing <span style={{ color: isDarkMode ? '#22d3ee' : '#003d82' }} className="font-bold">{pagination.offset + 1}</span> to{' '}
+              <span style={{ color: isDarkMode ? '#22d3ee' : '#003d82' }} className="font-bold">{Math.min(pagination.offset + pagination.limit, pagination.total)}</span> of{' '}
+              <span style={{ color: isDarkMode ? '#22d3ee' : '#003d82' }} className="font-bold">{pagination.total}</span> results
             </div>
             <div className="flex gap-3">
               <motion.button
@@ -609,13 +612,13 @@ export default function AttendanceLogs() {
                 disabled={pagination.offset === 0}
                 className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
-                  background: document.documentElement.classList.contains('dark')
-                    ? 'rgba(13, 27, 36, 0.8)'
+                  background: isDarkMode
+                    ? 'rgba(15, 23, 42, 0.8)'
                     : 'rgba(255, 255, 255, 0.9)',
-                  border: document.documentElement.classList.contains('dark')
-                    ? '1px solid rgba(48, 87, 150, 0.3)'
+                  border: isDarkMode
+                    ? '1px solid rgba(6, 182, 212, 0.3)'
                     : '1px solid rgba(0, 61, 130, 0.2)',
-                  color: 'var(--text-main)',
+                  color: isDarkMode ? '#c0f0f0' : 'var(--text-main)',
                   boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
                 }}
               >
@@ -628,10 +631,10 @@ export default function AttendanceLogs() {
                 disabled={pagination.offset + pagination.limit >= pagination.total}
                 className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
-                  backgroundColor: '#003d82',
+                  backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#003d82',
                   color: '#fff',
-                  border: '1px solid rgba(0, 61, 130, 0.3)',
-                  boxShadow: '0 4px 12px rgba(0, 61, 130, 0.3)'
+                  border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.5)' : '1px solid rgba(0, 61, 130, 0.3)',
+                  boxShadow: isDarkMode ? '0 0 20px rgba(6, 182, 212, 0.3)' : '0 4px 12px rgba(0, 61, 130, 0.3)'
                 }}
               >
                 Next
@@ -650,14 +653,14 @@ export default function AttendanceLogs() {
           transition={{ delay: 0.25 }}
           className="relative p-6 rounded-2xl overflow-visible border"
           style={{
-            background: document.documentElement.classList.contains('dark')
-              ? 'rgba(13, 27, 36, 0.6)'
+            background: isDarkMode
+              ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
               : 'rgba(255, 255, 255, 0.95)',
-            borderColor: document.documentElement.classList.contains('dark')
-              ? 'rgba(48, 87, 150, 0.2)'
+            borderColor: isDarkMode
+              ? 'rgba(6, 182, 212, 0.2)'
               : 'rgba(0, 61, 130, 0.15)',
-            boxShadow: document.documentElement.classList.contains('dark')
-              ? '0 4px 16px rgba(0, 0, 0, 0.2)'
+            boxShadow: isDarkMode
+              ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)'
               : '0 2px 8px rgba(0, 61, 130, 0.08)'
           }}
         >
@@ -674,14 +677,14 @@ export default function AttendanceLogs() {
           transition={{ delay: 0.27 }}
           className="relative p-6 rounded-2xl overflow-visible border"
           style={{
-            background: document.documentElement.classList.contains('dark')
-              ? 'rgba(13, 27, 36, 0.6)'
+            background: isDarkMode
+              ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
               : 'rgba(255, 255, 255, 0.95)',
-            borderColor: document.documentElement.classList.contains('dark')
-              ? 'rgba(48, 87, 150, 0.2)'
+            borderColor: isDarkMode
+              ? 'rgba(6, 182, 212, 0.2)'
               : 'rgba(0, 61, 130, 0.15)',
-            boxShadow: document.documentElement.classList.contains('dark')
-              ? '0 4px 16px rgba(0, 0, 0, 0.2)'
+            boxShadow: isDarkMode
+              ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.1)'
               : '0 2px 8px rgba(0, 61, 130, 0.08)'
           }}
         >
