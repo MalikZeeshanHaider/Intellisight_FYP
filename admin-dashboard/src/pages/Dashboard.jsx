@@ -24,7 +24,6 @@ import { zone1API } from '../api/zone1';
 import { format, subDays, getDaysInMonth, startOfMonth, parseISO } from 'date-fns';
 import DailyDetectionChart from '../components/DailyDetectionChart';
 import TopActiveStudentsChart from '../components/TopActiveStudentsChart';
-import WeeklyTrendsChart, { TrendSparkline } from '../components/WeeklyTrendsChart';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -55,11 +54,11 @@ const Dashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Generate dummy data for chart when no real data exists
+  // Generate zero-filled placeholder data when no real data exists yet
   const generateDummyData = (period) => {
     const today = new Date();
     const data = [];
-    
+
     let daysCount;
     if (period === 'daily') {
       daysCount = 1;
@@ -68,25 +67,21 @@ const Dashboard = () => {
     } else {
       daysCount = getDaysInMonth(today);
     }
-    
+
     for (let i = daysCount - 1; i >= 0; i--) {
       const date = subDays(today, i);
       const isToday = i === 0;
-      
-      // Generate random but realistic looking data
-      const baseStudents = Math.floor(Math.random() * 30) + 15;
-      const baseTeachers = Math.floor(Math.random() * 10) + 3;
-      
+
       data.push({
         date: format(date, 'yyyy-MM-dd'),
         dayOfWeek: format(date, 'EEE'),
-        studentDetections: isToday ? 0 : baseStudents,
-        teacherDetections: isToday ? 0 : baseTeachers,
-        totalDetections: isToday ? 0 : baseStudents + baseTeachers,
+        studentDetections: 0,
+        teacherDetections: 0,
+        totalDetections: 0,
         isToday: isToday
       });
     }
-    
+
     return data;
   };
 
@@ -108,7 +103,7 @@ const Dashboard = () => {
         isToday: true
       }];
     } else if (chartPeriod === 'weekly') {
-      // Show last 7 days
+      // Show last 7 days — use 0 for days with no recorded detections
       const last7Days = [];
       for (let i = 6; i >= 0; i--) {
         const date = subDays(today, i);
@@ -120,47 +115,38 @@ const Dashboard = () => {
           last7Days.push({
             date: dateStr,
             dayOfWeek: format(date, 'EEE'),
-            studentDetections: Math.floor(Math.random() * 25) + 10,
-            teacherDetections: Math.floor(Math.random() * 8) + 2,
+            studentDetections: 0,
+            teacherDetections: 0,
             totalDetections: 0,
             isToday: i === 0
           });
-          last7Days[last7Days.length - 1].totalDetections = 
-            last7Days[last7Days.length - 1].studentDetections + 
-            last7Days[last7Days.length - 1].teacherDetections;
         }
       }
       return last7Days;
     } else {
-      // Monthly - show all days of current month
+      // Monthly - show all days of current month; 0 for missing or future days
       const daysInMonth = getDaysInMonth(today);
       const monthStart = startOfMonth(today);
       const monthData = [];
-      
+
       for (let i = 0; i < daysInMonth; i++) {
         const date = new Date(monthStart);
         date.setDate(date.getDate() + i);
         const dateStr = format(date, 'yyyy-MM-dd');
         const existingData = sourceData.find(d => d.date === dateStr);
         const isToday = format(date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
-        const isFuture = date > today;
-        
+
         if (existingData) {
           monthData.push(existingData);
         } else {
           monthData.push({
             date: dateStr,
             dayOfWeek: format(date, 'EEE'),
-            studentDetections: isFuture ? 0 : Math.floor(Math.random() * 25) + 10,
-            teacherDetections: isFuture ? 0 : Math.floor(Math.random() * 8) + 2,
+            studentDetections: 0,
+            teacherDetections: 0,
             totalDetections: 0,
             isToday: isToday
           });
-          if (!isFuture) {
-            monthData[monthData.length - 1].totalDetections = 
-              monthData[monthData.length - 1].studentDetections + 
-              monthData[monthData.length - 1].teacherDetections;
-          }
         }
       }
       return monthData;

@@ -3,18 +3,25 @@ import { UnauthorizedError } from '../utils/errors.js';
 import { ERROR_MESSAGES } from '../config/constants.js';
 
 /**
- * Middleware to authenticate JWT token
+ * Middleware to authenticate JWT token.
+ * Priority: httpOnly cookie → Authorization header (for API clients / Postman).
  */
 export const authenticateToken = async (req, res, next) => {
   try {
-    // Get token from Authorization header
-    const authHeader = req.headers.authorization;
+    // 1. Prefer the httpOnly cookie (browser sessions)
+    let token = req.cookies?.token;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedError(ERROR_MESSAGES.TOKEN_REQUIRED);
+    // 2. Fall back to Authorization header (Postman / server-to-server)
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      }
     }
 
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    if (!token) {
+      throw new UnauthorizedError(ERROR_MESSAGES.TOKEN_REQUIRED);
+    }
 
     // Verify token
     const decoded = verifyToken(token);
@@ -74,16 +81,22 @@ export const requireRole = (...allowedRoles) => {
 };
 
 /**
- * Optional authentication - doesn't fail if no token
+ * Optional authentication - doesn't fail if no token.
+ * Cookie takes priority over Authorization header.
  */
 export const optionalAuth = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
+    let token = req.cookies?.token;
 
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      }
+    }
+
+    if (token) {
       const decoded = verifyToken(token);
-
       req.user = {
         adminId: decoded.adminId,
         email: decoded.email,

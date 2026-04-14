@@ -41,36 +41,25 @@ const Login = () => {
     }
   }, [user, navigate]);
 
-  // Load persisted error on mount
-  useEffect(() => {
-    const persistedError = localStorage.getItem('loginError');
-    if (persistedError) {
-      setError(persistedError);
-    }
-  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    localStorage.removeItem('loginError'); // Clear any previous error
     setIsLoading(true);
 
     const result = await login(email, password);
 
     if (result.success) {
-      localStorage.removeItem('loginError'); // Ensure error is cleared on success
-      
-      // Check if user is super admin
-      const storedUser = JSON.parse(localStorage.getItem('user'));
-      if (storedUser && storedUser.isSuperAdmin) {
+      // user state is set inside AuthContext.login — read it from context
+      // isSuperAdmin check uses the user object returned by the server
+      const loggedInUser = result.user ?? user;
+      if (loggedInUser?.isSuperAdmin) {
         navigate('/super-admin', { replace: true });
       } else {
         navigate(from, { replace: true });
       }
     } else {
-      const errorMessage = result.message;
-      setError(errorMessage);
-      localStorage.setItem('loginError', errorMessage); // Persist error
+      setError(result.message);
     }
     setIsLoading(false);
   };
@@ -78,18 +67,12 @@ const Login = () => {
   // Clear error when user starts typing
   const handleEmailChange = (e) => {
     setEmail(e.target.value);
-    if (error) {
-      setError('');
-      localStorage.removeItem('loginError');
-    }
+    if (error) setError('');
   };
 
   const handlePasswordChange = (e) => {
     setPassword(e.target.value);
-    if (error) {
-      setError('');
-      localStorage.removeItem('loginError');
-    }
+    if (error) setError('');
   };
 
   return (

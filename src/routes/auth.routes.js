@@ -17,15 +17,21 @@ import {
   addUser
 } from '../controllers/auth.controller.js';
 import { authenticateToken, requireRole, requireSuperAdmin } from '../middlewares/auth.js';
+import {
+  loginLimiter,
+  registerLimiter,
+  forgotPasswordLimiter,
+  resetPasswordLimiter,
+} from '../middlewares/rateLimiter.js';
 
 const router = express.Router();
 
-// Public routes
-router.post('/register', register);
-router.post('/login', login);
+// Public routes — rate limited to block brute-force attacks
+router.post('/register', registerLimiter, register);
+router.post('/login', loginLimiter, login);
 router.get('/verify-user/:token/:action', verifyUser);
-router.post('/forgot-password', forgotPasswordHandler);
-router.post('/reset-password/:token', resetPasswordHandler);
+router.post('/forgot-password', forgotPasswordLimiter, forgotPasswordHandler);
+router.post('/reset-password/:token', resetPasswordLimiter, resetPasswordHandler);
 
 // Protected routes
 router.post('/logout', authenticateToken, logout);

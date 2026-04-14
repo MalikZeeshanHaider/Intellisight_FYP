@@ -194,7 +194,19 @@ export const login = asyncHandler(async (req, res) => {
 
   const result = await loginAdmin({ email, password });
 
-  return successResponse(res, result, 'Login successful');
+  // Set JWT in httpOnly cookie — invisible to JavaScript, immune to XSS
+  const isProduction = process.env.NODE_ENV === 'production';
+  res.cookie('token', result.token, {
+    httpOnly: true,               // JS cannot read this cookie
+    secure: isProduction,         // HTTPS only in production
+    sameSite: isProduction ? 'strict' : 'lax', // CSRF protection
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms (matches JWT_EXPIRES_IN)
+    path: '/',
+  });
+
+  // Return admin info but NOT the token — client never needs to store it
+  const { token: _omit, ...safeResult } = result;
+  return successResponse(res, safeResult, 'Login successful');
 });
 
 /**
@@ -203,8 +215,8 @@ export const login = asyncHandler(async (req, res) => {
  * @access  Private
  */
 export const logout = asyncHandler(async (req, res) => {
-  // For JWT-based auth, logout is handled on client side
-  // This endpoint can be used for cleanup if needed
+  // Clear the httpOnly cookie by overwriting it with an expired one
+  res.clearCookie('token', { httpOnly: true, sameSite: 'lax', path: '/' });
   return successResponse(res, {}, 'Logged out successfully');
 });
 

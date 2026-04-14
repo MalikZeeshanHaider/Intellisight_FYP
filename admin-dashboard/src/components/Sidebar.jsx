@@ -18,9 +18,9 @@ import {
   FiVideo,
   FiAlertCircle,
   FiActivity,
-  FiClock,
   FiChevronLeft,
-  FiChevronRight
+  FiChevronRight,
+  FiBarChart2
 } from 'react-icons/fi';
 import { GiTeacher } from 'react-icons/gi';
 
@@ -64,14 +64,14 @@ const Sidebar = ({ onClose, onCollapseChange }) => {
       label: 'Active Presence'
     },
     {
-      path: '/attendance-logs',
-      icon: FiClock,
-      label: 'Attendance Logs'
-    },
-    {
       path: '/unknown-faces',
       icon: FiAlertCircle,
       label: 'Unknown Faces'
+    },
+    {
+      path: '/attendance-analytics',
+      icon: FiBarChart2,
+      label: 'Attendance'
     },
     {
       path: '/students',

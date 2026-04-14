@@ -21,19 +21,19 @@ from deepface import DeepFace
 
 from database_handler import DatabaseHandler
 from config import (
-    MODEL_NAME, DISTANCE_THRESHOLD, MIN_FACE_SIZE, 
+    MODEL_NAME, DISTANCE_THRESHOLD, MIN_FACE_SIZE,
     CONSECUTIVE_MATCHES, EMBEDDINGS_FILE, DETECTOR_BACKEND,
-    UNIDENTIFIED_SAVE_PATH
+    UNIDENTIFIED_SAVE_PATH, FRAME_SKIP
 )
 from utils import (
     setup_logging, get_euclidean_distance, find_best_match,
-    load_embeddings_from_json, draw_face_box, draw_info_panel, FPSCounter
+    load_embeddings_from_json, draw_face_box, draw_info_panel, FPSCounter,
+    build_person_key, preprocess_face_crop, EmbeddingIndex, FaceTracker
 )
 
 logger = setup_logging()
 
 # Recognition settings
-PROCESS_EVERY_N_FRAMES = 10  # Process recognition every N frames
 MAX_FACES = 10  # Maximum faces to process at once
 
 
@@ -43,8 +43,9 @@ class DualCameraRecognizer:
         self.db_handler = DatabaseHandler()
         self.zone_name = self.db_handler.get_zone_name(zone_id)
         
-        # Load known faces from embeddings file
-        self.embeddings_data = self.load_embeddings()
+        # Load known faces and build vectorized index
+        self.embeddings_data  = self.load_embeddings()
+        self.embedding_index  = EmbeddingIndex(self.embeddings_data)
         
         # Get cameras for zone
         cameras = self.db_handler.get_zone_cameras(zone_id)
@@ -54,30 +55,29 @@ class DualCameraRecognizer:
         if not self.entry_camera and not self.exit_camera:
             raise ValueError(f"No cameras configured for Zone {zone_id}")
         
-        # Initialize video captures
-        self.entry_cap = None
-        self.exit_cap = None
-        
+        # Initialize video captures (with retry on first open)
+        self.entry_cap    = None
+        self.exit_cap     = None
+        self.entry_source = None   # stored for reconnect in run()
+        self.exit_source  = None
+
         if self.entry_camera:
-            camera_source = self.parse_camera_source(self.entry_camera['Camera_URL'])
-            self.entry_cap = cv2.VideoCapture(camera_source)
-            print(f"[ENTRY CAMERA] Initialized: {camera_source}")
-        
+            self.entry_source = self.parse_camera_source(self.entry_camera['Camera_URL'])
+            self.entry_cap    = self._open_camera(self.entry_source, 'ENTRY CAMERA')
+
         if self.exit_camera:
-            camera_source = self.parse_camera_source(self.exit_camera['Camera_URL'])
-            self.exit_cap = cv2.VideoCapture(camera_source)
-            print(f"[EXIT CAMERA] Initialized: {camera_source}")
+            self.exit_source = self.parse_camera_source(self.exit_camera['Camera_URL'])
+            self.exit_cap    = self._open_camera(self.exit_source, 'EXIT CAMERA')
         
         # Tracking variables
         self.entry_match_counts = {}  # {person_key: count}
         self.exit_match_counts = {}
         self.frame_count = 0
         self.fps_counter = FPSCounter()
-        
-        # Haar Cascade for fast face detection
-        self.face_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-        )
+
+        # Face trackers — one per camera, cache identity for 2 s without re-recognition
+        self.entry_tracker = FaceTracker(max_age_seconds=2.0)
+        self.exit_tracker  = FaceTracker(max_age_seconds=2.0)
         
         print(f"\n{'='*60}")
         print(f"DUAL CAMERA RECOGNITION SYSTEM - DeepFace FaceNet")
@@ -87,6 +87,64 @@ class DualCameraRecognizer:
         print(f"Exit Camera: {'✓' if self.exit_cap else '✗'}")
         print(f"Distance Threshold: {DISTANCE_THRESHOLD}")
         print(f"{'='*60}\n")
+
+    def _open_camera(self, source, label, max_attempts=5):
+        """
+        Open a camera with exponential backoff.
+
+        Tries up to *max_attempts* times.  For RTSP URLs, configures FFMPEG
+        with TCP transport; for integer webcam indices a plain VideoCapture is
+        used.  Logs each attempt and returns the VideoCapture on success, or
+        None if every attempt fails (the run-loop will retry later).
+
+        Args:
+            source       : int (webcam index) or str (RTSP/file URL)
+            label        : human-readable label used in log lines
+            max_attempts : maximum number of open attempts
+
+        Returns:
+            cv2.VideoCapture | None
+        """
+        base_delay = 2
+        max_delay  = 60
+
+        for attempt in range(max_attempts):
+            try:
+                if attempt > 0:
+                    delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
+                    print(f"[{label}] Attempt {attempt + 1}/{max_attempts} — waiting {delay:.0f}s...")
+                    time.sleep(delay)
+
+                if isinstance(source, str) and source.lower().startswith('rtsp'):
+                    os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = (
+                        'rtsp_transport;tcp|'
+                        'rtsp_flags;prefer_tcp|'
+                        'stimeout;5000000|'
+                        'max_delay;500000|'
+                        'reorder_queue_size;0'
+                    )
+                    cap = cv2.VideoCapture(source, cv2.CAP_FFMPEG)
+                    cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 10000)
+                    cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC,  5000)
+                else:
+                    cap = cv2.VideoCapture(source)
+
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+                if cap.isOpened():
+                    ret, _ = cap.read()
+                    if ret:
+                        print(f"[{label}] ✓ Connected")
+                        return cap
+
+                cap.release()
+                print(f"[{label}] Attempt {attempt + 1}/{max_attempts} failed — could not read frame")
+
+            except Exception as e:
+                print(f"[{label}] Attempt {attempt + 1}/{max_attempts} error: {e}")
+
+        print(f"[{label}] Could not connect after {max_attempts} attempts — will retry during operation")
+        return None
 
     def parse_camera_source(self, camera_url):
         """Parse camera URL/index"""
@@ -98,214 +156,240 @@ class DualCameraRecognizer:
             return camera_url
 
     def load_embeddings(self):
-        """Load embeddings from database (FaceEmbeddings table) with JSON file fallback"""
-        # First try to load from database
+        """
+        Load embeddings from database (FaceEmbeddings table) with JSON file fallback.
+
+        The 'person' field of every returned item is set to the canonical person_key
+        ("42|STUDENT|Ali Khan") so that find_best_match() returns a person_key and
+        parse_person_key() can decode it without any further DB lookup.
+        """
         db_persons = self.db_handler.fetch_all_persons()
-        
+
         if db_persons:
-            # Convert database format to expected format for recognition
             embeddings_data = []
-            for person_key, person_data in db_persons.items():
+            for key, person_data in db_persons.items():
                 for embedding in person_data.get('embeddings', []):
                     embeddings_data.append({
-                        'person': person_data['name'],
-                        'embedding': embedding,
-                        'type': person_data.get('type', 'Unknown'),
-                        'id': person_data.get('id')
+                        'person_id':  person_data.get('id'),
+                        'name':       person_data.get('name', ''),
+                        'role':       person_data.get('role', 'UNKNOWN'),
+                        'person_key': person_data.get('key', key),
+                        'embedding':  embedding,
                     })
-            
+
             if embeddings_data:
-                persons = set([d['person'] for d in embeddings_data])
-                print(f"[EMBEDDINGS] Loaded {len(embeddings_data)} embeddings from DB for: {', '.join(persons)}")
+                unique_names = sorted(set(d['name'] or d['person_key'] for d in embeddings_data))
+                print(f"[EMBEDDINGS] Loaded {len(embeddings_data)} embedding(s) for: {', '.join(unique_names)}")
                 return embeddings_data
-        
-        # Fallback to JSON file
-        embeddings_data = load_embeddings_from_json(EMBEDDINGS_FILE)
-        
-        if not embeddings_data:
+
+        # JSON fallback — may be old format (just folder name) or new (person_key)
+        raw = load_embeddings_from_json(EMBEDDINGS_FILE)
+
+        if not raw:
             print(f"[WARNING] No embeddings found in database or {EMBEDDINGS_FILE}")
-            print("[WARNING] Run 'python train.py' or add persons through the UI first!")
+            print("[WARNING] Run 'python train.py' first!")
             return []
-        
-        persons = set([d['person'] for d in embeddings_data])
-        print(f"[EMBEDDINGS] Loaded {len(embeddings_data)} embeddings from file for: {', '.join(persons)}")
+
+        embeddings_data = []
+        for item in raw:
+            embeddings_data.append({
+                'person_id':  item.get('person_id'),
+                'name':       item.get('name') or item.get('person', ''),
+                'role':       (item.get('role') or 'UNKNOWN').upper(),
+                'person_key': item.get('person_key') or item.get('person', ''),
+                'embedding':  item['embedding'],
+            })
+
+        unique_names = set(d['name'] or d['person_key'] for d in embeddings_data)
+        print(f"[EMBEDDINGS] Loaded {len(embeddings_data)} embedding(s) from file ({len(unique_names)} persons)")
         return embeddings_data
     
     def reload_embeddings(self):
         """Reload embeddings from database (call when embeddings are updated)"""
         self.embeddings_data = self.load_embeddings()
+        self.embedding_index = EmbeddingIndex(self.embeddings_data)
         print(f"[EMBEDDINGS] Reloaded {len(self.embeddings_data)} embeddings")
-
-    def recognize_face(self, face_crop):
-        """
-        Recognize a single face crop using DeepFace FaceNet
-        
-        Args:
-            face_crop: OpenCV image of cropped face
-            
-        Returns:
-            tuple: (person_name, distance) or (None, None)
-        """
-        try:
-            # Generate embedding using DeepFace
-            results = DeepFace.represent(
-                img_path=face_crop,
-                model_name=MODEL_NAME,
-                detector_backend="opencv",  # Use opencv for speed on crops
-                enforce_detection=False,
-                align=False
-            )
-            
-            if results and len(results) > 0:
-                embedding = results[0]["embedding"]
-                person, distance = find_best_match(embedding, self.embeddings_data, DISTANCE_THRESHOLD)
-                return person, distance
-                
-        except Exception as e:
-            logger.debug(f"Face recognition error: {e}")
-        
-        return None, None
 
     def process_frame(self, frame, camera_type):
         """
-        Process a single frame for face detection and recognition
-        
+        Process a single frame using a two-phase pipeline:
+
+        Phase 1 — Detection (always runs):
+            DeepFace.extract_faces() with DETECTOR_BACKEND locates all faces and
+            returns aligned crops + bounding boxes.
+
+        Phase 2 — Recognition (tracker-gated):
+            For each detected face the FaceTracker is queried.  If a cached
+            identity exists (IoU ≥ 0.5, age < 2 s) it is reused without
+            calling DeepFace.represent() again.  Only genuinely new or
+            tracking-lost faces pay the full embedding cost.
+
         Args:
-            frame: OpenCV frame
-            camera_type: 'entry' or 'exit'
-            
+            frame       : OpenCV BGR frame
+            camera_type : 'entry' or 'exit'
+
         Returns:
-            tuple: (display_frame, recognized_persons)
+            (display_frame, recognized_persons)
         """
-        display = frame.copy()
+        tracker  = self.entry_tracker if camera_type == 'entry' else self.exit_tracker
+        display  = frame.copy()
         recognized_persons = []
-        
-        # Convert to grayscale for face detection
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
-        # Detect faces using Haar Cascade (fast)
-        faces = self.face_cascade.detectMultiScale(
-            gray,
-            scaleFactor=1.1,
-            minNeighbors=5,
-            minSize=(MIN_FACE_SIZE, MIN_FACE_SIZE)
-        )
-        
-        # Sort by size (largest first) and limit
-        if len(faces) > 0:
-            faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)[:MAX_FACES]
-        
-        # Process each face
-        for (x, y, w, h) in faces:
-            # Add margin
-            margin = 20
-            y1 = max(0, y - margin)
-            y2 = min(frame.shape[0], y + h + margin)
-            x1 = max(0, x - margin)
-            x2 = min(frame.shape[1], x + w + margin)
-            
-            face_crop = frame[y1:y2, x1:x2]
-            
-            # Recognize face
-            person, distance = self.recognize_face(face_crop)
-            
-            if person and person != "Unknown":
-                # Known person
+        detections         = []   # fed into tracker.update() at end of frame
+
+        # ── Phase 1: detect all faces ─────────────────────────────────────────
+        try:
+            face_list = DeepFace.extract_faces(
+                img_path=preprocess_face_crop(frame),
+                detector_backend=DETECTOR_BACKEND,
+                enforce_detection=False,
+                align=True
+            )
+        except Exception as e:
+            logger.debug(f"Detection error: {e}")
+            face_list = []
+
+        # Sort largest-first, cap to MAX_FACES
+        face_list = sorted(
+            face_list,
+            key=lambda f: f.get('facial_area', {}).get('w', 0) * f.get('facial_area', {}).get('h', 0),
+            reverse=True
+        )[:MAX_FACES]
+
+        # ── Phase 2: identity lookup per face ─────────────────────────────────
+        for face_obj in face_list:
+            fa = face_obj.get('facial_area', {})
+            x, y, w, h = fa.get('x', 0), fa.get('y', 0), fa.get('w', 0), fa.get('h', 0)
+
+            if w < MIN_FACE_SIZE or h < MIN_FACE_SIZE:
+                continue
+
+            bbox = (x, y, w, h)
+
+            # Check tracker cache — avoids re-recognition for known faces
+            cached_person, cached_dist, _ = tracker.get_person_for_bbox(bbox)
+
+            if cached_person is not None:
+                person_dict = cached_person
+                distance    = cached_dist
+            else:
+                # Full recognition: embed the aligned crop, search index
+                face_crop = face_obj.get('face')
+                if face_crop is None or (hasattr(face_crop, 'size') and face_crop.size == 0):
+                    fh, fw = frame.shape[:2]
+                    m = 20
+                    face_crop = frame[max(0, y - m):min(fh, y + h + m),
+                                      max(0, x - m):min(fw, x + w + m)]
+
+                face_crop    = preprocess_face_crop(face_crop)
+                face_resized = cv2.resize(face_crop, (160, 160))
+
+                person_dict = distance = None
+                try:
+                    results = DeepFace.represent(
+                        img_path=face_resized,
+                        model_name=MODEL_NAME,
+                        detector_backend="skip",   # already cropped + aligned
+                        enforce_detection=False,
+                        align=True
+                    )
+                    if results:
+                        person_dict, distance = self.embedding_index.search(
+                            results[0]["embedding"], DISTANCE_THRESHOLD
+                        )
+                except Exception as e:
+                    logger.debug(f"Recognition error: {e}")
+
+            # Accumulate detection for tracker update
+            detections.append({
+                'bbox':       bbox,
+                'person':     person_dict,
+                'distance':   distance or 0,
+                'confidence': 0,
+            })
+
+            # Build display label and collect recognized persons
+            if person_dict is not None:
+                role         = person_dict['role']
+                display_name = person_dict['name']
+                color = (255, 100, 0) if role == 'TEACHER' else (0, 200, 0)
+                label = f"{display_name} ({distance:.1f})"
                 recognized_persons.append({
-                    'name': person,
-                    'distance': distance,
-                    'bbox': (x, y, w, h)
+                    'person_id':  person_dict['person_id'],
+                    'name':       display_name,
+                    'role':       role,
+                    'person_key': person_dict['person_key'],
+                    'distance':   distance,
+                    'bbox':       bbox,
                 })
-                
-                color = (0, 255, 0)  # Green
-                label = f"{person} ({distance:.1f})"
-                
-            elif person == "Unknown":
-                color = (0, 0, 255)  # Red
+            elif distance is not None:
+                color = (0, 0, 255)
                 label = f"Unknown ({distance:.1f})"
             else:
-                color = (0, 255, 255)  # Yellow - detecting
+                color = (0, 255, 255)
                 label = "Detecting..."
-            
-            # Draw box and label
+
             draw_face_box(display, x, y, w, h, label, color)
-        
+
+        # ── Update tracker with this frame's detections ───────────────────────
+        tracker.update(detections, self.frame_count)
+
         return display, recognized_persons
 
-    def handle_entry_detection(self, person_name):
-        """Handle person detected at entry camera"""
+    def handle_entry_detection(self, person: dict):
+        """
+        Handle a person recognised at the entry camera.
+
+        Args:
+            person: dict with keys 'person_id', 'name', 'role', 'person_key',
+                    'distance', 'bbox' as produced by process_frame().
+        """
+        person_key = person['person_key']
         match_counts = self.entry_match_counts
-        
-        if person_name not in match_counts:
-            match_counts[person_name] = 0
-        
-        match_counts[person_name] += 1
-        
-        # Require consecutive matches
-        if match_counts[person_name] >= CONSECUTIVE_MATCHES:
-            # Parse person type and ID from name
-            person_type, person_id = self.parse_person_info(person_name)
-            
-            if person_type and person_id:
+
+        match_counts[person_key] = match_counts.get(person_key, 0) + 1
+
+        if match_counts[person_key] >= CONSECUTIVE_MATCHES:
+            person_id = person['person_id']
+            role      = person['role']
+            name      = person['name']
+
+            if person_id is not None and role in ('STUDENT', 'TEACHER'):
+                person_type = 'Student' if role == 'STUDENT' else 'Teacher'
                 success = self.db_handler.add_to_active_presence(person_id, person_type, self.zone_id)
                 if success:
-                    print(f"[ENTRY] ✓ {person_name} entered {self.zone_name}")
-            
-            # Reset count
-            match_counts[person_name] = 0
+                    print(f"[ENTRY] ✓ {name} ({role}) entered {self.zone_name}")
+            else:
+                logger.warning(f"[ENTRY] Invalid identity in person dict: {person!r}")
 
-    def handle_exit_detection(self, person_name):
-        """Handle person detected at exit camera"""
+            match_counts[person_key] = 0
+
+    def handle_exit_detection(self, person: dict):
+        """
+        Handle a person recognised at the exit camera.
+
+        Args:
+            person: dict with keys 'person_id', 'name', 'role', 'person_key',
+                    'distance', 'bbox' as produced by process_frame().
+        """
+        person_key = person['person_key']
         match_counts = self.exit_match_counts
-        
-        if person_name not in match_counts:
-            match_counts[person_name] = 0
-        
-        match_counts[person_name] += 1
-        
-        # Require consecutive matches
-        if match_counts[person_name] >= CONSECUTIVE_MATCHES:
-            # Parse person type and ID from name
-            person_type, person_id = self.parse_person_info(person_name)
-            
-            if person_type and person_id:
+
+        match_counts[person_key] = match_counts.get(person_key, 0) + 1
+
+        if match_counts[person_key] >= CONSECUTIVE_MATCHES:
+            person_id = person['person_id']
+            role      = person['role']
+            name      = person['name']
+
+            if person_id is not None and role in ('STUDENT', 'TEACHER'):
+                person_type = 'Student' if role == 'STUDENT' else 'Teacher'
                 success = self.db_handler.remove_from_active_presence(person_id, person_type, self.zone_id)
                 if success:
-                    print(f"[EXIT] ✓ {person_name} exited {self.zone_name}")
-            
-            # Reset count
-            match_counts[person_name] = 0
+                    print(f"[EXIT] ✓ {name} ({role}) exited {self.zone_name}")
+            else:
+                logger.warning(f"[EXIT] Invalid identity in person dict: {person!r}")
 
-    def parse_person_info(self, person_name):
-        """
-        Parse person type and ID from folder/person name
-        
-        Expected formats:
-        - "student_1" or "teacher_2" 
-        - "John_Doe" (matched from database)
-        
-        Returns:
-            tuple: (person_type, person_id) or (None, None)
-        """
-        name_lower = person_name.lower()
-        
-        if name_lower.startswith('student_'):
-            try:
-                person_id = int(name_lower.replace('student_', ''))
-                return 'Student', person_id
-            except ValueError:
-                pass
-        
-        elif name_lower.startswith('teacher_'):
-            try:
-                person_id = int(name_lower.replace('teacher_', ''))
-                return 'Teacher', person_id
-            except ValueError:
-                pass
-        
-        # Try to lookup by name in database
-        # This requires a database lookup
-        return None, None
+            match_counts[person_key] = 0
 
     def run(self, entry_only=False, exit_only=False):
         """
@@ -317,58 +401,105 @@ class DualCameraRecognizer:
         """
         print("\n[RECOGNITION] Starting face recognition loop...")
         print("[RECOGNITION] Press 'q' to quit\n")
-        
+
+        # Per-camera reconnect state
+        entry_fail_count = 0
+        exit_fail_count  = 0
+        entry_reconnects = 0
+        exit_reconnects  = 0
+        FAIL_THRESHOLD   = 10   # Consecutive read failures before attempting reconnect
+
         try:
             while True:
                 self.frame_count += 1
                 self.fps_counter.update()
-                
-                # Process entry camera
-                if self.entry_cap and not exit_only:
-                    ret, frame = self.entry_cap.read()
+
+                # ── Entry camera ──────────────────────────────────────────────
+                if self.entry_source is not None and not exit_only:
+                    if self.entry_cap is not None:
+                        ret, frame = self.entry_cap.read()
+                    else:
+                        ret = False  # cap is None — trigger reconnect path below
+
                     if ret:
-                        if self.frame_count % PROCESS_EVERY_N_FRAMES == 0:
+                        entry_fail_count = 0
+                        if self.frame_count % FRAME_SKIP == 0:
                             display, recognized = self.process_frame(frame, 'entry')
-                            
                             for person in recognized:
-                                self.handle_entry_detection(person['name'])
-                            
-                            # Show status
+                                self.handle_entry_detection(person)
                             fps = self.fps_counter.get_fps()
-                            info_lines = [
+                            draw_info_panel(display, [
                                 f"Zone: {self.zone_name} (Entry)",
                                 f"FPS: {fps:.1f}",
                                 f"Faces: {len(recognized)}"
-                            ]
-                            draw_info_panel(display, info_lines)
-                            
+                            ])
                             cv2.imshow(f'Entry Camera - {self.zone_name}', display)
                         else:
                             cv2.imshow(f'Entry Camera - {self.zone_name}', frame)
-                
-                # Process exit camera
-                if self.exit_cap and not entry_only:
-                    ret, frame = self.exit_cap.read()
+                    else:
+                        entry_fail_count += 1
+                        if entry_fail_count >= FAIL_THRESHOLD:
+                            entry_reconnects += 1
+                            delay = min(2 * (2 ** min(entry_reconnects - 1, 5)), 60)
+                            print(
+                                f"[ENTRY] Stream lost — reconnect attempt {entry_reconnects}, "
+                                f"waiting {delay:.0f}s..."
+                            )
+                            if self.entry_cap:
+                                self.entry_cap.release()
+                                self.entry_cap = None
+                            time.sleep(delay)
+                            self.entry_cap = self._open_camera(
+                                self.entry_source, 'ENTRY CAMERA', max_attempts=1
+                            )
+                            if self.entry_cap:
+                                entry_reconnects = 0
+                                print("[ENTRY] ✓ Reconnected")
+                            entry_fail_count = 0
+
+                # ── Exit camera ───────────────────────────────────────────────
+                if self.exit_source is not None and not entry_only:
+                    if self.exit_cap is not None:
+                        ret, frame = self.exit_cap.read()
+                    else:
+                        ret = False
+
                     if ret:
-                        if self.frame_count % PROCESS_EVERY_N_FRAMES == 0:
+                        exit_fail_count = 0
+                        if self.frame_count % FRAME_SKIP == 0:
                             display, recognized = self.process_frame(frame, 'exit')
-                            
                             for person in recognized:
-                                self.handle_exit_detection(person['name'])
-                            
-                            # Show status
+                                self.handle_exit_detection(person)
                             fps = self.fps_counter.get_fps()
-                            info_lines = [
+                            draw_info_panel(display, [
                                 f"Zone: {self.zone_name} (Exit)",
                                 f"FPS: {fps:.1f}",
                                 f"Faces: {len(recognized)}"
-                            ]
-                            draw_info_panel(display, info_lines)
-                            
+                            ])
                             cv2.imshow(f'Exit Camera - {self.zone_name}', display)
                         else:
                             cv2.imshow(f'Exit Camera - {self.zone_name}', frame)
-                
+                    else:
+                        exit_fail_count += 1
+                        if exit_fail_count >= FAIL_THRESHOLD:
+                            exit_reconnects += 1
+                            delay = min(2 * (2 ** min(exit_reconnects - 1, 5)), 60)
+                            print(
+                                f"[EXIT] Stream lost — reconnect attempt {exit_reconnects}, "
+                                f"waiting {delay:.0f}s..."
+                            )
+                            if self.exit_cap:
+                                self.exit_cap.release()
+                                self.exit_cap = None
+                            time.sleep(delay)
+                            self.exit_cap = self._open_camera(
+                                self.exit_source, 'EXIT CAMERA', max_attempts=1
+                            )
+                            if self.exit_cap:
+                                exit_reconnects = 0
+                                print("[EXIT] ✓ Reconnected")
+                            exit_fail_count = 0
+
                 # Check for quit
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break

@@ -17,6 +17,7 @@ import argparse
 import base64
 from io import BytesIO
 from PIL import Image
+import cv2
 import numpy as np
 
 from deepface import DeepFace
@@ -27,7 +28,7 @@ from config import (
 )
 from utils import (
     setup_logging, decode_base64_image, save_base64_image,
-    save_embeddings_to_json, create_person_folder
+    save_embeddings_to_json, create_person_folder, preprocess_face_crop
 )
 
 logger = setup_logging()
@@ -48,7 +49,11 @@ def generate_embedding_from_base64(base64_string):
         image = decode_base64_image(base64_string)
         if image is None:
             return None
-        
+
+        # Apply the same preprocessing used during recognition so training
+        # and recognition embeddings occupy the same feature space.
+        image = preprocess_face_crop(image)
+
         # Generate embedding using DeepFace
         result = DeepFace.represent(
             img_path=image,
@@ -85,9 +90,15 @@ def generate_embeddings_from_images(image_paths):
             
         try:
             print(f"  Processing image {idx + 1}/{len(image_paths)}...", end=" ")
-            
+
+            image = cv2.imread(path)
+            if image is None:
+                print("✗ Cannot read image file")
+                continue
+            image = preprocess_face_crop(image)
+
             result = DeepFace.represent(
-                img_path=path,
+                img_path=image,
                 model_name=MODEL_NAME,
                 detector_backend=DETECTOR_BACKEND,
                 enforce_detection=True,
@@ -155,11 +166,12 @@ def enroll_person_from_database(person_id, person_type, db_handler):
     if not embeddings:
         print(f"[ERROR] No valid embeddings generated for {person_data['Name']}")
         return False
-    
+
     print(f"[SUCCESS] Generated {len(embeddings)} embeddings")
-    
-    # Save to database
-    return db_handler.save_face_embeddings(person_id, person_type, embeddings)
+
+    # Save to database — pass person_name so save_face_embeddings can build
+    # the canonical person_key and write it to the FaceEmbeddings table.
+    return db_handler.save_face_embeddings(person_id, person_type, embeddings, person_name=person_data['Name'])
 
 
 def enroll_all_from_database(db_handler):
@@ -279,32 +291,39 @@ def train_from_images_folder():
             image_path = os.path.join(person_path, image_file)
             
             try:
+                image = cv2.imread(image_path)
+                if image is None:
+                    print(f"  ✗ {image_file} - Cannot read image file")
+                    error_count += 1
+                    continue
+                image = preprocess_face_crop(image)
+
                 result = DeepFace.represent(
-                    img_path=image_path,
+                    img_path=image,
                     model_name=MODEL_NAME,
                     detector_backend=DETECTOR_BACKEND,
                     enforce_detection=True,
                     align=True
                 )
-                
+
                 if result and len(result) > 0:
                     embedding = result[0]["embedding"]
-                    
+
                     embeddings_data.append({
                         "person": person_name,
                         "image": image_file,
                         "embedding": embedding,
                         "image_path": image_path
                     })
-                    
+
                     processed_count += 1
                     print(f"  ✓ {image_file}")
-                    
+
                     del result, embedding
                 else:
                     print(f"  ✗ {image_file} - No face detected")
                     error_count += 1
-                    
+
             except Exception as e:
                 print(f"  ✗ {image_file} - Error: {str(e)[:50]}")
                 error_count += 1
@@ -314,19 +333,29 @@ def train_from_images_folder():
         
         print()
     
-    # Save embeddings
+    # Save embeddings then sync to DB so explicit person_id/role/name fields
+    # are written into the JSON file (same as train.py does).
     if embeddings_data:
         save_embeddings_to_json(embeddings_data, EMBEDDINGS_FILE)
-        
+
+        # Enrich JSON with explicit identity fields via DB sync
+        try:
+            from train import sync_embeddings_to_database
+            synced, unlinked = sync_embeddings_to_database(embeddings_data)
+        except Exception as e:
+            print(f"[WARNING] Could not sync embeddings to database: {e}")
+            synced, unlinked = 0, len(embeddings_data)
+
         print("\n" + "="*60)
         print("TRAINING COMPLETE")
         print("="*60)
         print(f"  Total images processed: {processed_count}")
         print(f"  Failed images: {error_count}")
         print(f"  Embeddings saved: {len(embeddings_data)}")
+        print(f"  Synced to DB: {synced} | Unlinked: {unlinked}")
         print(f"  Output file: {EMBEDDINGS_FILE}")
         print("="*60 + "\n")
-        
+
         gc.collect()
         return True
     else:

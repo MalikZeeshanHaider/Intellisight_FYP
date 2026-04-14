@@ -57,7 +57,7 @@ export const resetDailyActivePresence = async () => {
               Zone_id: record.Zone_id,
               EntryTime: record.EntryTime,
               ExitTime: now, // Auto-exit at day end
-              Duration: Math.floor((now - record.EntryTime) / 60000), // Duration in minutes
+              Duration: Math.max(0, Math.floor((now - record.EntryTime) / 60000)), // Duration in minutes, never negative
             },
           });
 

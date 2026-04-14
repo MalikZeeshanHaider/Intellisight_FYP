@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FaUsers, FaUserClock, FaUserCheck, FaUserShield, FaTrash, FaCheck, FaTimes, FaUserPlus, FaTimes as FaClose, FaSignOutAlt, FaMoon, FaSun, FaUserCircle, FaChevronDown } from 'react-icons/fa';
-import axios from 'axios';
+import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-
 const SuperAdminDashboard = () => {
-  const { token, logout } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
   const [statistics, setStatistics] = useState({
     totalUsers: 0,
@@ -54,12 +52,10 @@ const SuperAdminDashboard = () => {
       setLoading(true);
       setError('');
 
-      const headers = { Authorization: `Bearer ${token}` };
-
       const [statsRes, adminsRes, pendingRes] = await Promise.all([
-        axios.get(`${API_URL}/auth/admin/statistics`, { headers }),
-        axios.get(`${API_URL}/auth/admin/all`, { headers }),
-        axios.get(`${API_URL}/auth/pending-users`, { headers })
+        api.get('/auth/admin/statistics'),
+        api.get('/auth/admin/all'),
+        api.get('/auth/pending-users')
       ]);
 
       setStatistics(statsRes.data.data);
@@ -74,8 +70,7 @@ const SuperAdminDashboard = () => {
 
   const handleApprove = async (userId) => {
     try {
-      const headers = { Authorization: `Bearer ${token}` };
-      await axios.post(`${API_URL}/auth/admin/approve/${userId}`, {}, { headers });
+      await api.post(`/auth/admin/approve/${userId}`, {});
       setSuccessMessage('User approved successfully');
       fetchData();
       setTimeout(() => setSuccessMessage(''), 3000);
@@ -87,8 +82,7 @@ const SuperAdminDashboard = () => {
 
   const handleReject = async (userId, reason = 'No reason provided') => {
     try {
-      const headers = { Authorization: `Bearer ${token}` };
-      await axios.post(`${API_URL}/auth/admin/reject/${userId}`, { reason }, { headers });
+      await api.post(`/auth/admin/reject/${userId}`, { reason });
       setSuccessMessage('User rejected successfully');
       fetchData();
       setTimeout(() => setSuccessMessage(''), 3000);
@@ -107,8 +101,7 @@ const SuperAdminDashboard = () => {
     if (!adminToDelete) return;
 
     try {
-      const headers = { Authorization: `Bearer ${token}` };
-      await axios.delete(`${API_URL}/auth/admin/${adminToDelete}`, { headers });
+      await api.delete(`/auth/admin/${adminToDelete}`);
       setSuccessMessage('Admin deleted successfully');
       setShowDeleteConfirm(false);
       setAdminToDelete(null);
@@ -131,8 +124,7 @@ const SuperAdminDashboard = () => {
 
     try {
       setIsAddingUser(true);
-      const headers = { Authorization: `Bearer ${token}` };
-      await axios.post(`${API_URL}/auth/admin/add-user`, newUser, { headers });
+      await api.post('/auth/admin/add-user', newUser);
       setSuccessMessage('User added successfully! Password reset email sent.');
       setShowAddUserModal(false);
       setNewUser({ name: '', email: '' });

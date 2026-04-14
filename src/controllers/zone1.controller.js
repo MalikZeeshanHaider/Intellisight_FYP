@@ -28,118 +28,101 @@ export const logRecognizedPerson = async (req, res) => {
     // Normalize personType (Student/Teacher)
     const normalizedType = personType === 'STUDENT' || personType === 'Student' ? 'Student' : 'Teacher';
 
-    // Check if person is already in active presence
-    const existingEntry = await prisma.activePresence.findFirst({
-      where: {
-        Zone_id: 1,
-        PersonType: normalizedType,
-        ...(normalizedType === 'Teacher' 
-          ? { Teacher_ID: parseInt(personId) }
-          : { Student_ID: parseInt(personId) }
-        )
-      }
-    });
+    // Wrap the duplicate-check + create in a transaction to prevent race conditions
+    // when two requests arrive simultaneously for the same person.
+    const personIdInt = parseInt(personId);
+    const personWhere = {
+      Zone_id: 1,
+      PersonType: normalizedType,
+      ...(normalizedType === 'Teacher'
+        ? { Teacher_ID: personIdInt }
+        : { Student_ID: personIdInt }),
+    };
 
-    if (existingEntry) {
-      console.log(`⏭️ ${normalizedType} ${personId} already in zone - skipping duplicate entry`);
-      return res.status(200).json({
-        success: true,
-        message: 'Person already in zone',
-        data: existingEntry
-      });
-    }
+    let existingEntry = null;
 
-    // Also check if there's an open attendance log (no exit time)
-    const openAttendanceLog = await prisma.attendanceLog.findFirst({
-      where: {
-        Zone_id: 1,
-        PersonType: normalizedType,
-        ExitTime: null,
-        ...(normalizedType === 'Teacher' 
-          ? { Teacher_ID: parseInt(personId) }
-          : { Student_ID: parseInt(personId) }
-        )
-      }
-    });
-
-    if (openAttendanceLog) {
-      console.log(`⏭️ ${normalizedType} ${personId} has open attendance log - skipping duplicate`);
-      return res.status(200).json({
-        success: true,
-        message: 'Person already has active attendance session',
-        data: openAttendanceLog
-      });
-    }
-
-    // Add to active presence (only on Entry camera)
     if (cameraType === 'Entry') {
-      const entryTime = new Date();
-      
-      // Create ActivePresence record
-      const entry = await prisma.activePresence.create({
-        data: {
-          Zone_id: 1,
-          PersonType: normalizedType,
-          EntryTime: entryTime,
-          ...(normalizedType === 'Teacher' 
-            ? { Teacher_ID: parseInt(personId) }
-            : { Student_ID: parseInt(personId) }
-          )
-        },
-        include: {
-          teacher: {
-            select: {
-              Teacher_ID: true,
-              Name: true,
-              Email: true,
-              Department: true
-            }
-          },
-          student: {
-            select: {
-              Student_ID: true,
-              Name: true,
-              Email: true,
-              Department: true,
-              RollNumber: true
-            }
-          },
-          zone: {
-            select: {
-              Zone_id: true,
-              Zone_Name: true
-            }
-          }
-        }
-      });
+      // Use a transaction so the findFirst → create pair is atomic
+      let entry = null;
+      try {
+        entry = await prisma.$transaction(async (tx) => {
+          // Re-check inside transaction
+          const existing = await tx.activePresence.findFirst({ where: personWhere });
+          if (existing) return { _duplicate: true, data: existing };
 
-      // Also create AttendanceLog entry for tracking (with null ExitTime initially)
-      await prisma.attendanceLog.create({
-        data: {
-          Zone_id: 1,
-          PersonType: normalizedType,
-          EntryTime: entryTime,
-          ExitTime: null,
-          Duration: null,
-          ...(normalizedType === 'Teacher' 
-            ? { Teacher_ID: parseInt(personId) }
-            : { Student_ID: parseInt(personId) }
-          )
+          // Check for open attendance log
+          const openLog = await tx.attendanceLog.findFirst({
+            where: { ...personWhere, ExitTime: null },
+          });
+          if (openLog) return { _duplicate: true, data: openLog };
+
+          const entryTime = new Date();
+
+          const created = await tx.activePresence.create({
+            data: {
+              Zone_id: 1,
+              PersonType: normalizedType,
+              EntryTime: entryTime,
+              ...(normalizedType === 'Teacher'
+                ? { Teacher_ID: personIdInt }
+                : { Student_ID: personIdInt }),
+            },
+            include: {
+              teacher: { select: { Teacher_ID: true, Name: true, Email: true, Department: true } },
+              student: { select: { Student_ID: true, Name: true, Email: true, Department: true, RollNumber: true } },
+              zone: { select: { Zone_id: true, Zone_Name: true } },
+            },
+          });
+
+          await tx.attendanceLog.create({
+            data: {
+              Zone_id: 1,
+              PersonType: normalizedType,
+              EntryTime: entryTime,
+              ExitTime: null,
+              Duration: null,
+              ...(normalizedType === 'Teacher'
+                ? { Teacher_ID: personIdInt }
+                : { Student_ID: personIdInt }),
+            },
+          });
+
+          return created;
+        });
+      } catch (txError) {
+        // If it's a unique constraint violation from a concurrent request, treat as duplicate
+        if (txError.code === 'P2002') {
+          console.log(`⏭️ ${normalizedType} ${personId} concurrent duplicate suppressed`);
+          return res.status(200).json({ success: true, message: 'Person already in zone', data: null });
         }
-      });
+        throw txError;
+      }
+
+      if (entry?._duplicate) {
+        console.log(`⏭️ ${normalizedType} ${personId} already in zone - skipping duplicate entry`);
+        return res.status(200).json({ success: true, message: 'Person already in zone', data: entry.data });
+      }
 
       console.log(`✅ Entry logged for ${normalizedType} ${personId}`);
+      return res.status(201).json({ success: true, message: 'Person entry logged successfully', data: entry });
+    }
 
-      res.status(201).json({
-        success: true,
-        message: 'Person entry logged successfully',
-        data: entry
-      });
-    } else if (cameraType === 'Exit' && existingEntry) {
+    // For Exit path: still need existingEntry
+    existingEntry = await prisma.activePresence.findFirst({ where: personWhere });
+
+    if (!existingEntry && cameraType !== 'Exit') {
+      // Unknown camera type
+      return res.status(200).json({ success: true, message: `${cameraType} detection acknowledged`, data: null });
+    }
+
+    if (cameraType === 'Exit' && existingEntry) {
       // Exit camera - trigger exit logic
       const exitTime = new Date();
-      const durationMs = exitTime - new Date(existingEntry.EntryTime);
-      const durationMinutes = Math.round(durationMs / 1000 / 60);
+      const entryDate = new Date(existingEntry.EntryTime);
+      // If exit time is before entry time (e.g. entry had future timestamp), use entry time
+      const adjustedExitTime = exitTime < entryDate ? entryDate : exitTime;
+      const durationMs = adjustedExitTime - entryDate;
+      const durationMinutes = Math.max(0, Math.round(durationMs / 1000 / 60));
 
       // Update AttendanceLog with exit time and duration
       const attendanceEntry = await prisma.attendanceLog.findFirst({
@@ -163,7 +146,7 @@ export const logRecognizedPerson = async (req, res) => {
             Log_ID: attendanceEntry.Log_ID
           },
           data: {
-            ExitTime: exitTime,
+            ExitTime: adjustedExitTime,
             Duration: durationMinutes
           }
         });

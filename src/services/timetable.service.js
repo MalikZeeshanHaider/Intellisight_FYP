@@ -17,7 +17,13 @@ export class TimetableService {
    * Prevents duplicate open entries for the same person
    */
   async recordEntry({ personType, personId, zoneId, cameraId, timestamp, adminId }) {
-    const entryTime = timestamp ? new Date(timestamp) : new Date();
+    const now = new Date();
+    let entryTime = timestamp ? new Date(timestamp) : now;
+
+    // Prevent future timestamps - cap at current time
+    if (entryTime > now) {
+      entryTime = now;
+    }
 
     // Check for existing open entry
     const existingOpenEntry = await this.findOpenEntry(personType, personId);
@@ -113,12 +119,15 @@ export class TimetableService {
       });
 
       if (attendanceLog) {
-        const duration = Math.floor((exitTime - new Date(attendanceLog.EntryTime)) / 1000 / 60); // minutes
+        const entryDate = new Date(attendanceLog.EntryTime);
+        // If exit time is before entry time (e.g. entry had future timestamp), use entry time + 0 duration
+        const adjustedExitTime = exitTime < entryDate ? entryDate : exitTime;
+        const duration = Math.max(0, Math.floor((adjustedExitTime - entryDate) / 1000 / 60)); // minutes, never negative
         
         const updated = await prisma.attendanceLog.update({
           where: { Log_ID: attendanceLog.Log_ID },
           data: { 
-            ExitTime: exitTime,
+            ExitTime: adjustedExitTime,
             Duration: duration,
           },
           include: {

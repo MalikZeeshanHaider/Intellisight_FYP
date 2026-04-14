@@ -1,13 +1,12 @@
-import dotenv from 'dotenv';
+// env.js loads .env and validates all required variables — must be first import
+import './config/env.js';
+
 import app from './app.js';
 import { testConnection, disconnect } from './config/database.js';
 import logger from './utils/logger.js';
 import imagePreprocessingService from './services/imagePreprocessing.service.js';
 import { initializePythonServices, stopAllProcesses } from './services/pythonService.js';
 import { scheduleDailyReset } from './services/dailyReset.service.js';
-
-// Load environment variables
-dotenv.config();
 
 const PORT = process.env.PORT || 3000;
 

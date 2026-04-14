@@ -1,0 +1,88 @@
+/**
+ * src/middlewares/rateLimiter.js
+ *
+ * Route-specific rate limiters using express-rate-limit.
+ * Applied only to sensitive auth endpoints to prevent brute-force attacks.
+ *
+ * Each limiter tracks requests per IP address independently.
+ */
+
+import rateLimit from 'express-rate-limit';
+
+/**
+ * Shared handler — returns a consistent JSON error response
+ * instead of the default plain-text HTML page.
+ */
+const rateLimitHandler = (req, res, next, options) => {
+  res.status(options.statusCode).json({
+    success: false,
+    message: options.message,
+    retryAfter: Math.ceil(options.windowMs / 1000 / 60), // minutes
+  });
+};
+
+/**
+ * LOGIN — 20 attempts per 15 minutes per IP.
+ * Blocks brute-force while giving legitimate users plenty of room.
+ */
+export const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutes
+  max: 20,
+  message: 'Too many login attempts. Please try again after 15 minutes.',
+  standardHeaders: true,       // Return RateLimit-* headers
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+});
+
+/**
+ * REGISTER — 5 registrations per hour per IP.
+ * Prevents mass account creation / spam.
+ */
+export const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,   // 1 hour
+  max: 5,
+  message: 'Too many registration attempts. Please try again after 1 hour.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+});
+
+/**
+ * FORGOT PASSWORD — 5 requests per hour per IP.
+ * Prevents email bombing and user enumeration via timing.
+ */
+export const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,   // 1 hour
+  max: 5,
+  message: 'Too many password reset requests. Please try again after 1 hour.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+});
+
+/**
+ * RESET PASSWORD — 10 attempts per 15 minutes per IP.
+ * Short window so stolen reset links can't be brute-forced.
+ */
+export const resetPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,   // 15 minutes
+  max: 10,
+  message: 'Too many password reset attempts. Please try again after 15 minutes.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+});
+
+/**
+ * GENERAL API — 500 requests per 15 minutes per IP.
+ * Broad protection against abuse while allowing normal dashboard
+ * polling (multiple widgets refreshing every 5 seconds).
+ */
+export const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,   // 15 minutes
+  max: 500,
+  message: 'Too many requests. Please slow down and try again after 15 minutes.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+});

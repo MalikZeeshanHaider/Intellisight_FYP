@@ -9,33 +9,24 @@ import os
 import gc
 import json
 import sys
+import cv2
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from deepface import DeepFace
-import numpy as np
 
 # Fix Windows console encoding
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
-# Import configuration
+# Import configuration — fail loudly if config or required env vars are missing
 try:
     from config import IMAGES_FOLDER, EMBEDDINGS_FOLDER, EMBEDDINGS_FILE, MODEL_NAME, DETECTOR_BACKEND, DB_CONFIG
-except ImportError:
-    # Fallback to defaults if config not available
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    IMAGES_FOLDER = os.path.join(BASE_DIR, "images")
-    EMBEDDINGS_FOLDER = os.path.join(BASE_DIR, "embeddings")
-    EMBEDDINGS_FILE = os.path.join(EMBEDDINGS_FOLDER, "representations_facenet.json")
-    MODEL_NAME = "Facenet"
-    DETECTOR_BACKEND = "retinaface"
-    DB_CONFIG = {
-        'host': 'localhost',
-        'port': 5432,
-        'database': 'FYP_Intellisight',
-        'user': 'postgres',
-        'password': 'zeeshan'
-    }
+except (ImportError, RuntimeError) as e:
+    print(f"[FATAL] Could not load config: {e}")
+    print("[FATAL] Ensure config.py exists and all required environment variables are set in .env")
+    sys.exit(1)
+
+from utils import build_person_key, preprocess_face_crop
 
 
 def create_folders():
@@ -129,16 +120,24 @@ def generate_embeddings():
             image_path = os.path.join(person_path, image_file)
             
             try:
-                # TODO: Generate embedding using DeepFace with FaceNet model
-                # Use opencv detector for better stability
-                # enforce_detection=True ensures only clear faces are processed
-                # align=True improves accuracy by aligning face geometry
+                # Read image and apply the same preprocessing used during recognition
+                # (CLAHE contrast enhancement + cubic upscale for small faces).
+                # This is critical: training and recognition must produce embeddings
+                # in the same feature space for accurate distance matching.
+                image = cv2.imread(image_path)
+                if image is None:
+                    print(f"  [FAIL] {image_file} - Cannot read image file")
+                    error_count += 1
+                    continue
+
+                image = preprocess_face_crop(image)
+
                 embedding_objs = DeepFace.represent(
-                    img_path=image_path,
+                    img_path=image,
                     model_name=MODEL_NAME,
-                    detector_backend="opencv",  # More stable detector
-                    enforce_detection=False,  # Allow processing even if face detection is uncertain
-                    align=True  # Align faces for better accuracy
+                    detector_backend=DETECTOR_BACKEND,
+                    enforce_detection=True,   # Skip images where no face is detected
+                    align=True
                 )
                 
                 # TODO: DeepFace.represent returns a list, get the first face
@@ -202,110 +201,133 @@ def save_embeddings(embeddings_data):
 
 def sync_embeddings_to_database(embeddings_data):
     """
-    Sync embeddings to the PostgreSQL database FaceEmbeddings table.
-    Links embeddings to Students or Teachers based on folder name matching.
+    Sync embeddings to the FaceEmbeddings table and rewrite the JSON file.
+
+    After matching each embedding's folder name to a real Student/Teacher row,
+    this function:
+      1. Inserts the embedding into the FaceEmbeddings table with person_id, type, name.
+      2. Enriches each item in embeddings_data in-place with the canonical fields
+         (person_key, person_id, role, name) so the JSON file becomes the authoritative
+         source of truth for future recognition runs — even without a DB connection.
+
+    Returns:
+        (synced_count, skipped_count)
     """
     print("\n" + "="*60)
     print("SYNCING EMBEDDINGS TO DATABASE")
     print("="*60 + "\n")
-    
+
     conn = None
-    synced_count = 0
-    skipped_count = 0
-    
+    synced_count   = 0
+    skipped_count  = 0
+
     try:
-        # Connect to database
         conn = psycopg2.connect(**DB_CONFIG)
         print("[DB] Connected successfully")
-        
+
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # First, clear old embeddings
+            # Clear old embeddings so the table stays in sync with the JSON file
             cur.execute('DELETE FROM "FaceEmbeddings"')
-            print("[DB] Cleared old embeddings from database")
-            
-            # Get all students and teachers for matching
+            print("[DB] Cleared old embeddings from FaceEmbeddings table")
+
+            # Build lookup maps: lowercase name → DB row
             cur.execute('SELECT "Student_ID", "Name" FROM "Students"')
             students = {row['Name'].lower().strip(): row for row in cur.fetchall() if row['Name']}
-            
+
             cur.execute('SELECT "Teacher_ID", "Name" FROM "Teacher"')
             teachers = {row['Name'].lower().strip(): row for row in cur.fetchall() if row['Name']}
-            
+
             print(f"[DB] Found {len(students)} students and {len(teachers)} teachers in database")
-            
-            # Process each embedding
+
             for item in embeddings_data:
-                person_name = item["person"]
-                person_name_lower = person_name.lower().strip()
-                embedding = item["embedding"]
-                image_path = item.get("image_path", "")
-                
-                # Convert embedding to JSON string
-                embedding_list = embedding if isinstance(embedding, list) else embedding.tolist()
-                embedding_json = json.dumps(embedding_list)
-                embedding_bytes = bytes(json.dumps(embedding_list), 'utf-8')
-                
-                # Try to match with student
-                student = None
-                teacher = None
+                # folder_person is whatever folder name was used (e.g. "Ali_Khan", "ali khan")
+                folder_person      = item.get("person", "")
+                folder_person_norm = folder_person.lower().strip().replace("_", " ")
+                embedding          = item["embedding"]
+                image_path         = item.get("image_path", "")
+
+                embedding_list  = embedding if isinstance(embedding, list) else list(embedding)
+                embedding_json  = json.dumps(embedding_list)
+                embedding_bytes = embedding_json.encode('utf-8')
+
                 person_type = None
-                person_id = None
-                
-                # Check exact match first
-                if person_name_lower in students:
-                    student = students[person_name_lower]
+                person_id   = None
+                db_name     = None   # exact name as stored in DB
+
+                # ── Exact match (normalise underscores → spaces for comparison) ──
+                if folder_person_norm in students:
+                    db_row      = students[folder_person_norm]
                     person_type = "Student"
-                    person_id = student['Student_ID']
-                elif person_name_lower in teachers:
-                    teacher = teachers[person_name_lower]
+                    person_id   = db_row['Student_ID']
+                    db_name     = db_row['Name']
+                elif folder_person_norm in teachers:
+                    db_row      = teachers[folder_person_norm]
                     person_type = "Teacher"
-                    person_id = teacher['Teacher_ID']
+                    person_id   = db_row['Teacher_ID']
+                    db_name     = db_row['Name']
                 else:
-                    # Try partial matching
-                    for name, s in students.items():
-                        if person_name_lower in name or name in person_name_lower:
-                            student = s
+                    # ── Partial / substring match ─────────────────────────────
+                    for name_key, s in students.items():
+                        if folder_person_norm in name_key or name_key in folder_person_norm:
                             person_type = "Student"
-                            person_id = s['Student_ID']
+                            person_id   = s['Student_ID']
+                            db_name     = s['Name']
                             break
-                    
-                    if not student:
-                        for name, t in teachers.items():
-                            if person_name_lower in name or name in person_name_lower:
-                                teacher = t
+                    if not person_type:
+                        for name_key, t in teachers.items():
+                            if folder_person_norm in name_key or name_key in folder_person_norm:
                                 person_type = "Teacher"
-                                person_id = t['Teacher_ID']
+                                person_id   = t['Teacher_ID']
+                                db_name     = t['Name']
                                 break
-                
-                if person_type:
-                    # Insert into FaceEmbeddings table
+
+                if person_type and person_id and db_name:
+                    role       = 'STUDENT' if person_type == 'Student' else 'TEACHER'
+                    person_key = build_person_key(person_id, role, db_name)
+
+                    # ── Insert into FaceEmbeddings table ──────────────────────
                     if person_type == "Student":
                         cur.execute("""
-                            INSERT INTO "FaceEmbeddings" 
-                            ("PersonType", "Student_ID", "PersonName", "ImagePath", "Embedding", "EmbeddingJson", "CreatedAt", "UpdatedAt")
+                            INSERT INTO "FaceEmbeddings"
+                                ("PersonType", "Student_ID", "PersonName",
+                                 "ImagePath", "Embedding", "EmbeddingJson",
+                                 "CreatedAt", "UpdatedAt")
                             VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
-                        """, (person_type, person_id, person_name, image_path, embedding_bytes, embedding_json))
+                        """, (person_type, person_id, db_name,
+                              image_path, embedding_bytes, embedding_json))
                     else:
                         cur.execute("""
-                            INSERT INTO "FaceEmbeddings" 
-                            ("PersonType", "Teacher_ID", "PersonName", "ImagePath", "Embedding", "EmbeddingJson", "CreatedAt", "UpdatedAt")
+                            INSERT INTO "FaceEmbeddings"
+                                ("PersonType", "Teacher_ID", "PersonName",
+                                 "ImagePath", "Embedding", "EmbeddingJson",
+                                 "CreatedAt", "UpdatedAt")
                             VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
-                        """, (person_type, person_id, person_name, image_path, embedding_bytes, embedding_json))
-                    
+                        """, (person_type, person_id, db_name,
+                              image_path, embedding_bytes, embedding_json))
+
+                    # ── Enrich the in-memory item (will be rewritten to JSON) ─
+                    item["person_key"] = person_key
+                    item["person_id"]  = person_id
+                    item["role"]       = role
+                    item["name"]       = db_name
+
                     synced_count += 1
-                    print(f"  [SYNCED] {person_name} -> {person_type} (ID: {person_id})")
+                    print(f"  [SYNCED]   {folder_person!r} → {person_key}")
                 else:
-                    # Insert without linking to student/teacher
+                    # No DB match — keep as unlinked but still store in table
                     cur.execute("""
-                        INSERT INTO "FaceEmbeddings" 
-                        ("PersonType", "PersonName", "ImagePath", "Embedding", "EmbeddingJson", "CreatedAt", "UpdatedAt")
+                        INSERT INTO "FaceEmbeddings"
+                            ("PersonType", "PersonName", "ImagePath",
+                             "Embedding", "EmbeddingJson", "CreatedAt", "UpdatedAt")
                         VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
-                    """, ("Unknown", person_name, image_path, embedding_bytes, embedding_json))
+                    """, ("Unknown", folder_person, image_path,
+                          embedding_bytes, embedding_json))
                     skipped_count += 1
-                    print(f"  [UNLINKED] {person_name} - No matching student/teacher found in DB")
-            
+                    print(f"  [UNLINKED] {folder_person!r} — no matching student/teacher found in DB")
+
             conn.commit()
             print(f"\n[DB] Sync complete: {synced_count} synced, {skipped_count} unlinked")
-            
+
     except Exception as e:
         if conn:
             conn.rollback()
@@ -316,7 +338,31 @@ def sync_embeddings_to_database(embeddings_data):
         if conn:
             conn.close()
             print("[DB] Connection closed")
-    
+
+    # ── Rewrite JSON file with enriched (person_key) data ────────────────────
+    # Do this even if some items are unlinked — the linked ones now carry full
+    # identity info so the JSON fallback path works correctly.
+    if synced_count > 0:
+        try:
+            serializable = []
+            for item in embeddings_data:
+                emb = item["embedding"]
+                serializable.append({
+                    "person":     item.get("person", ""),
+                    "person_key": item.get("person_key", ""),
+                    "person_id":  item.get("person_id"),
+                    "role":       item.get("role", ""),
+                    "name":       item.get("name", item.get("person", "")),
+                    "image":      item.get("image", ""),
+                    "image_path": item.get("image_path", ""),
+                    "embedding":  emb if isinstance(emb, list) else list(emb),
+                })
+            with open(EMBEDDINGS_FILE, 'w') as f:
+                json.dump(serializable, f, indent=2)
+            print(f"[JSON] Embeddings file rewritten with canonical person_key format")
+        except Exception as e:
+            print(f"[WARNING] Could not rewrite embeddings JSON: {e}")
+
     return synced_count, skipped_count
 
 
@@ -327,7 +373,15 @@ def main():
     print("\n" + "="*60)
     print("FACE RECOGNITION TRAINING - FaceNet Model")
     print("="*60 + "\n")
-    
+
+    # Always start with a clean slate so stale embeddings from a previous
+    # (possibly inconsistent) run are never mixed with the new ones.
+    # The DB table is purged inside sync_embeddings_to_database(); the JSON
+    # file is purged here so a partial failure cannot leave an old file behind.
+    if os.path.exists(EMBEDDINGS_FILE):
+        os.remove(EMBEDDINGS_FILE)
+        print(f"[REBUILD] Cleared old embeddings file: {EMBEDDINGS_FILE}")
+
     # TODO: Step 1 - Create necessary folders
     create_folders()
     

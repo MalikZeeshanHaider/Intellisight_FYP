@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { FiFileText, FiRefreshCw, FiAlertCircle, FiFilter, FiClock, FiLogIn, FiLogOut, FiChevronDown } from 'react-icons/fi';
+import { FiFileText, FiRefreshCw, FiAlertCircle, FiFilter, FiClock, FiLogIn, FiLogOut, FiChevronDown, FiDownload } from 'react-icons/fi';
 import { zone1API } from '../api/zone1';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
@@ -104,6 +104,28 @@ const Logs = () => {
     };
   }, [fetchLogs]);
 
+  const exportToCSV = () => {
+    if (logs.length === 0) return;
+    const headers = ['Person', 'Type', 'Zone', 'Entry Time', 'Exit Time', 'Duration (min)', 'Status'];
+    const rows = logs.map(log => [
+      log.Name || 'Unknown',
+      log.PersonType || '',
+      log.Zone || '',
+      log.EntryTime ? format(new Date(log.EntryTime), 'yyyy-MM-dd HH:mm:ss') : '',
+      log.ExitTime ? format(new Date(log.ExitTime), 'yyyy-MM-dd HH:mm:ss') : '',
+      log.Duration ?? '',
+      log.Status || '',
+    ]);
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `activity-logs-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   if (loading && logs.length === 0) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -155,6 +177,32 @@ const Logs = () => {
             <div className="text-xs font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
               Last updated: {format(lastUpdate, 'HH:mm:ss')}
             </div>
+
+            {/* Export CSV button */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={exportToCSV}
+              disabled={logs.length === 0}
+              className="flex items-center gap-2 px-4 py-2 text-white rounded-xl font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#305796',
+                boxShadow: isDarkMode ? '0 0 20px rgba(6, 182, 212, 0.3)' : '0 2px 8px rgba(48, 87, 150, 0.25)'
+              }}
+              onMouseEnter={(e) => {
+                if (logs.length > 0) {
+                  e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 1)' : '#274370';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (logs.length > 0) {
+                  e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#305796';
+                }
+              }}
+            >
+              <FiDownload size={16} />
+              <span>Export CSV</span>
+            </motion.button>
           </div>
         </div>
       </motion.div>

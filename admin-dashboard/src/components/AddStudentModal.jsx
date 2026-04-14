@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FiX, FiUpload, FiTrash2, FiChevronDown } from 'react-icons/fi';
 import { studentAPI } from '../api/api';
+import { sectionAPI } from '../api/attendance';
 
 const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
     const [formData, setFormData] = useState({
@@ -8,7 +9,8 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
         RollNumber: '',
         Email: '',
         Gender: '',
-        Department: ''
+        Department: '',
+        Section_ID: ''
     });
     const [facePictures, setFacePictures] = useState({
         Face_Picture_1: null,
@@ -21,6 +23,8 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
     const [error, setError] = useState('');
     const [genderDropdownOpen, setGenderDropdownOpen] = useState(false);
     const genderDropdownRef = useRef(null);
+    const [sections, setSections] = useState([]);
+    const [sectionsLoading, setSectionsLoading] = useState(false);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -31,6 +35,18 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Load sections once — show all sections, Section_ID is optional
+    useEffect(() => {
+        setSectionsLoading(true);
+        sectionAPI.getAll()
+            .then(res => {
+                const list = Array.isArray(res) ? res : (res.data ?? []);
+                setSections(list);
+            })
+            .catch(() => setSections([]))
+            .finally(() => setSectionsLoading(false));
     }, []);
 
     const handleInputChange = (e) => {
@@ -95,6 +111,11 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                 Face_Picture_1: facePictures.Face_Picture_1
             };
 
+            // Section_ID is optional — only include if selected
+            if (formData.Section_ID) {
+                payload.Section_ID = parseInt(formData.Section_ID, 10);
+            }
+
             // Add optional pictures
             if (facePictures.Face_Picture_2) payload.Face_Picture_2 = facePictures.Face_Picture_2;
             if (facePictures.Face_Picture_3) payload.Face_Picture_3 = facePictures.Face_Picture_3;
@@ -103,7 +124,7 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
 
             await studentAPI.createStudent(payload);
 
-            setFormData({ Name: '', RollNumber: '', Email: '', Gender: '', Department: '' });
+            setFormData({ Name: '', RollNumber: '', Email: '', Gender: '', Department: '', Section_ID: '' });
             setFacePictures({
                 Face_Picture_1: null,
                 Face_Picture_2: null,
@@ -346,6 +367,49 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
                                 </div>
                             )}
                         </div>
+                    </div>
+
+                    {/* Section */}
+                    <div>
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.9)' : '#1e293b' }}>
+                            Section <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                            name="Section_ID"
+                            value={formData.Section_ID}
+                            onChange={handleInputChange}
+                            required
+                            disabled={sectionsLoading || sections.length === 0}
+                            className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
+                            style={{
+                                background: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                                border: isDarkMode ? '2px solid rgba(129, 140, 248, 0.3)' : '2px solid rgba(148, 163, 184, 0.3)',
+                                color: formData.Section_ID ? (isDarkMode ? '#c0f0f0' : '#0F172A') : (isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#9CA3AF'),
+                                transition: 'border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease'
+                            }}
+                            onFocus={(e) => {
+                                e.target.style.borderColor = isDarkMode ? '#818cf8' : '#305796';
+                                e.target.style.boxShadow = isDarkMode ? '0 0 0 3px rgba(129, 140, 248, 0.15)' : '0 0 0 3px rgba(48, 87, 150, 0.15)';
+                                e.target.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.95)' : '#ffffff';
+                            }}
+                            onBlur={(e) => {
+                                e.target.style.borderColor = isDarkMode ? 'rgba(129, 140, 248, 0.3)' : 'rgba(148, 163, 184, 0.3)';
+                                e.target.style.boxShadow = 'none';
+                                e.target.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)';
+                            }}
+                        >
+                            <option value="" disabled>{sectionsLoading ? 'Loading sections...' : (sections.length ? 'Select section' : 'No attendance sections available')}</option>
+                            {sections.map((section) => {
+                                const labelParts = [section.Name || `Section ${section.Section_ID}`];
+                                if (section.Semester) labelParts.push(`Sem ${section.Semester}`);
+                                if (section.Shift) labelParts.push(section.Shift);
+                                return (
+                                    <option key={section.Section_ID} value={section.Section_ID}>
+                                        {labelParts.join(' — ')}
+                                    </option>
+                                );
+                            })}
+                        </select>
                     </div>
 
                     {/* Department */}

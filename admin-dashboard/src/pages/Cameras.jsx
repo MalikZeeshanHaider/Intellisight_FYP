@@ -3,16 +3,20 @@
  * Manage cameras for each zone with Entry/Exit configuration
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiVideo, FiRefreshCw, FiPlus, FiAlertCircle, FiX, FiEdit2, FiTrash2, FiMapPin, FiChevronDown } from 'react-icons/fi';
-import { cameraAPI, zoneAPI } from '../api/api';
+import { FiVideo, FiRefreshCw, FiPlus, FiAlertCircle, FiX, FiEdit2, FiTrash2, FiMapPin, FiChevronDown, FiPlay, FiSquare, FiEye, FiEyeOff, FiWifi, FiWifiOff } from 'react-icons/fi';
+import { cameraAPI, zoneAPI, streamAPI } from '../api/api';
 
 const Cameras = () => {
   const [cameras, setCameras] = useState([]);
   const [zones, setZones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Streaming state: which cameras are active in the Flask service
+  const [streamingCameras, setStreamingCameras] = useState({}); // { cameraId: true/false }
+  const [streamActionLoading, setStreamActionLoading] = useState({}); // { cameraId: true/false }
+  const [streamServiceOnline, setStreamServiceOnline] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCamera, setNewCamera] = useState({
     Camera_URL: '',
@@ -60,7 +64,24 @@ const Cameras = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch cameras and zones
+  // Poll streaming service status (camera active states)
+  const fetchStreamStatus = useCallback(async () => {
+    try {
+      const data = await streamAPI.getCameraStatuses();
+      setStreamServiceOnline(true);
+      // data is expected to be { cameras: { "<id>": { is_running: bool, ... }, ... } }
+      const cameras = data?.cameras || {};
+      const activeMap = {};
+      Object.entries(cameras).forEach(([id, info]) => {
+        activeMap[parseInt(id)] = info?.is_running === true;
+      });
+      setStreamingCameras(activeMap);
+    } catch {
+      setStreamServiceOnline(false);
+    }
+  }, []);
+
+  // Fetch cameras and zones from Node.js backend
   const fetchData = async () => {
     try {
       setError(null);
@@ -89,7 +110,39 @@ const Cameras = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+    fetchStreamStatus();
+    // Poll streaming status every 5 seconds
+    const interval = setInterval(fetchStreamStatus, 5000);
+    return () => clearInterval(interval);
+  }, [fetchStreamStatus]);
+
+  // Start a camera stream in the Python Flask service
+  const handleStartStream = async (camera) => {
+    const id = camera.Camara_Id;
+    setStreamActionLoading(prev => ({ ...prev, [id]: true }));
+    try {
+      await streamAPI.startCamera(id, camera.Camera_URL, camera.Camera_Type, camera.Zone_id);
+      setStreamingCameras(prev => ({ ...prev, [id]: true }));
+    } catch (err) {
+      setError(`Failed to start stream for Camera #${id}: ${err.message}`);
+    } finally {
+      setStreamActionLoading(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
+  // Stop a camera stream in the Python Flask service
+  const handleStopStream = async (camera) => {
+    const id = camera.Camara_Id;
+    setStreamActionLoading(prev => ({ ...prev, [id]: true }));
+    try {
+      await streamAPI.stopCamera(id);
+      setStreamingCameras(prev => ({ ...prev, [id]: false }));
+    } catch (err) {
+      setError(`Failed to stop stream for Camera #${id}: ${err.message}`);
+    } finally {
+      setStreamActionLoading(prev => ({ ...prev, [id]: false }));
+    }
+  };
 
   // Create new camera
   const handleCreateCamera = async () => {
@@ -234,9 +287,24 @@ const Cameras = () => {
             <h1 className="text-3xl font-bold mb-2" style={{ color: isDarkMode ? '#22d3ee' : '#305796' }}>
               Cameras
             </h1>
-            <p className="text-sm font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
-              Manage zone cameras
-            </p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm font-medium" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
+                Manage zone cameras
+              </p>
+              {/* Streaming service status pill */}
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold"
+                style={{
+                  backgroundColor: streamServiceOnline
+                    ? (isDarkMode ? 'rgba(34, 197, 94, 0.15)' : 'rgba(34, 197, 94, 0.1)')
+                    : (isDarkMode ? 'rgba(107, 114, 128, 0.2)' : 'rgba(107, 114, 128, 0.1)'),
+                  color: streamServiceOnline ? '#22c55e' : (isDarkMode ? '#9ca3af' : '#6b7280'),
+                  border: `1px solid ${streamServiceOnline ? 'rgba(34, 197, 94, 0.3)' : 'rgba(107, 114, 128, 0.2)'}`
+                }}
+              >
+                {streamServiceOnline ? <FiWifi size={11} /> : <FiWifiOff size={11} />}
+                {streamServiceOnline ? 'Stream Service Online' : 'Stream Service Offline'}
+              </div>
+            </div>
           </div>
 
           <div className="flex gap-3">
@@ -360,12 +428,17 @@ const Cameras = () => {
                   </h3>
                   {entryCameras.length > 0 ? (
                     entryCameras.map((camera) => (
-                      <CameraCard 
-                        key={camera.Camara_Id} 
-                        camera={camera} 
+                      <CameraCard
+                        key={camera.Camara_Id}
+                        camera={camera}
                         onEdit={handleOpenEdit}
                         onDelete={handleOpenDelete}
                         isDarkMode={isDarkMode}
+                        isStreaming={streamingCameras[camera.Camara_Id] === true}
+                        streamActionLoading={streamActionLoading[camera.Camara_Id] === true}
+                        streamServiceOnline={streamServiceOnline}
+                        onStartStream={handleStartStream}
+                        onStopStream={handleStopStream}
                       />
                     ))
                   ) : (
@@ -389,12 +462,17 @@ const Cameras = () => {
                   </h3>
                   {exitCameras.length > 0 ? (
                     exitCameras.map((camera) => (
-                      <CameraCard 
-                        key={camera.Camara_Id} 
-                        camera={camera} 
+                      <CameraCard
+                        key={camera.Camara_Id}
+                        camera={camera}
                         onEdit={handleOpenEdit}
                         onDelete={handleOpenDelete}
                         isDarkMode={isDarkMode}
+                        isStreaming={streamingCameras[camera.Camara_Id] === true}
+                        streamActionLoading={streamActionLoading[camera.Camara_Id] === true}
+                        streamServiceOnline={streamServiceOnline}
+                        onStartStream={handleStartStream}
+                        onStopStream={handleStopStream}
                       />
                     ))
                   ) : (
@@ -605,7 +683,7 @@ const Cameras = () => {
                       <strong>With port:</strong> rtsp://user:pass@192.168.1.100:554/cam/realmonitor?channel=1
                     </p>
                     <p className="text-xs" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
-                      <strong>Without port:</strong> rtsp://admin:ozair123@192.168.10.4/cam/realmonitor?channel=1&subtype=0
+                      <strong>Without port:</strong> rtsp://user:pass@192.168.1.100/cam/realmonitor?channel=1&subtype=0
                     </p>
                   </div>
                 </div>
@@ -842,7 +920,7 @@ const Cameras = () => {
                       <strong>With port:</strong> rtsp://user:pass@IP:554/cam/realmonitor?channel=1
                     </p>
                     <p className="text-xs" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
-                      <strong>Without port:</strong> rtsp://admin:ozair123@192.168.10.4/cam/realmonitor?channel=1&subtype=0
+                      <strong>Without port:</strong> rtsp://user:pass@192.168.1.100/cam/realmonitor?channel=1&subtype=0
                     </p>
                   </div>
                 </div>
@@ -1001,80 +1079,221 @@ const Cameras = () => {
   );
 };
 
-// Camera Card Component
-const CameraCard = ({ camera, onEdit, onDelete, isDarkMode }) => {
+// Camera Card Component — with live stream preview and start/stop controls
+const CameraCard = ({
+  camera, onEdit, onDelete, isDarkMode,
+  isStreaming, streamActionLoading, streamServiceOnline,
+  onStartStream, onStopStream,
+}) => {
+  const [showPreview, setShowPreview] = useState(false);
+  const [frameSrc, setFrameSrc]       = useState(null);
+  const wsRef      = useRef(null);
+  const prevBlobRef = useRef(null);
+
+  // Hide preview automatically when stream stops
+  useEffect(() => {
+    if (!isStreaming) setShowPreview(false);
+  }, [isStreaming]);
+
+  // Open / close WebSocket connection whenever preview visibility changes
+  useEffect(() => {
+    // Close any existing WS first
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    if (prevBlobRef.current) {
+      URL.revokeObjectURL(prevBlobRef.current);
+      prevBlobRef.current = null;
+    }
+    setFrameSrc(null);
+
+    if (!showPreview || !isStreaming) return;  // nothing to open
+
+    const wsUrl = streamAPI.getWsStreamUrl(camera.Camara_Id);
+    const ws    = new WebSocket(wsUrl);
+    ws.binaryType = 'arraybuffer';
+    wsRef.current = ws;
+
+    ws.onmessage = (event) => {
+      const blob = new Blob([event.data], { type: 'image/jpeg' });
+      const url  = URL.createObjectURL(blob);
+      // Revoke the previous blob URL to free memory
+      if (prevBlobRef.current) URL.revokeObjectURL(prevBlobRef.current);
+      prevBlobRef.current = url;
+      setFrameSrc(url);
+    };
+
+    ws.onerror = () => setShowPreview(false);
+    ws.onclose = () => setFrameSrc(null);
+
+    return () => {
+      ws.close();
+      if (prevBlobRef.current) {
+        URL.revokeObjectURL(prevBlobRef.current);
+        prevBlobRef.current = null;
+      }
+    };
+  }, [showPreview, isStreaming, camera.Camara_Id]);
+
   return (
     <motion.div
-      whileHover={{ scale: 1.02 }}
-      className="rounded-xl p-4 border-2 mb-3"
-      style={{ 
+      className="rounded-xl border-2 mb-3 overflow-hidden"
+      style={{
         backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.6)' : '#ffffff',
-        borderColor: isDarkMode ? 'rgba(6, 182, 212, 0.2)' : '#e5e7eb'
+        borderColor: isStreaming
+          ? (isDarkMode ? 'rgba(34, 197, 94, 0.4)' : 'rgba(34, 197, 94, 0.5)')
+          : (isDarkMode ? 'rgba(6, 182, 212, 0.2)' : '#e5e7eb'),
       }}
     >
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <FiVideo style={{ color: isDarkMode ? '#22d3ee' : '#305796' }} size={20} />
-          <span className="font-bold text-sm" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>
-            Camera #{camera.Camara_Id}
-          </span>
-        </div>
-        <div className={`px-2 py-1 rounded-lg text-xs font-bold ${
-          camera.Camera_Type === 'Entry' 
-            ? (isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-500/20 text-green-600')
-            : (isDarkMode ? 'bg-red-500/20 text-red-400' : 'bg-red-500/20 text-red-600')
-        }`}>
-          {camera.Camera_Type}
-        </div>
-      </div>
-      
-      {camera.Camera_URL && (
-        <p className="text-xs mb-2 font-mono truncate" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
-          {camera.Camera_URL}
-        </p>
-      )}
+      {/* Live stream preview panel — WebSocket push frames */}
+      <AnimatePresence>
+        {showPreview && isStreaming && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="relative bg-black" style={{ aspectRatio: '16/9' }}>
+              {frameSrc ? (
+                <img
+                  src={frameSrc}
+                  alt={`Camera ${camera.Camara_Id} live feed`}
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="inline-block w-8 h-8 border-2 border-white/40 border-t-white rounded-full animate-spin mb-2" />
+                    <p className="text-white/60 text-xs">Connecting...</p>
+                  </div>
+                </div>
+              )}
+              {/* Live badge */}
+              <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold text-white"
+                style={{ backgroundColor: 'rgba(239, 68, 68, 0.9)' }}>
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                LIVE
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="flex gap-2 mt-3">
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => onEdit(camera)}
-          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all"
-          style={{ 
-            backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.15)' : 'rgba(48, 87, 150, 0.1)', 
-            color: isDarkMode ? '#22d3ee' : '#305796',
-            border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : 'none'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.25)' : 'rgba(48, 87, 150, 0.2)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.15)' : 'rgba(48, 87, 150, 0.1)';
-          }}
-        >
-          <FiEdit2 size={14} />
-          <span>Edit</span>
-        </motion.button>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => onDelete(camera)}
-          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all"
-          style={{ 
-            backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)', 
-            color: '#ef4444',
-            border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.2)' : 'none'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.2)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)';
-          }}
-        >
-          <FiTrash2 size={14} />
-          <span>Delete</span>
-        </motion.button>
+      <div className="p-4">
+        {/* Header row */}
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <FiVideo style={{ color: isDarkMode ? '#22d3ee' : '#305796' }} size={20} />
+            <span className="font-bold text-sm" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>
+              Camera #{camera.Camara_Id}
+            </span>
+            {/* Streaming status dot */}
+            {streamServiceOnline && (
+              <span
+                className={`w-2 h-2 rounded-full ${isStreaming ? 'bg-green-500' : 'bg-gray-400'}`}
+                title={isStreaming ? 'Stream active' : 'Stream inactive'}
+                style={{ boxShadow: isStreaming && isDarkMode ? '0 0 6px #22c55e' : 'none' }}
+              />
+            )}
+          </div>
+          <div className={`px-2 py-1 rounded-lg text-xs font-bold ${
+            camera.Camera_Type === 'Entry'
+              ? (isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-500/20 text-green-600')
+              : (isDarkMode ? 'bg-red-500/20 text-red-400' : 'bg-red-500/20 text-red-600')
+          }`}>
+            {camera.Camera_Type}
+          </div>
+        </div>
+
+        {camera.Camera_URL && (
+          <p className="text-xs mb-3 font-mono truncate" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
+            {camera.Camera_URL}
+          </p>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex gap-2 flex-wrap">
+          {/* Start / Stop stream */}
+          {streamServiceOnline && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              disabled={streamActionLoading}
+              onClick={() => isStreaming ? onStopStream(camera) : onStartStream(camera)}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
+              style={{
+                backgroundColor: isStreaming
+                  ? (isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)')
+                  : (isDarkMode ? 'rgba(34, 197, 94, 0.15)' : 'rgba(34, 197, 94, 0.1)'),
+                color: isStreaming ? '#ef4444' : '#22c55e',
+                border: `1px solid ${isStreaming ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
+              }}
+            >
+              {streamActionLoading ? (
+                <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : isStreaming ? (
+                <FiSquare size={12} />
+              ) : (
+                <FiPlay size={12} />
+              )}
+              {streamActionLoading ? 'Wait...' : isStreaming ? 'Stop' : 'Start'}
+            </motion.button>
+          )}
+
+          {/* Preview toggle — only when streaming */}
+          {isStreaming && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowPreview(v => !v)}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all"
+              style={{
+                backgroundColor: showPreview
+                  ? (isDarkMode ? 'rgba(6, 182, 212, 0.25)' : 'rgba(48, 87, 150, 0.15)')
+                  : (isDarkMode ? 'rgba(6, 182, 212, 0.1)' : 'rgba(48, 87, 150, 0.08)'),
+                color: isDarkMode ? '#22d3ee' : '#305796',
+                border: isDarkMode ? '1px solid rgba(6,182,212,0.3)' : 'none',
+              }}
+            >
+              {showPreview ? <FiEyeOff size={12} /> : <FiEye size={12} />}
+              {showPreview ? 'Hide' : 'Preview'}
+            </motion.button>
+          )}
+
+          {/* Edit */}
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => onEdit(camera)}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all"
+            style={{
+              backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.15)' : 'rgba(48, 87, 150, 0.1)',
+              color: isDarkMode ? '#22d3ee' : '#305796',
+              border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : 'none',
+            }}
+          >
+            <FiEdit2 size={12} />
+            Edit
+          </motion.button>
+
+          {/* Delete */}
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => onDelete(camera)}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all"
+            style={{
+              backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)',
+              color: '#ef4444',
+              border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.2)' : 'none',
+            }}
+          >
+            <FiTrash2 size={12} />
+            Delete
+          </motion.button>
+        </div>
       </div>
     </motion.div>
   );

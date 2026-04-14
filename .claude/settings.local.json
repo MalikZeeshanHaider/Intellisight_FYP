@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /e/FYP/Intellisight_FYP/a/Intellisight_FYP/Facerecongination/*.py)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"require\\('express-rate-limit'\\); console.log\\('OK'\\)\")",
+      "Bash(python -m py_compile utils.py)",
+      "Bash(python -m py_compile config.py)",
+      "Bash(python -m py_compile recognition_live.py)",
+      "Bash(python -m py_compile persistent_camera_manager.py)",
+      "Bash(python -m py_compile camera_streaming_service.py)",
+      "Bash(python -m py_compile camera_streaming_service_optimized.py)",
+      "Bash(python -m py_compile train.py)",
+      "Bash(python -m py_compile enrollment.py)",
+      "Bash(python -m py_compile train_incremental.py)",
+      "Bash(grep -n \"DeepFace.represent\" /e/FYP/Intellisight_FYP/a/Intellisight_FYP/Facerecongination/*.py)",
+      "Bash(python -m py_compile recognize.py)",
+      "Bash(python -m py_compile utils.py recognition_live.py enrollment.py train_incremental.py database_handler.py config.py)",
+      "Bash(python -c \"import flask, flask_cors, deepface, cv2, psycopg2; print\\('All imports OK'\\)\")",
+      "Bash(powershell -Command \"& 'C:\\\\Users\\\\abdul\\\\miniconda3\\\\envs\\\\Intellisight_FYP\\\\python.exe' -c 'import flask, flask_cors, deepface, cv2, psycopg2; print\\(\\\\\"All imports OK\\\\\"\\)'\")",
+      "Bash(powershell -Command \"& 'C:\\\\Users\\\\abdul\\\\miniconda3\\\\envs\\\\Intellisight_FYP\\\\python.exe' -c 'import flask; import cv2; import deepface; import psycopg2; print\\(chr\\(79\\)+chr\\(75\\)\\)'\")",
+      "Bash(powershell -Command \"& 'C:\\\\Users\\\\abdul\\\\miniconda3\\\\envs\\\\Intellisight_FYP\\\\python.exe' -c 'import deepface; import cv2; print\\(deepface.__version__\\)'\")",
+      "Bash(powershell -Command \"Get-ChildItem 'C:\\\\Users\\\\abdul\\\\miniconda3\\\\envs\\\\Intellisight_FYP\\\\Lib\\\\site-packages\\\\' | Select-Object -ExpandProperty Name\")",
+      "Bash(powershell -Command \"& 'C:\\\\Users\\\\abdul\\\\miniconda3\\\\envs\\\\intellisight_gpu\\\\python.exe' -c 'import flask; import cv2; import deepface; import psycopg2; print\\(\\\\\"OK\\\\\"\\)'\")",
+      "Bash(powershell -Command \"& 'C:\\\\Users\\\\abdul\\\\miniconda3\\\\envs\\\\intellisight_gpu\\\\python.exe' -c 'import flask; import cv2; import deepface; import psycopg2; print\\(1\\)'\")"
+    ]
+  }
+}

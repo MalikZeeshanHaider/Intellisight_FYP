@@ -10,6 +10,12 @@ import healthRoutes from './health.routes.js';
 import faceRecognitionRoutes from './faceRecognition.routes.js';
 import liveRecognitionRoutes from './liveRecognition.routes.js';
 import dailyResetRoutes from './dailyReset.routes.js';
+// ── Timetable / Academic ──────────────────────────────────────
+import sectionRoutes from './section.routes.js';
+import courseRoutes from './course.routes.js';
+import enrollmentRoutes from './enrollment.routes.js';
+import slotRoutes from './slot.routes.js';
+import classAttendanceRoutes from './classAttendance.routes.js';
 
 const router = express.Router();
 
@@ -27,5 +33,11 @@ router.use('/timetable', timetableRoutes);
 router.use('/face-recognition', faceRecognitionRoutes);
 router.use('/live-recognition', liveRecognitionRoutes); // Auto live recognition
 router.use('/daily-reset', dailyResetRoutes); // Daily reset operations
+// ── Academic / Timetable Management ──────────────────────────
+router.use('/sections', sectionRoutes);
+router.use('/courses', courseRoutes);
+router.use('/enrollments', enrollmentRoutes);
+router.use('/slots', slotRoutes);
+router.use('/class-attendance', classAttendanceRoutes);
 
 export default router;

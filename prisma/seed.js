@@ -9,10 +9,15 @@ async function main() {
   // Clear existing data and reset primary key sequences so IDs start from 1
   console.log('🗑️  Clearing existing data and resetting sequences...');
   // Using TRUNCATE with RESTART IDENTITY to ensure deterministic IDs for tests
-  await prisma.$executeRawUnsafe('TRUNCATE "AttendanceLog", "ActivePresence", "Logs", "ProcessedFaceImages", "FaceEmbeddings", "UnknownFaces", "Students", "Teacher", "Camara", "Admin", "Zone" RESTART IDENTITY CASCADE');
+  await prisma.$executeRawUnsafe('TRUNCATE "ClassAttendance", "TimetableSlot", "Enrollment", "Section", "Course", "AttendanceLog", "ActivePresence", "Logs", "ProcessedFaceImages", "FaceEmbeddings", "UnknownFaces", "Students", "Teacher", "Camara", "Admin", "Zone" RESTART IDENTITY CASCADE');
 
-  // Hash password for admins
-  const hashedPassword = await bcrypt.hash('admin123', 10);
+  // Hash password for seed admin — read from env so no plaintext secret in source
+  const seedAdminPassword = process.env.SEED_ADMIN_PASSWORD;
+  if (!seedAdminPassword) {
+    console.error('[FATAL] SEED_ADMIN_PASSWORD is not set in .env');
+    process.exit(1);
+  }
+  const hashedPassword = await bcrypt.hash(seedAdminPassword, 10);
 
   // Seed Admins
   console.log('👤 Seeding Admins...');
@@ -316,7 +321,85 @@ async function main() {
   ]);
   console.log(`✅ Created ${attendanceEntries.length} attendance log entries`);
 
-  console.log('\n🎉 Database seeding completed successfully!');
+  // ── Seed Courses ───────────────────────────────────────────────
+  console.log('📚 Seeding Courses...');
+  const courses = await Promise.all([
+    prisma.course.create({
+      data: { Name: 'Object Oriented Programming', Code: 'CS-301', CreditHours: 3, Department: 'Computer Science' },
+    }),
+    prisma.course.create({
+      data: { Name: 'Data Structures & Algorithms', Code: 'CS-302', CreditHours: 3, Department: 'Computer Science' },
+    }),
+    prisma.course.create({
+      data: { Name: 'Database Systems', Code: 'CS-401', CreditHours: 3, Department: 'Computer Science' },
+    }),
+    prisma.course.create({
+      data: { Name: 'Software Engineering', Code: 'CS-402', CreditHours: 3, Department: 'Computer Science' },
+    }),
+    prisma.course.create({
+      data: { Name: 'Calculus II', Code: 'MATH-201', CreditHours: 3, Department: 'Mathematics' },
+    }),
+  ]);
+  console.log(`✅ Created ${courses.length} courses`);
+
+  // ── Seed Sections ──────────────────────────────────────────────
+  console.log('🏫 Seeding Sections...');
+  const sections = await Promise.all([
+    prisma.section.create({
+      data: { Name: 'BSIT-VIII-A (Shift-I)', Department: 'Computer Science', Semester: '8th', Shift: 'Morning' },
+    }),
+    prisma.section.create({
+      data: { Name: 'BSIT-VIII-B (Shift-I)', Department: 'Computer Science', Semester: '8th', Shift: 'Morning' },
+    }),
+    prisma.section.create({
+      data: { Name: 'BSCS-VI-A (Shift-II)', Department: 'Computer Science', Semester: '6th', Shift: 'Evening' },
+    }),
+  ]);
+  console.log(`✅ Created ${sections.length} sections`);
+
+  // ── Seed Enrollments ───────────────────────────────────────────
+  console.log('📋 Seeding Enrollments...');
+  // Section A → students 0,1,3,4
+  // Section B → students 2,5,6,7
+  // Section C → students 0,2,4
+  const enrollmentsData = [
+    { Section_ID: sections[0].Section_ID, Student_ID: students[0].Student_ID },
+    { Section_ID: sections[0].Section_ID, Student_ID: students[1].Student_ID },
+    { Section_ID: sections[0].Section_ID, Student_ID: students[3].Student_ID },
+    { Section_ID: sections[0].Section_ID, Student_ID: students[4].Student_ID },
+    { Section_ID: sections[1].Section_ID, Student_ID: students[2].Student_ID },
+    { Section_ID: sections[1].Section_ID, Student_ID: students[5].Student_ID },
+    { Section_ID: sections[1].Section_ID, Student_ID: students[6].Student_ID },
+    { Section_ID: sections[1].Section_ID, Student_ID: students[7].Student_ID },
+    { Section_ID: sections[2].Section_ID, Student_ID: students[0].Student_ID },
+    { Section_ID: sections[2].Section_ID, Student_ID: students[2].Student_ID },
+    { Section_ID: sections[2].Section_ID, Student_ID: students[4].Student_ID },
+  ];
+  await prisma.enrollment.createMany({ data: enrollmentsData });
+  console.log(`✅ Created ${enrollmentsData.length} enrollments`);
+
+  // ── Seed TimetableSlots ─────────────────────────────────────────
+  console.log('📅 Seeding TimetableSlots...');
+  // Section BSIT-VIII-A: Mon-Fri schedule
+  const slotsData = [
+    // BSIT-VIII-A (Shift-I) — Section A
+    { Section_ID: sections[0].Section_ID, Course_ID: courses[0].Course_ID, Teacher_ID: teachers[0].Teacher_ID, SubjectName: 'Object Oriented Programming', DayOfWeek: 'MON', StartTime: '09:00', EndTime: '10:00', Zone_id: zones[0].Zone_id },
+    { Section_ID: sections[0].Section_ID, Course_ID: courses[1].Course_ID, Teacher_ID: teachers[1].Teacher_ID, SubjectName: 'Data Structures & Algorithms', DayOfWeek: 'MON', StartTime: '10:00', EndTime: '11:00', Zone_id: zones[0].Zone_id },
+    { Section_ID: sections[0].Section_ID, Course_ID: courses[2].Course_ID, Teacher_ID: teachers[0].Teacher_ID, SubjectName: 'Database Systems', DayOfWeek: 'TUE', StartTime: '09:00', EndTime: '10:30', Zone_id: zones[1].Zone_id },
+    { Section_ID: sections[0].Section_ID, Course_ID: courses[3].Course_ID, Teacher_ID: teachers[2].Teacher_ID, SubjectName: 'Software Engineering', DayOfWeek: 'WED', StartTime: '11:00', EndTime: '12:00', Zone_id: zones[0].Zone_id },
+    { Section_ID: sections[0].Section_ID, Course_ID: courses[4].Course_ID, Teacher_ID: teachers[1].Teacher_ID, SubjectName: 'Calculus II', DayOfWeek: 'THU', StartTime: '09:00', EndTime: '10:00', Zone_id: zones[1].Zone_id },
+    { Section_ID: sections[0].Section_ID, Course_ID: courses[0].Course_ID, Teacher_ID: teachers[0].Teacher_ID, SubjectName: 'Object Oriented Programming (Lab)', DayOfWeek: 'FRI', StartTime: '14:00', EndTime: '16:00', Zone_id: zones[2].Zone_id },
+    // BSIT-VIII-B (Shift-I) — Section B
+    { Section_ID: sections[1].Section_ID, Course_ID: courses[0].Course_ID, Teacher_ID: teachers[3].Teacher_ID, SubjectName: 'Object Oriented Programming', DayOfWeek: 'MON', StartTime: '11:00', EndTime: '12:00', Zone_id: zones[1].Zone_id },
+    { Section_ID: sections[1].Section_ID, Course_ID: courses[2].Course_ID, Teacher_ID: teachers[4].Teacher_ID, SubjectName: 'Database Systems', DayOfWeek: 'TUE', StartTime: '10:00', EndTime: '11:00', Zone_id: zones[0].Zone_id },
+    { Section_ID: sections[1].Section_ID, Course_ID: courses[3].Course_ID, Teacher_ID: teachers[2].Teacher_ID, SubjectName: 'Software Engineering', DayOfWeek: 'WED', StartTime: '09:00', EndTime: '10:00', Zone_id: zones[1].Zone_id },
+    // BSCS-VI-A (Shift-II) — Section C (Evening)
+    { Section_ID: sections[2].Section_ID, Course_ID: courses[1].Course_ID, Teacher_ID: teachers[3].Teacher_ID, SubjectName: 'Data Structures & Algorithms', DayOfWeek: 'MON', StartTime: '16:00', EndTime: '17:00', Zone_id: zones[0].Zone_id },
+    { Section_ID: sections[2].Section_ID, Course_ID: courses[4].Course_ID, Teacher_ID: teachers[4].Teacher_ID, SubjectName: 'Calculus II', DayOfWeek: 'WED', StartTime: '17:00', EndTime: '18:00', Zone_id: zones[1].Zone_id },
+  ];
+  await prisma.timetableSlot.createMany({ data: slotsData });
+  console.log(`✅ Created ${slotsData.length} timetable slots`);
+
   console.log('\n📊 Summary:');
   console.log(`   - Admins: ${admins.length}`);
   console.log(`   - Zones: ${zones.length}`);
@@ -324,9 +407,13 @@ async function main() {
   console.log(`   - Teachers: ${teachers.length}`);
   console.log(`   - Students: ${students.length}`);
   console.log(`   - Attendance Entries: ${attendanceEntries.length}`);
+  console.log(`   - Courses: ${courses.length}`);
+  console.log(`   - Sections: ${sections.length}`);
+  console.log(`   - Enrollments: ${enrollmentsData.length}`);
+  console.log(`   - Timetable Slots: ${slotsData.length}`);
   console.log('\n🔑 Test Admin Credentials:');
   console.log('   Email: john.admin@intellisight.com');
-  console.log('   Password: admin123');
+  console.log('   Password: (value of SEED_ADMIN_PASSWORD in your .env)');
 }
 
 main()

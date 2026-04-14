@@ -5,26 +5,27 @@ import { UnauthorizedError, ConflictError, NotFoundError } from '../utils/errors
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 
+// Env vars are guaranteed to exist — validated centrally in src/config/env.js on startup.
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS) || 10;
-const JWT_SECRET = process.env.JWT_SECRET || '442fa66927da31788406801dabb2b33ab5262bdcbd75986a064368ae4e814cc4';
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 // Email configuration
 const emailConfig = {
   service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER || '221083@students.au.edu.pk',
-    pass: process.env.EMAIL_PASS || 'afag ijik emzq blqo'
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
   }
 };
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '221083@students.au.edu.pk';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001';
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
 
 // Super Admin Configuration
-const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'admin@gmail.com';
-const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'admin@123';
+const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL;
+const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD;
 const SUPER_ADMIN_NAME = process.env.SUPER_ADMIN_NAME || 'Super Administrator';
 
 /**
@@ -306,19 +307,25 @@ export const verifyUserRegistration = async (token, action, rejectionReason = nu
  * Login admin
  */
 export const loginAdmin = async ({ email, password }) => {
-  // Check if it's the super admin
-  if (email === SUPER_ADMIN_EMAIL && password === SUPER_ADMIN_PASSWORD) {
+  // Read super admin credentials fresh on every call — never rely on
+  // module-level constants that may be captured before dotenv settles.
+  const superAdminEmail    = process.env.SUPER_ADMIN_EMAIL;
+  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD;
+  const superAdminName     = process.env.SUPER_ADMIN_NAME || 'Super Administrator';
+
+  // Check if it's the super admin (plaintext comparison against env vars)
+  if (superAdminEmail && email === superAdminEmail && password === superAdminPassword) {
     const token = generateToken({
       adminId: 'super_admin',
-      email: SUPER_ADMIN_EMAIL,
+      email: superAdminEmail,
       role: 'SuperAdmin',
       isSuperAdmin: true
     });
 
     const superAdmin = {
       Admin_ID: 'super_admin',
-      Name: SUPER_ADMIN_NAME,
-      Email: SUPER_ADMIN_EMAIL,
+      Name: superAdminName,
+      Email: superAdminEmail,
       Role: 'SuperAdmin',
       isSuperAdmin: true
     };

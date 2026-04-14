@@ -4,6 +4,8 @@ Fixed: Memory leaks, slow detection, inaccurate recognition
 Version: 2.0 - Performance & Accuracy Improvements
 """
 
+import os
+import sys
 import cv2
 import numpy as np
 import json
@@ -17,188 +19,52 @@ from flask_cors import CORS
 from datetime import datetime
 from deepface import DeepFace
 import psycopg2
+
+# Fix Windows console encoding so Unicode characters don't crash the server
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 from psycopg2.extras import RealDictCursor
 
-from config import DB_CONFIG, MODEL_NAME, DISTANCE_THRESHOLD, MIN_FACE_SIZE, EMBEDDINGS_FILE
-from utils import load_embeddings_from_json, get_euclidean_distance, FPSCounter
+from config import (
+    DB_CONFIG, MODEL_NAME, DISTANCE_THRESHOLD, MIN_FACE_SIZE,
+    EMBEDDINGS_FILE, RECOGNITION_CONFIDENCE_THRESHOLD, DETECTOR_BACKEND, FRAME_SKIP
+)
+from utils import load_embeddings_from_json, get_euclidean_distance, FPSCounter, preprocess_face_crop, EmbeddingIndex, FaceTracker
 from database_handler import DatabaseHandler
 
 app = Flask(__name__)
 CORS(app)
 
 # Global variables
-active_cameras = {}
-embeddings_data = []
-db_handler = None
+active_cameras  = {}
+embeddings_data = []    # raw list — kept for len() / reload responses
+embedding_index = None  # EmbeddingIndex — built once at startup
+db_handler      = None
 embeddings_lock = threading.Lock()
 
 # OPTIMIZED SETTINGS
-DETECTION_CONFIDENCE = 0.7
+# RECOGNITION_CONFIDENCE_THRESHOLD, MIN_FACE_SIZE imported from config — do not redefine here
 RECOGNITION_COOLDOWN = 2.0  # Seconds between recognizing same person
 MAX_CACHE_SIZE = 100
-FACE_SIZE_MIN = 40  # Minimum face size for recognition
-DISTANCE_THRESHOLD_STRICT = 8.0  # More strict threshold for better accuracy
+# DISTANCE_THRESHOLD_STRICT removed — use DISTANCE_THRESHOLD from config
 
 
-def find_best_match_optimized(embedding, embeddings_data, threshold=DISTANCE_THRESHOLD_STRICT):
+def find_best_match_optimized(embedding, embeddings_data_or_index, threshold=DISTANCE_THRESHOLD):
     """
-    OPTIMIZED: Find the best matching person with confidence scoring
+    Vectorized search with confidence scoring.  Delegates to
+    EmbeddingIndex.search_with_confidence() — accepts either an EmbeddingIndex
+    (preferred, built once at startup) or a legacy list of dicts.
+
+    Returns:
+        (person_dict | None, float distance, float confidence)
     """
-    if not embeddings_data:
-        return "Unknown", float('inf'), 0.0
-    
-    best_person = None
-    min_distance = float('inf')
-    match_count = 0
-    
-    # Group embeddings by person for better matching
-    person_distances = {}
-    
-    for data in embeddings_data:
-        if not isinstance(data, dict) or 'embedding' not in data:
-            continue
-        
-        emb = data['embedding']
-        person = data.get('person', 'Unknown')
-        
-        try:
-            dist = get_euclidean_distance(embedding, emb)
-            
-            if person not in person_distances:
-                person_distances[person] = []
-            person_distances[person].append(dist)
-            
-            if dist < min_distance:
-                min_distance = dist
-                best_person = person
-        except Exception:
-            continue
-    
-    # Calculate confidence based on multiple embeddings per person
-    confidence = 0.0
-    if best_person and best_person in person_distances:
-        distances = person_distances[best_person]
-        avg_distance = sum(distances) / len(distances)
-        match_count = sum(1 for d in distances if d < threshold)
-        
-        # Higher confidence if multiple embeddings match
-        if min_distance < threshold:
-            confidence = max(0, 1 - (min_distance / threshold)) * 100
-            # Boost confidence if multiple matches
-            if match_count > 1:
-                confidence = min(100, confidence * (1 + match_count * 0.1))
-    
-    if min_distance <= threshold and best_person:
-        return best_person, min_distance, confidence
-    
-    return "Unknown", min_distance, confidence
+    if isinstance(embeddings_data_or_index, EmbeddingIndex):
+        return embeddings_data_or_index.search_with_confidence(embedding, threshold)
+    return EmbeddingIndex(embeddings_data_or_index).search_with_confidence(embedding, threshold)
 
 
-class FaceTracker:
-    """
-    OPTIMIZED: Track faces across frames to avoid repeated recognition
-    Fixes: Memory leak by limiting cache size
-    """
-    def __init__(self, max_age=30, max_cache=MAX_CACHE_SIZE):
-        self.tracks = {}  # {track_id: {bbox, person, last_seen, embedding}}
-        self.next_id = 0
-        self.max_age = max_age
-        self.max_cache = max_cache
-        self.lock = threading.Lock()
-    
-    def _iou(self, box1, box2):
-        """Calculate Intersection over Union"""
-        x1 = max(box1[0], box2[0])
-        y1 = max(box1[1], box2[1])
-        x2 = min(box1[0] + box1[2], box2[0] + box2[2])
-        y2 = min(box1[1] + box1[3], box2[1] + box2[3])
-        
-        if x2 < x1 or y2 < y1:
-            return 0.0
-        
-        intersection = (x2 - x1) * (y2 - y1)
-        area1 = box1[2] * box1[3]
-        area2 = box2[2] * box2[3]
-        union = area1 + area2 - intersection
-        
-        return intersection / union if union > 0 else 0
-    
-    def update(self, detections, frame_count):
-        """Update tracks with new detections"""
-        with self.lock:
-            # Match detections to existing tracks
-            matched = set()
-            
-            for det in detections:
-                bbox = det['bbox']
-                best_track = None
-                best_iou = 0.3  # Minimum IoU threshold
-                
-                for track_id, track in self.tracks.items():
-                    iou = self._iou(bbox, track['bbox'])
-                    if iou > best_iou:
-                        best_iou = iou
-                        best_track = track_id
-                
-                if best_track is not None:
-                    # Update existing track
-                    self.tracks[best_track]['bbox'] = bbox
-                    self.tracks[best_track]['last_seen'] = frame_count
-                    if det.get('person'):
-                        self.tracks[best_track]['person'] = det['person']
-                        self.tracks[best_track]['distance'] = det.get('distance', 0)
-                        self.tracks[best_track]['confidence'] = det.get('confidence', 0)
-                    matched.add(best_track)
-                else:
-                    # Create new track
-                    self.tracks[self.next_id] = {
-                        'bbox': bbox,
-                        'person': det.get('person'),
-                        'distance': det.get('distance', 0),
-                        'confidence': det.get('confidence', 0),
-                        'last_seen': frame_count,
-                        'first_seen': frame_count
-                    }
-                    self.next_id += 1
-            
-            # Remove old tracks
-            to_remove = []
-            for track_id, track in self.tracks.items():
-                if frame_count - track['last_seen'] > self.max_age:
-                    to_remove.append(track_id)
-            
-            for track_id in to_remove:
-                del self.tracks[track_id]
-            
-            # Limit cache size to prevent memory leak
-            if len(self.tracks) > self.max_cache:
-                # Remove oldest tracks
-                sorted_tracks = sorted(self.tracks.items(), 
-                                      key=lambda x: x[1]['last_seen'])
-                for track_id, _ in sorted_tracks[:len(self.tracks) - self.max_cache]:
-                    del self.tracks[track_id]
-    
-    def get_person_for_bbox(self, bbox):
-        """Get cached person for a bounding box"""
-        with self.lock:
-            best_track = None
-            best_iou = 0.5
-            
-            for track_id, track in self.tracks.items():
-                iou = self._iou(bbox, track['bbox'])
-                if iou > best_iou and track.get('person'):
-                    best_iou = iou
-                    best_track = track
-            
-            if best_track:
-                return best_track.get('person'), best_track.get('distance', 0), best_track.get('confidence', 0)
-            return None, None, None
-    
-    def clear(self):
-        """Clear all tracks - prevents memory leak"""
-        with self.lock:
-            self.tracks.clear()
-            gc.collect()
+# FaceTracker is now defined in utils.py and imported at the top of this file.
 
 
 class CameraStream:
@@ -228,34 +94,8 @@ class CameraStream:
             'known_faces': 0
         }
         
-        # OPTIMIZED: Use DNN face detector (more accurate than Haar)
-        self.use_dnn = True
-        self.dnn_net = None
-        self._init_face_detector()
-        
         # Connect to camera
         self.connect()
-    
-    def _init_face_detector(self):
-        """Initialize face detector - DNN is more accurate"""
-        try:
-            # Try to use DNN detector (OpenCV's DNN face detector)
-            model_path = cv2.data.haarcascades + '../haarcascades_cuda/'
-            
-            # Fall back to Haar Cascade but with better parameters
-            self.face_cascade = cv2.CascadeClassifier(
-                cv2.data.haarcascades + 'haarcascade_frontalface_alt2.xml'
-            )
-            # Also load profile face detector for side views
-            self.profile_cascade = cv2.CascadeClassifier(
-                cv2.data.haarcascades + 'haarcascade_profileface.xml'
-            )
-            print(f"[Camera {self.camera_id}] Face detector initialized")
-        except Exception as e:
-            print(f"[Camera {self.camera_id}] Face detector init error: {e}")
-            self.face_cascade = cv2.CascadeClassifier(
-                cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-            )
     
     def connect(self):
         """Connect to RTSP camera with optimized settings"""
@@ -302,110 +142,115 @@ class CameraStream:
         return False
     
     def _capture_loop(self):
-        """OPTIMIZED: Background capture loop with better memory management"""
-        process_every = 3  # Process recognition every N frames
+        """OPTIMIZED: Background capture loop with exponential-backoff reconnection."""
+        process_every      = FRAME_SKIP
         reconnect_attempts = 0
-        max_reconnect = 5
-        
+
         while self.is_running:
             try:
+                # ── Reconnect if stream is lost ───────────────────────────────
                 if self.cap is None or not self.cap.isOpened():
-                    if reconnect_attempts < max_reconnect:
-                        print(f"[Camera {self.camera_id}] Reconnecting... ({reconnect_attempts + 1}/{max_reconnect})")
-                        time.sleep(2)
-                        self.connect()
-                        reconnect_attempts += 1
+                    delay = min(2 * (2 ** min(reconnect_attempts, 5)), 60)
+                    print(
+                        f"[Camera {self.camera_id}] Reconnect attempt {reconnect_attempts + 1} "
+                        f"— waiting {delay:.0f}s..."
+                    )
+                    time.sleep(delay)
+
+                    if self.cap:
+                        self.cap.release()
+                        self.cap = None
+
+                    # Re-open in-place — do NOT call connect(), it would start a new thread
+                    os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = (
+                        'rtsp_transport;tcp|'
+                        'rtsp_flags;prefer_tcp|'
+                        'stimeout;5000000|'
+                        'max_delay;500000|'
+                        'reorder_queue_size;0'
+                    )
+                    new_cap = cv2.VideoCapture(self.camera_url, cv2.CAP_FFMPEG)
+                    new_cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 10000)
+                    new_cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC,  5000)
+                    new_cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+                    if new_cap.isOpened():
+                        ret, frame = new_cap.read()
+                        if ret and frame is not None:
+                            self.cap   = new_cap
+                            self.frame = frame
+                            reconnect_attempts = 0
+                            print(f"[Camera {self.camera_id}] ✓ Reconnected successfully")
+                        else:
+                            new_cap.release()
+                            reconnect_attempts += 1
+                            print(f"[Camera {self.camera_id}] ✗ Reconnect failed (no frames)")
                     else:
-                        print(f"[Camera {self.camera_id}] Max reconnect attempts reached")
-                        break
+                        new_cap.release()
+                        reconnect_attempts += 1
+                        print(f"[Camera {self.camera_id}] ✗ Reconnect failed (cannot open)")
+
                     continue
-                
+
+                # ── Normal frame read ─────────────────────────────────────────
                 ret, frame = self.cap.read()
-                
+
                 if ret and frame is not None:
                     reconnect_attempts = 0
-                    self.frame_count += 1
-                    
-                    # Process recognition on selected frames
+                    self.frame_count  += 1
+
                     if self.frame_count % process_every == 0:
                         self.frame = self._process_frame(frame)
                     else:
-                        # Just update the frame without heavy processing
                         self.frame = self._draw_cached_boxes(frame)
-                    
+
                     self.fps_counter.update()
-                    
-                    # MEMORY CLEANUP: Periodic garbage collection
-                    if self.frame_count % 300 == 0:  # Every ~10 seconds at 30fps
+
+                    if self.frame_count % 300 == 0:
                         gc.collect()
-                    
-                    time.sleep(0.01)  # Small delay
+
+                    time.sleep(0.01)
                 else:
-                    print(f"[Camera {self.camera_id}] Frame read failed")
+                    print(f"[Camera {self.camera_id}] Frame read failed — marking for reconnect")
+                    if self.cap:
+                        self.cap.release()
+                        self.cap = None
                     time.sleep(0.5)
-                    
+
             except Exception as e:
                 print(f"[Camera {self.camera_id}] Capture error: {e}")
                 time.sleep(0.5)
-        
+
         print(f"[Camera {self.camera_id}] Capture loop ended")
     
     def _detect_faces(self, frame):
-        """OPTIMIZED: Better face detection with multiple detectors"""
-        h, w = frame.shape[:2]
-        
-        # OPTIMIZED: Adaptive scaling based on resolution
-        if w > 1280:
-            scale = 0.4
-        elif w > 640:
-            scale = 0.6
-        else:
-            scale = 0.8
-        
-        small_frame = cv2.resize(frame, (int(w * scale), int(h * scale)))
-        gray = cv2.cvtColor(small_frame, cv2.COLOR_BGR2GRAY)
-        
-        # OPTIMIZED: Better histogram equalization for varying lighting
-        gray = cv2.equalizeHist(gray)
-        
-        # Detect frontal faces with OPTIMIZED parameters
-        faces = self.face_cascade.detectMultiScale(
-            gray,
-            scaleFactor=1.1,   # Smaller scale = more accurate but slower
-            minNeighbors=5,    # Higher = fewer false positives
-            minSize=(25, 25),  # Minimum face size
-            flags=cv2.CASCADE_SCALE_IMAGE
-        )
-        
-        # Also detect profile faces (side views)
+        """Face detection using RetinaFace via DeepFace.extract_faces().
+        Returns list of (x, y, w, h) tuples filtered by minimum size.
+        """
+        faces = []
         try:
-            profile_faces = self.profile_cascade.detectMultiScale(
-                gray,
-                scaleFactor=1.1,
-                minNeighbors=5,
-                minSize=(25, 25)
+            results = DeepFace.extract_faces(
+                img_path=frame,
+                detector_backend=DETECTOR_BACKEND,
+                enforce_detection=False,
+                align=True
             )
-            if len(profile_faces) > 0:
-                faces = np.vstack([faces, profile_faces]) if len(faces) > 0 else profile_faces
-        except:
-            pass
-        
-        # Scale back to original size and filter
-        scaled_faces = []
-        for (x, y, fw, fh) in faces:
-            x = int(x / scale)
-            y = int(y / scale)
-            fw = int(fw / scale)
-            fh = int(fh / scale)
-            
-            # Filter too small faces
-            if fw >= FACE_SIZE_MIN and fh >= FACE_SIZE_MIN:
-                scaled_faces.append((x, y, fw, fh))
-        
-        # Remove duplicate/overlapping detections
-        filtered_faces = self._non_max_suppression(scaled_faces)
-        
-        return filtered_faces
+
+            for face_obj in results:
+                facial_area = face_obj.get('facial_area', {})
+                x  = facial_area.get('x', 0)
+                y  = facial_area.get('y', 0)
+                fw = facial_area.get('w', 0)
+                fh = facial_area.get('h', 0)
+
+                if fw >= MIN_FACE_SIZE and fh >= MIN_FACE_SIZE:
+                    faces.append((x, y, fw, fh))
+
+        except Exception as e:
+            if "face" not in str(e).lower():
+                print(f"[Camera {self.camera_id}] Face detection error: {e}")
+
+        return faces
     
     def _non_max_suppression(self, faces, overlap_thresh=0.3):
         """Remove overlapping face detections"""
@@ -443,8 +288,6 @@ class CameraStream:
     
     def _process_frame(self, frame):
         """OPTIMIZED: Process frame with better recognition"""
-        global embeddings_data
-        
         display = frame.copy()
         
         # Detect faces
@@ -459,38 +302,40 @@ class CameraStream:
             
             # Check cache first (avoid re-recognition)
             cached_person, cached_dist, cached_conf = self.face_tracker.get_person_for_bbox(bbox)
-            
-            if cached_person and cached_person != "Unknown":
-                # Use cached result
-                person = cached_person
-                distance = cached_dist
-                confidence = cached_conf
+
+            if cached_person is not None:
+                # Use cached result (cached_person is a dict or None)
+                person_dict = cached_person
+                distance    = cached_dist
+                confidence  = cached_conf
             else:
                 # Need to recognize
-                person, distance, confidence = self._recognize_face(frame, x, y, w, h)
-            
+                person_dict, distance, confidence = self._recognize_face(frame, x, y, w, h)
+
             # Store detection for tracking
             detections.append({
-                'bbox': bbox,
-                'person': person,
-                'distance': distance,
+                'bbox':       bbox,
+                'person':     person_dict,
+                'distance':   distance,
                 'confidence': confidence
             })
-            
+
             # Draw bounding box
-            if person and person != "Unknown":
+            if person_dict is not None:
                 color = (0, 255, 0)  # Green for recognized
-                label = f"{person} ({confidence:.0f}%)"
+                label = f"{person_dict['name']} ({confidence:.0%})"
                 self.stats['known_faces'] += 1
-                
+
                 # Handle recognition event (database update)
-                if self._should_record_recognition(person):
+                if self._should_record_recognition(person_dict):
                     recognized_this_frame.append({
-                        'name': person,
-                        'distance': distance,
+                        'name':      person_dict['name'],
+                        'role':      person_dict['role'],
+                        'person_id': person_dict['person_id'],
+                        'distance':  distance,
                         'confidence': confidence
                     })
-                    self._handle_recognition(person, distance)
+                    self._handle_recognition(person_dict, distance)
             else:
                 color = (0, 0, 255)  # Red for unknown
                 label = f"Unknown ({distance:.1f})" if distance else "Detecting..."
@@ -522,15 +367,15 @@ class CameraStream:
         
         with self.face_tracker.lock:
             for track_id, track in self.face_tracker.tracks.items():
-                bbox = track['bbox']
-                person = track.get('person')
-                confidence = track.get('confidence', 0)
-                
+                bbox        = track['bbox']
+                person_dict = track.get('person')
+                confidence  = track.get('confidence', 0)
+
                 x, y, w, h = bbox
-                
-                if person and person != "Unknown":
+
+                if person_dict is not None:
                     color = (0, 255, 0)
-                    label = f"{person} ({confidence:.0f}%)"
+                    label = f"{person_dict['name']} ({confidence:.0%})"
                 else:
                     color = (0, 0, 255)
                     label = "Unknown"
@@ -562,8 +407,8 @@ class CameraStream:
     
     def _recognize_face(self, frame, x, y, w, h):
         """OPTIMIZED: Recognize face with better accuracy"""
-        global embeddings_data
-        
+        global embedding_index
+
         # Extract face with margin for better recognition
         margin_ratio = 0.2
         margin_x = int(w * margin_ratio)
@@ -581,10 +426,10 @@ class CameraStream:
             return None, None, 0
         
         try:
-            # OPTIMIZED: Better preprocessing
-            # Resize face to standard size for consistent recognition
-            face_resized = cv2.resize(face_crop, (160, 160))
-            
+            # Preprocess: upscale small faces + CLAHE for low-light, then resize to FaceNet input size
+            face_preprocessed = preprocess_face_crop(face_crop)
+            face_resized = cv2.resize(face_preprocessed, (160, 160))
+
             # Generate embedding
             with embeddings_lock:
                 results = DeepFace.represent(
@@ -600,14 +445,16 @@ class CameraStream:
                 self.stats['total_recognitions'] += 1
                 
                 # Find best match with confidence
-                person, distance, confidence = find_best_match_optimized(
-                    embedding, embeddings_data, DISTANCE_THRESHOLD_STRICT
+                person_dict, distance, confidence = (
+                    embedding_index.search_with_confidence(embedding, DISTANCE_THRESHOLD)
+                    if embedding_index is not None
+                    else (None, float('inf'), 0.0)
                 )
-                
+
                 # Cleanup
                 del results, embedding
-                
-                return person, distance, confidence
+
+                return person_dict, distance, confidence
                 
         except Exception as e:
             # Only log unexpected errors
@@ -616,47 +463,49 @@ class CameraStream:
         
         return "Unknown", float('inf'), 0
     
-    def _should_record_recognition(self, person):
+    def _should_record_recognition(self, person_dict):
         """Check if we should record this recognition (cooldown)"""
         current_time = time.time()
-        
+        cache_key = f"{person_dict.get('person_id')}|{person_dict.get('role', '')}"
+
         with self.cache_lock:
-            last_time = self.recognition_cache.get(person, 0)
-            
+            last_time = self.recognition_cache.get(cache_key, 0)
+
             if current_time - last_time >= RECOGNITION_COOLDOWN:
-                self.recognition_cache[person] = current_time
-                
+                self.recognition_cache[cache_key] = current_time
+
                 # Limit cache size
                 if len(self.recognition_cache) > MAX_CACHE_SIZE:
                     oldest = min(self.recognition_cache, key=self.recognition_cache.get)
                     del self.recognition_cache[oldest]
-                
+
                 return True
-        
+
         return False
-    
-    def _handle_recognition(self, person, distance):
-        """Handle recognized person - update database"""
+
+    def _handle_recognition(self, person_dict, distance):
+        """Handle recognized person — update database using explicit identity fields."""
         global db_handler
-        
+
         try:
-            # Try to determine role from person name
-            name = person
-            role = "STUDENT"  # Default
-            
-            if "-" in person:
-                parts = person.rsplit("-", 1)
-                name = parts[0]
-                if len(parts) > 1:
-                    role = parts[1].upper()
-            
+            # Read fields directly — no string parsing needed
+            person_id   = person_dict['person_id']
+            role        = person_dict['role']
+            name        = person_dict['name']
+
+            if person_id is None or role not in ('STUDENT', 'TEACHER'):
+                print(f"[Warning] Invalid identity in person dict: {person_dict!r}")
+                return
+
+            person_type = 'Student' if role == 'STUDENT' else 'Teacher'
+
             if self.camera_type == 'Entry':
-                db_handler.mark_entry(name, role, self.zone_id, self.camera_id)
-                print(f"[Entry] ✓ {name} entered Zone {self.zone_id}")
+                db_handler.mark_entry(person_id, person_type, self.zone_id, self.camera_id)
+                print(f"[Entry] ✓ {name} ({role}) entered Zone {self.zone_id}")
             elif self.camera_type == 'Exit':
-                db_handler.mark_exit(name, role, self.zone_id, self.camera_id)
-                print(f"[Exit] ✓ {name} exited Zone {self.zone_id}")
-                
+                db_handler.mark_exit(person_id, person_type, self.zone_id, self.camera_id)
+                print(f"[Exit] ✓ {name} ({role}) exited Zone {self.zone_id}")
+
         except Exception as e:
             print(f"[DB Error] {e}")
     
@@ -828,10 +677,11 @@ def stop_zone_cameras(zone_id):
 @app.route('/embeddings/reload', methods=['POST'])
 def reload_embeddings():
     """Reload embeddings from file"""
-    global embeddings_data
-    
+    global embeddings_data, embedding_index
+
     with embeddings_lock:
         embeddings_data = load_embeddings_from_json(EMBEDDINGS_FILE)
+        embedding_index = EmbeddingIndex(embeddings_data)
     
     return jsonify({
         'success': True,
@@ -856,15 +706,16 @@ def get_stats():
 
 def initialize():
     """Initialize the service"""
-    global embeddings_data, db_handler
-    
+    global embeddings_data, embedding_index, db_handler
+
     print("=" * 70)
     print("IntelliSight - OPTIMIZED Camera Streaming Service v2.0")
     print("=" * 70)
-    
-    # Load embeddings
+
+    # Load embeddings and build vectorized index
     embeddings_data = load_embeddings_from_json(EMBEDDINGS_FILE)
-    print(f"✓ Loaded {len(embeddings_data)} face embeddings")
+    embedding_index = EmbeddingIndex(embeddings_data)
+    print(f"✓ Loaded {len(embeddings_data)} face embeddings ({len(embedding_index)} vectors in index)")
     
     if len(embeddings_data) == 0:
         print("⚠ WARNING: No embeddings loaded! Recognition will not work.")

@@ -21,8 +21,8 @@ from deepface import DeepFace
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-from config import DB_CONFIG, MODEL_NAME, DISTANCE_THRESHOLD, MIN_FACE_SIZE
-from utils import load_embeddings_from_json, find_best_match, FPSCounter
+from config import DB_CONFIG, MODEL_NAME, DISTANCE_THRESHOLD, MIN_FACE_SIZE, RECOGNITION_CONFIDENCE_THRESHOLD, DETECTOR_BACKEND, FRAME_SKIP
+from utils import load_embeddings_from_json, FPSCounter, preprocess_face_crop, EmbeddingIndex, FaceTracker
 from database_handler import DatabaseHandler
 
 # Configure logging
@@ -37,12 +37,13 @@ logging.basicConfig(
 logger = logging.getLogger('CameraManager')
 
 # Configuration
-CONFIDENCE_THRESHOLD = 0.6  # Recognition confidence threshold
-DEDUPLICATION_WINDOW = 10  # Seconds to prevent duplicate detections of same person
-AUTO_RECONNECT_DELAY = 5  # Seconds to wait before reconnecting
-MAX_RECONNECT_ATTEMPTS = 5  # Max attempts before marking camera as failed
-FRAME_PROCESS_INTERVAL = 3  # Process every Nth frame for detection
-HEALTH_CHECK_INTERVAL = 30  # Seconds between health checks
+# CONFIDENCE_THRESHOLD is imported from config as RECOGNITION_CONFIDENCE_THRESHOLD
+DEDUPLICATION_WINDOW   = 10   # Seconds to prevent duplicate detections of same person
+RECONNECT_BASE_DELAY   = 2    # Starting backoff delay (seconds)
+RECONNECT_MAX_DELAY    = 60   # Maximum backoff delay (seconds)
+MAX_RECONNECT_ATTEMPTS = 5    # Attempt count at which delay reaches its maximum
+FRAME_PROCESS_INTERVAL = FRAME_SKIP  # From config — process every Nth frame
+HEALTH_CHECK_INTERVAL  = 30   # Seconds between health checks
 
 
 class PersistentCamera:
@@ -50,13 +51,13 @@ class PersistentCamera:
     Manages a single camera with persistent connection and auto-recovery
     """
     
-    def __init__(self, camera_id, camera_url, camera_type, zone_id, embeddings_data, db_handler):
-        self.camera_id = camera_id
-        self.camera_url = camera_url
-        self.camera_type = camera_type
-        self.zone_id = zone_id
-        self.embeddings_data = embeddings_data
-        self.db_handler = db_handler
+    def __init__(self, camera_id, camera_url, camera_type, zone_id, embedding_index, db_handler):
+        self.camera_id      = camera_id
+        self.camera_url     = camera_url
+        self.camera_type    = camera_type
+        self.zone_id        = zone_id
+        self.embedding_index = embedding_index  # EmbeddingIndex — pre-built at startup
+        self.db_handler     = db_handler
         
         # Connection state
         self.cap = None
@@ -69,12 +70,10 @@ class PersistentCamera:
         self.fps_counter = FPSCounter()
         self.frame_count = 0
         self.detection_history = defaultdict(lambda: None)  # {person_name: last_detection_time}
-        
-        # Face detector
-        self.face_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-        )
-        
+
+        # Face tracker — caches identity for 2 s to skip repeated recognition
+        self.face_tracker = FaceTracker(max_age_seconds=2.0)
+
         # Threading
         self.capture_thread = None
         self.lock = threading.Lock()
@@ -108,17 +107,45 @@ class PersistentCamera:
         logger.info(f"[Camera {self.camera_id}] Stopped")
     
     def _connect(self):
-        """Connect to camera with retry logic"""
+        """
+        Open (or re-open) the camera stream.
+
+        For RTSP URLs, configures FFMPEG with TCP transport and sensible
+        timeouts before calling VideoCapture.  Any stale handle is released
+        first to avoid resource leaks.
+
+        Returns:
+            True on success, False otherwise.
+        """
+        import os
+
+        # Release any stale handle before attempting a fresh connection
+        if self.cap:
+            self.cap.release()
+            self.cap = None
+
+        url = self.camera_url
+        logger.info(f"[Camera {self.camera_id}] Connecting to {url}...")
+
         try:
-            logger.info(f"[Camera {self.camera_id}] Connecting to {self.camera_url}...")
-            
-            self.cap = cv2.VideoCapture(self.camera_url)
-            
-            # Set buffer size to reduce latency
+            # RTSP streams need TCP transport and explicit timeouts
+            if isinstance(url, str) and url.lower().startswith('rtsp'):
+                os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = (
+                    'rtsp_transport;tcp|'
+                    'rtsp_flags;prefer_tcp|'
+                    'stimeout;5000000|'
+                    'max_delay;500000|'
+                    'reorder_queue_size;0'
+                )
+                self.cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+                self.cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 10000)
+                self.cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC,  5000)
+            else:
+                self.cap = cv2.VideoCapture(url)
+
             self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-            
+
             if self.cap.isOpened():
-                # Test read
                 ret, frame = self.cap.read()
                 if ret and frame is not None:
                     self.is_connected = True
@@ -126,12 +153,18 @@ class PersistentCamera:
                     self.last_frame_time = time.time()
                     logger.info(f"[Camera {self.camera_id}] ✓ Connected successfully")
                     return True
-            
-            logger.error(f"[Camera {self.camera_id}] ✗ Failed to connect")
+
+            if self.cap:
+                self.cap.release()
+                self.cap = None
+            logger.warning(f"[Camera {self.camera_id}] ✗ Failed to connect")
             return False
-            
+
         except Exception as e:
             logger.error(f"[Camera {self.camera_id}] Connection error: {e}")
+            if self.cap:
+                self.cap.release()
+                self.cap = None
             return False
     
     def _run(self):
@@ -140,19 +173,20 @@ class PersistentCamera:
         
         while self.is_running:
             try:
-                # Connect if not connected
+                # Connect if not connected — exponential backoff, never permanent stop
                 if not self.is_connected:
-                    if self.reconnect_attempts >= MAX_RECONNECT_ATTEMPTS:
-                        logger.error(f"[Camera {self.camera_id}] Max reconnection attempts reached. Waiting...")
-                        time.sleep(60)  # Wait 1 minute before retrying
-                        self.reconnect_attempts = 0
-                    
+                    delay = min(
+                        RECONNECT_BASE_DELAY * (2 ** min(self.reconnect_attempts, MAX_RECONNECT_ATTEMPTS)),
+                        RECONNECT_MAX_DELAY
+                    )
+                    logger.info(
+                        f"[Camera {self.camera_id}] Reconnect attempt {self.reconnect_attempts + 1} "
+                        f"— waiting {delay:.0f}s before retry..."
+                    )
+                    time.sleep(delay)
                     self.reconnect_attempts += 1
-                    if self._connect():
-                        continue
-                    else:
-                        time.sleep(AUTO_RECONNECT_DELAY)
-                        continue
+                    self._connect()
+                    continue
                 
                 # Read frame
                 ret, frame = self.cap.read()
@@ -183,123 +217,145 @@ class PersistentCamera:
                 time.sleep(1)
     
     def _process_detection(self, frame):
-        """Process frame for person detection"""
+        """
+        Detect and identify faces in a frame using a two-phase pipeline.
+
+        Phase 1 — Detection (always runs):
+            DeepFace.extract_faces() locates all faces and returns aligned crops.
+
+        Phase 2 — Recognition (tracker-gated):
+            The FaceTracker is checked first.  If a cached identity exists (IoU
+            ≥ 0.5, age < 2 s) it is reused without embedding extraction.  Only
+            new or tracking-lost faces run DeepFace.represent() + index search.
+        """
+        fh, fw = frame.shape[:2]
+        detections = []   # fed into face_tracker.update() at end
+
+        # ── Phase 1: detect faces ─────────────────────────────────────────────
         try:
-            h, w = frame.shape[:2]
-            
-            # Resize for faster detection
-            scale = 0.5
-            small_frame = cv2.resize(frame, (int(w * scale), int(h * scale)))
-            gray = cv2.cvtColor(small_frame, cv2.COLOR_BGR2GRAY)
-            
-            # Detect faces
-            faces = self.face_cascade.detectMultiScale(
-                gray,
-                scaleFactor=1.2,
-                minNeighbors=4,  # Balance between speed and accuracy
-                minSize=(30, 30)
-            )
-            
-            if len(faces) == 0:
-                return
-            
-            # Process each face
-            for (x, y, w_face, h_face) in faces:
-                # Scale back to original size
-                x = int(x / scale)
-                y = int(y / scale)
-                w_face = int(w_face / scale)
-                h_face = int(h_face / scale)
-                
-                # Extract face with margin
-                margin = 20
-                y1 = max(0, y - margin)
-                y2 = min(h, y + h_face + margin)
-                x1 = max(0, x - margin)
-                x2 = min(w, x + w_face + margin)
-                
-                face_crop = frame[y1:y2, x1:x2]
-                
-                # Skip if face too small
-                if face_crop.shape[0] < 50 or face_crop.shape[1] < 50:
-                    continue
-                
-                # Recognize face
-                person, distance = self._recognize_face(face_crop)
-                
-                if person and distance is not None:
-                    # Apply confidence threshold
-                    confidence = 1 - (distance / 1.0)  # Convert distance to confidence
-                    
-                    if confidence >= CONFIDENCE_THRESHOLD:
-                        # Check deduplication
-                        if self._should_process_detection(person):
-                            self._handle_detection(person, distance, confidence)
-                    
-        except Exception as e:
-            logger.error(f"[Camera {self.camera_id}] Detection error: {e}")
-    
-    def _recognize_face(self, face_crop):
-        """Recognize a face using DeepFace"""
-        try:
-            results = DeepFace.represent(
-                img_path=face_crop,
-                model_name=MODEL_NAME,
-                detector_backend="skip",
+            face_list = DeepFace.extract_faces(
+                img_path=preprocess_face_crop(frame),
+                detector_backend=DETECTOR_BACKEND,
                 enforce_detection=False,
-                align=False
+                align=True
             )
-            
-            if results and len(results) > 0:
-                embedding = results[0]["embedding"]
-                person, distance = find_best_match(
-                    embedding, 
-                    self.embeddings_data, 
-                    DISTANCE_THRESHOLD
-                )
-                return person, distance
-        
         except Exception as e:
-            # Silent fail - face recognition errors are common
-            pass
-        
-        return None, None
-    
-    def _should_process_detection(self, person):
+            logger.debug(f"[Camera {self.camera_id}] Detection error: {e}")
+            return
+
+        # ── Phase 2: identify each face ───────────────────────────────────────
+        for face_obj in face_list:
+            fa = face_obj.get('facial_area', {})
+            x, y, w, h = fa.get('x', 0), fa.get('y', 0), fa.get('w', 0), fa.get('h', 0)
+
+            if w < MIN_FACE_SIZE or h < MIN_FACE_SIZE:
+                continue
+
+            bbox = (x, y, w, h)
+
+            # Check tracker cache — skip embedding if identity is still fresh
+            cached_person, cached_dist, cached_conf = self.face_tracker.get_person_for_bbox(bbox)
+
+            if cached_person is not None:
+                person_dict = cached_person
+                distance    = cached_dist
+                confidence  = cached_conf
+            else:
+                # Full recognition: embed aligned crop, search index
+                face_crop = face_obj.get('face')
+                if face_crop is None or (hasattr(face_crop, 'size') and face_crop.size == 0):
+                    m = 20
+                    face_crop = frame[max(0, y - m):min(fh, y + h + m),
+                                      max(0, x - m):min(fw, x + w + m)]
+
+                face_crop    = preprocess_face_crop(face_crop)
+                face_resized = cv2.resize(face_crop, (160, 160))
+
+                person_dict = distance = None
+                try:
+                    results = DeepFace.represent(
+                        img_path=face_resized,
+                        model_name=MODEL_NAME,
+                        detector_backend="skip",   # already cropped + aligned
+                        enforce_detection=False,
+                        align=True
+                    )
+                    if results:
+                        person_dict, distance = self.embedding_index.search(
+                            results[0]["embedding"], DISTANCE_THRESHOLD
+                        )
+                except Exception as e:
+                    logger.debug(f"[Camera {self.camera_id}] Recognition error: {e}")
+
+                confidence = (max(0.0, 1.0 - (distance / DISTANCE_THRESHOLD))
+                              if distance is not None else 0.0)
+
+            detections.append({
+                'bbox':       bbox,
+                'person':     person_dict,
+                'distance':   distance or 0,
+                'confidence': confidence,
+            })
+
+            # Fire database event only when confidence is high enough
+            if person_dict is not None and distance is not None:
+                if confidence >= RECOGNITION_CONFIDENCE_THRESHOLD:
+                    if self._should_process_detection(person_dict):
+                        self._handle_detection(person_dict, distance, confidence)
+
+        # ── Update tracker ────────────────────────────────────────────────────
+        self.face_tracker.update(detections, self.frame_count)
+
+    def _should_process_detection(self, person_dict):
         """Check if detection should be processed (deduplication)"""
-        last_detection = self.detection_history[person]
-        
+        dedup_key = f"{person_dict.get('person_id')}|{person_dict.get('role', '')}"
+        last_detection = self.detection_history[dedup_key]
+
         if last_detection is None:
             return True
-        
-        time_since_last = time.time() - last_detection
-        return time_since_last >= DEDUPLICATION_WINDOW
-    
-    def _handle_detection(self, person, distance, confidence):
-        """Handle a valid person detection"""
+
+        return time.time() - last_detection >= DEDUPLICATION_WINDOW
+
+    def _handle_detection(self, person_dict, distance, confidence):
+        """
+        Handle a confirmed person detection.
+
+        Args:
+            person_dict : dict with person_id, role, name, person_key — as returned
+                          by EmbeddingIndex.search(); no string parsing needed.
+            distance    : euclidean distance from the matched embedding
+            confidence  : 0-1 confidence score
+        """
         try:
-            # Update detection history
-            self.detection_history[person] = time.time()
-            
-            # Parse person name (format: "Name-ROLE")
-            parts = person.split('-')
-            name = parts[0]
-            role = parts[1] if len(parts) > 1 else "STUDENT"
-            
+            person_id   = person_dict['person_id']
+            role        = person_dict['role']
+            name        = person_dict['name']
+
+            if person_id is None or role not in ('STUDENT', 'TEACHER'):
+                logger.warning(
+                    f"[Camera {self.camera_id}] Invalid identity in person dict: {person_dict!r}"
+                )
+                return
+
+            # Update deduplication timestamp
+            dedup_key = f"{person_id}|{role}"
+            self.detection_history[dedup_key] = time.time()
+
+            person_type = 'Student' if role == 'STUDENT' else 'Teacher'
+
             logger.info(
-                f"[Camera {self.camera_id}] Detected: {name} "
-                f"(confidence: {confidence:.2%}, distance: {distance:.3f})"
+                f"[Camera {self.camera_id}] Detected: {name} ({role}) | "
+                f"confidence: {confidence:.2%} | distance: {distance:.3f}"
             )
-            
-            # Update database based on camera type
+
             if self.camera_type == 'Entry':
-                self.db_handler.mark_entry(name, role, self.zone_id, self.camera_id)
+                self.db_handler.mark_entry(person_id, person_type, self.zone_id, self.camera_id)
                 logger.info(f"[Entry] {name} entered Zone {self.zone_id}")
-                
+
             elif self.camera_type == 'Exit':
-                self.db_handler.mark_exit(name, role, self.zone_id, self.camera_id)
+                self.db_handler.mark_exit(person_id, person_type, self.zone_id, self.camera_id)
                 logger.info(f"[Exit] {name} left Zone {self.zone_id}")
-            
+
         except Exception as e:
             logger.error(f"[Camera {self.camera_id}] Error handling detection: {e}")
     
@@ -325,9 +381,10 @@ class CameraManager:
     """
     
     def __init__(self):
-        self.cameras = {}  # {camera_id: PersistentCamera}
+        self.cameras         = {}  # {camera_id: PersistentCamera}
         self.embeddings_data = []
-        self.db_handler = None
+        self.embedding_index = None  # Built once in initialize()
+        self.db_handler      = None
         self.is_running = False
         
         # Health monitoring thread
@@ -343,7 +400,9 @@ class CameraManager:
             # Load face embeddings
             from config import EMBEDDINGS_FILE
             self.embeddings_data = load_embeddings_from_json(EMBEDDINGS_FILE)
-            logger.info(f"Loaded {len(self.embeddings_data)} face embeddings")
+            self.embedding_index = EmbeddingIndex(self.embeddings_data)
+            logger.info(f"Loaded {len(self.embeddings_data)} face embeddings "
+                        f"({len(self.embedding_index)} vectors in index)")
             
             # Initialize database handler
             self.db_handler = DatabaseHandler()
@@ -402,7 +461,7 @@ class CameraManager:
                     camera_url,
                     camera_type,
                     zone_id,
-                    self.embeddings_data,
+                    self.embedding_index,
                     self.db_handler
                 )
                 

@@ -12,12 +12,11 @@ import pandas as pd
 from datetime import datetime
 from deepface import DeepFace
 
+from config import MODEL_NAME, DISTANCE_THRESHOLD, DETECTOR_BACKEND, FRAME_SKIP, EMBEDDINGS_FILE
+from utils import preprocess_face_crop, EmbeddingIndex
+
 # Constants
-EMBEDDINGS_FILE = os.path.join("embeddings", "representations_facenet.json")
 ATTENDANCE_FILE = "attendance.csv"
-MODEL_NAME = "Facenet"
-DISTANCE_THRESHOLD = 10.0  # Stricter threshold - only match if distance < 10
-PROCESS_EVERY_N_FRAMES = 20  # Process recognition every N frames
 MAX_FACES = 10  # Maximum faces to process at once
 
 
@@ -34,8 +33,8 @@ def load_embeddings():
         print("ERROR: No embeddings found")
         return None
     
-    persons = set([d['person'] for d in data])
-    print(f"Loaded {len(data)} embeddings for: {', '.join(persons)}")
+    persons = set([d.get('name') or d.get('person', 'Unknown') for d in data])
+    print(f"Loaded {len(data)} embeddings for: {', '.join(sorted(persons))}")
     return data
 
 
@@ -68,65 +67,19 @@ def mark_attendance(name):
     return True
 
 
-def get_euclidean_distance(emb1, emb2):
-    """Calculate Euclidean distance"""
-    return np.linalg.norm(np.array(emb1) - np.array(emb2))
-
-
-def find_best_match(embedding, embeddings_data):
-    """Find the best matching person"""
-    best_person = None
-    min_distance = float('inf')
-    
-    for data in embeddings_data:
-        dist = get_euclidean_distance(embedding, data['embedding'])
-        if dist < min_distance:
-            min_distance = dist
-            best_person = data['person']
-    
-    return best_person, min_distance
-
-
-def recognize_face(face_crop, embeddings_data):
-    """
-    Recognize a single face crop
-    Returns (person_name, distance) or ("Unknown", distance) or (None, None)
-    """
-    try:
-        results = DeepFace.represent(
-            img_path=face_crop,
-            model_name=MODEL_NAME,
-            detector_backend="opencv",
-            enforce_detection=False,
-            align=False
-        )
-        
-        if results and len(results) > 0:
-            embedding = results[0]["embedding"]
-            person, distance = find_best_match(embedding, embeddings_data)
-            
-            if distance <= DISTANCE_THRESHOLD:
-                return person, distance
-            else:
-                return "Unknown", distance
-                
-    except Exception:
-        pass
-    
-    return None, None
-
-
 def main():
     print("\n" + "=" * 60)
     print("  FACE RECOGNITION ATTENDANCE SYSTEM")
     print("  Multi-Face Detection - Up to 10 faces simultaneously")
     print("=" * 60 + "\n")
     
-    # Load embeddings
+    # Load embeddings and build vectorized index once at startup
     embeddings_data = load_embeddings()
     if not embeddings_data:
         return
-    
+    embedding_index = EmbeddingIndex(embeddings_data)
+    print(f"  Index ready: {len(embedding_index)} embedding vectors\n")
+
     # Init attendance file
     init_attendance()
     
@@ -144,12 +97,7 @@ def main():
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     
     print("Webcam ready! Press 'q' to quit.\n")
-    
-    # Load Haar Cascade for fast face detection
-    face_cascade = cv2.CascadeClassifier(
-        cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-    )
-    
+
     frame_count = 0
     attendance_marked = set()
     
@@ -164,66 +112,71 @@ def main():
         
         frame_count += 1
         display = frame.copy()
-        
-        # Detect all faces using Haar Cascade - smaller minSize for long range
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(
-            gray,
-            scaleFactor=1.05,
-            minNeighbors=4,
-            minSize=(30, 30)  # Smaller minimum to detect faces from 1-2 meters
-        )
-        
+
+        # Use RetinaFace via DeepFace.represent() to detect all faces and embed in one call
+        deepface_results = []
+        if frame_count % FRAME_SKIP == 0:
+            try:
+                deepface_results = DeepFace.represent(
+                    img_path=preprocess_face_crop(frame),
+                    model_name=MODEL_NAME,
+                    detector_backend=DETECTOR_BACKEND,
+                    enforce_detection=False,
+                    align=True
+                )
+            except Exception as e:
+                pass
+
+        # Build faces list from DeepFace results (sorted largest first, limited)
+        faces = []
+        for r in deepface_results:
+            fa = r.get('facial_area', {})
+            faces.append((fa.get('x', 0), fa.get('y', 0), fa.get('w', 0), fa.get('h', 0)))
+
+        faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)[:MAX_FACES]
         num_faces = len(faces)
-        
-        # Sort faces by size (largest first) and limit to MAX_FACES
-        if num_faces > 0:
-            faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)[:MAX_FACES]
-        
-        # Process recognition every N frames when faces detected
-        if num_faces > 0 and frame_count % PROCESS_EVERY_N_FRAMES == 0:
-            print(f"\nFrame {frame_count}: Processing {len(faces)} face(s)...")
+
+        # Process recognition for this frame's results
+        if deepface_results and frame_count % FRAME_SKIP == 0:
+            print(f"\nFrame {frame_count}: Processing {len(deepface_results)} face(s)...")
             recognized_faces.clear()
-            
-            for idx, (x, y, w, h) in enumerate(faces):
-                # Add margin around face
-                margin = 30
-                y1 = max(0, y - margin)
-                y2 = min(frame.shape[0], y + h + margin)
-                x1 = max(0, x - margin)
-                x2 = min(frame.shape[1], x + w + margin)
-                
-                face_crop = frame[y1:y2, x1:x2]
-                
-                # Recognize this face
-                person, distance = recognize_face(face_crop, embeddings_data)
-                
-                if person:
-                    recognized_faces[idx] = (person, distance)
-                    
-                    if person != "Unknown":
-                        print(f"  Face {idx+1}: {person} (distance: {distance:.2f})")
-                        
-                        # Mark attendance if not already marked
-                        if person not in attendance_marked:
-                            if mark_attendance(person):
-                                attendance_marked.add(person)
+
+            for idx, result in enumerate(deepface_results[:MAX_FACES]):
+                fa        = result.get('facial_area', {})
+                x, y, w, h = fa.get('x', 0), fa.get('y', 0), fa.get('w', 0), fa.get('h', 0)
+                embedding = result.get('embedding')
+
+                if not embedding:
+                    continue
+
+                person_dict, distance = embedding_index.search(embedding, DISTANCE_THRESHOLD)
+
+                if distance is not None:
+                    recognized_faces[idx] = (person_dict, distance)
+
+                    if person_dict is not None:
+                        name = person_dict['name']
+                        print(f"  Face {idx+1}: {name} [{person_dict['role']}] (distance: {distance:.2f})")
+
+                        if name not in attendance_marked:
+                            if mark_attendance(name):
+                                attendance_marked.add(name)
                     else:
                         print(f"  Face {idx+1}: UNKNOWN (distance: {distance:.2f})")
-        
+
         # Draw rectangles and labels for all detected faces
         for idx, (x, y, w, h) in enumerate(faces):
             if idx in recognized_faces:
-                person, distance = recognized_faces[idx]
-                
-                if person == "Unknown":
+                person_dict, distance = recognized_faces[idx]
+
+                if person_dict is None:
                     # Red rectangle for unknown person
                     color = (0, 0, 255)
                     label = f"Unknown ({distance:.1f})"
                 else:
                     # Green rectangle for recognized person
                     color = (0, 255, 0)
-                    label = f"{person} ({distance:.1f})"
+                    label = f"{person_dict['name']} ({distance:.1f})"
                 
                 cv2.rectangle(display, (x, y), (x+w, y+h), color, 3)
                 
@@ -243,8 +196,8 @@ def main():
             status = "No faces detected - Please look at camera"
             status_color = (100, 100, 100)
         else:
-            known_count = sum(1 for p, d in recognized_faces.values() if p != "Unknown")
-            unknown_count = sum(1 for p, d in recognized_faces.values() if p == "Unknown")
+            known_count = sum(1 for p, d in recognized_faces.values() if p is not None)
+            unknown_count = sum(1 for p, d in recognized_faces.values() if p is None)
             
             if known_count > 0 or unknown_count > 0:
                 status = f"Faces: {num_faces} | Recognized: {known_count} | Unknown: {unknown_count}"

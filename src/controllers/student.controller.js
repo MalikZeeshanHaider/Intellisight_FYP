@@ -65,6 +65,7 @@ export const createStudent = asyncHandler(async (req, res) => {
     Email,
     Gender,
     Department,
+    Section_ID,
     Face_Picture_1,
     Face_Picture_2,
     Face_Picture_3,
@@ -75,6 +76,19 @@ export const createStudent = asyncHandler(async (req, res) => {
   // Validate required fields
   if (!Name || !RollNumber || !Email) {
     throw new BadRequestError('Name, Roll Number, and Email are required');
+  }
+
+  // Validate section if provided
+  let sectionIdParsed = null;
+  if (Section_ID !== undefined && Section_ID !== null) {
+    sectionIdParsed = parseInt(Section_ID);
+    if (Number.isNaN(sectionIdParsed) || sectionIdParsed <= 0) {
+      throw new BadRequestError('Section_ID must be a positive integer');
+    }
+    const section = await prisma.section.findUnique({ where: { Section_ID: sectionIdParsed } });
+    if (!section) {
+      throw new NotFoundError(`Section with ID ${Section_ID} not found`);
+    }
   }
 
   // Validate at least one picture
@@ -98,6 +112,7 @@ export const createStudent = asyncHandler(async (req, res) => {
       Email,
       Gender,
       Department,
+      Section_ID: sectionIdParsed,
       Face_Picture_1,
       Face_Picture_2,
       Face_Picture_3,
@@ -105,6 +120,16 @@ export const createStudent = asyncHandler(async (req, res) => {
       Face_Picture_5,
     },
   });
+
+  // Create enrollment if Section_ID provided
+  if (sectionIdParsed) {
+    await prisma.enrollment.create({
+      data: {
+        Section_ID: sectionIdParsed,
+        Student_ID: student.Student_ID,
+      },
+    });
+  }
 
   // Save face images to training folder for new algorithm
   try {
@@ -140,6 +165,7 @@ export const updateStudent = asyncHandler(async (req, res) => {
     Email,
     Gender,
     Department,
+    Section_ID,
     Face_Picture_1,
     Face_Picture_2,
     Face_Picture_3,
@@ -179,6 +205,21 @@ export const updateStudent = asyncHandler(async (req, res) => {
   if (Face_Picture_4 !== undefined) updateData.Face_Picture_4 = Face_Picture_4;
   if (Face_Picture_5 !== undefined) updateData.Face_Picture_5 = Face_Picture_5;
 
+  // Validate section if provided
+  let sectionIdParsed = null;
+  if (Section_ID !== undefined && Section_ID !== null) {
+    sectionIdParsed = parseInt(Section_ID);
+    if (Number.isNaN(sectionIdParsed) || sectionIdParsed <= 0) {
+      throw new BadRequestError('Section_ID must be a positive integer');
+    }
+    const section = await prisma.section.findUnique({ where: { Section_ID: sectionIdParsed } });
+    if (!section) {
+      throw new NotFoundError(`Section with ID ${Section_ID} not found`);
+    }
+    // Add Section_ID to updateData so it saves to Students table
+    updateData.Section_ID = sectionIdParsed;
+  }
+
   // Update student
   const student = await prisma.students.update({
     where: { Student_ID: parseInt(id) },
@@ -203,6 +244,29 @@ export const updateStudent = asyncHandler(async (req, res) => {
       }, true); // isUpdate = true to clear old embeddings
     } catch (err) {
       console.warn('[STUDENT] Failed to save images to train folder:', err.message);
+    }
+  }
+
+  // Upsert enrollment if Section_ID provided
+  if (sectionIdParsed) {
+    const existingEnrollment = await prisma.enrollment.findFirst({
+      where: { Student_ID: student.Student_ID },
+    });
+
+    if (existingEnrollment) {
+      if (existingEnrollment.Section_ID !== sectionIdParsed) {
+        await prisma.enrollment.update({
+          where: { Enrollment_ID: existingEnrollment.Enrollment_ID },
+          data: { Section_ID: sectionIdParsed },
+        });
+      }
+    } else {
+      await prisma.enrollment.create({
+        data: {
+          Section_ID: sectionIdParsed,
+          Student_ID: student.Student_ID,
+        },
+      });
     }
   }
 

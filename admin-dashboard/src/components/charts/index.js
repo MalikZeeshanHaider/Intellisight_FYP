@@ -15,16 +15,6 @@ export { default as TopActiveStudentsChart } from './TopActiveStudentsChart';
 // Zone Capacity Gauge Charts
 export { default as ZoneCapacityGauge, MiniZoneGauge } from './ZoneCapacityGauge';
 
-// Peak Hours Heatmap
-export { default as PeakHoursHeatmap, CompactHeatmap } from './PeakHoursHeatmap';
-
-// Weekly Trends Line Chart
-export { 
-  default as WeeklyTrendsChart, 
-  TrendSparkline, 
-  ComparisonTrendsChart 
-} from './WeeklyTrendsChart';
-
 /**
  * Chart Types Available:
  * 

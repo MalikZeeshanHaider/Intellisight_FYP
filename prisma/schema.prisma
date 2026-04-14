@@ -52,6 +52,7 @@ model Zone {
   AttendanceLog  AttendanceLog[]
   Camara         Camara[]
   Logs           Logs[]
+  TimetableSlots TimetableSlot[]
 
   @@map("Zone")
 }
@@ -87,6 +88,8 @@ model Teacher {
   FaceEmbeddings  FaceEmbeddings[]
   Logs            Logs[]
   ProcessedImages ProcessedFaceImages[]
+  TimetableSlots  TimetableSlot[]
+  ClassAttendance ClassAttendance[]
 
   @@map("Teacher")
 }
@@ -106,11 +109,15 @@ model Students {
   UpdatedAt       DateTime              @updatedAt
   Department      String?
   Gender          String?
+  Section_ID      Int?
+  section         Section?              @relation("StudentSection", fields: [Section_ID], references: [Section_ID])
   ActivePresence  ActivePresence[]
   AttendanceLog   AttendanceLog[]
   FaceEmbeddings  FaceEmbeddings[]
   Logs            Logs[]
   ProcessedImages ProcessedFaceImages[]
+  Enrollments     Enrollment[]
+  ClassAttendance ClassAttendance[]
 
   @@map("Students")
 }
@@ -206,4 +213,102 @@ model Logs {
   Students   Students? @relation(fields: [Student_ID], references: [Student_ID])
   Teacher    Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID])
   Zone       Zone?     @relation(fields: [Zone_id], references: [Zone_id])
+}
+
+// ─── Course (e.g., "Object Oriented Programming") ───
+model Course {
+  Course_ID      Int              @id @default(autoincrement())
+  Name           String                      // "Object Oriented Programming"
+  Code           String           @unique    // "CS-301"
+  CreditHours    Int?                        // 3
+  Department     String?                     // "Computer Science"
+  CreatedAt      DateTime         @default(now())
+  UpdatedAt      DateTime         @updatedAt
+
+  TimetableSlots TimetableSlot[]
+
+  @@map("Course")
+}
+
+// ─── Section (e.g., "BSIT-VIII-A (Shift-I)") ───
+model Section {
+  Section_ID     Int              @id @default(autoincrement())
+  Name           String           @unique    // "BSIT-VIII-A (Shift-I)"
+  Department     String?                     // "Computer Science"
+  Semester       String?                     // "8th"
+  Shift          String?                     // "Morning" / "Evening"
+  CreatedAt      DateTime         @default(now())
+  UpdatedAt      DateTime         @updatedAt
+
+  Enrollments    Enrollment[]
+  Students       Students[]        @relation("StudentSection")
+  TimetableSlots TimetableSlot[]
+
+  @@map("Section")
+}
+
+// ─── Enrollment (which students belong to which section) ───
+model Enrollment {
+  Enrollment_ID Int      @id @default(autoincrement())
+  Section_ID    Int
+  Student_ID    Int
+  CreatedAt     DateTime @default(now())
+
+  section       Section  @relation(fields: [Section_ID], references: [Section_ID], onDelete: Cascade)
+  student       Students @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
+
+  @@unique([Section_ID, Student_ID]) // one student enrolled once per section
+  @@map("Enrollment")
+}
+
+// ─── TimetableSlot (one row = one class block in the week) ───
+model TimetableSlot {
+  Slot_ID         Int               @id @default(autoincrement())
+  Section_ID      Int
+  Course_ID       Int?                       // FK to Course (nullable for manual entry)
+  Teacher_ID      Int?                       // FK to existing Teacher (nullable if just a name)
+  TeacherName     String?                    // fallback: plain text name
+  SubjectName     String                     // "Object Oriented Programming"
+  DayOfWeek       String                     // "MON","TUE","WED","THU","FRI"
+  StartTime       String                     // "09:00"
+  EndTime         String                     // "10:00"
+  Zone_id         Int?                       // FK to existing Zone (room/lab)
+  RoomName        String?                    // fallback: plain text "Room-301"
+  IsActive        Boolean           @default(true)
+  CreatedAt       DateTime          @default(now())
+  UpdatedAt       DateTime          @updatedAt
+
+  section         Section           @relation(fields: [Section_ID], references: [Section_ID], onDelete: Cascade)
+  course          Course?           @relation(fields: [Course_ID], references: [Course_ID], onDelete: SetNull)
+  teacher         Teacher?          @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: SetNull)
+  zone            Zone?             @relation(fields: [Zone_id], references: [Zone_id], onDelete: SetNull)
+  ClassAttendance ClassAttendance[]
+
+  @@unique([Section_ID, DayOfWeek, StartTime]) // no duplicate slot for same section/day/time
+  @@map("TimetableSlot")
+}
+
+// ─── ClassAttendance (computed from camera logs per slot per day) ───
+model ClassAttendance {
+  Attendance_ID   Int            @id @default(autoincrement())
+  Slot_ID         Int                        // which timetable slot
+  Date            DateTime       @db.Date    // which day (2026-03-01)
+  PersonType      String                     // "STUDENT" or "TEACHER"
+  Student_ID      Int?
+  Teacher_ID      Int?
+  Status          String         @default("ABSENT") // "PRESENT","ABSENT","LATE"
+  FirstSeenAt     DateTime?                  // first camera detection in that slot window
+  LastSeenAt      DateTime?                  // last camera detection
+  TotalMinutes    Int?                       // total time detected in slot
+  DetectionsCount Int            @default(0) // how many times camera saw them
+  CreatedAt       DateTime       @default(now())
+  UpdatedAt       DateTime       @updatedAt
+
+  slot            TimetableSlot  @relation(fields: [Slot_ID], references: [Slot_ID], onDelete: Cascade)
+  student         Students?      @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
+  teacher         Teacher?       @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
+
+  @@unique([Slot_ID, Date, Student_ID]) // one record per student per slot per day
+  @@unique([Slot_ID, Date, Teacher_ID]) // one record per teacher per slot per day
+  @@map("ClassAttendance")
 }

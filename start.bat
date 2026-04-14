@@ -19,56 +19,69 @@ echo  ^|                    Zainab Moazzam - 221095                   ^|
 echo  ================================================================
 echo.
 
-REM Set the project directory
-set PROJECT_DIR=%~dp0
-cd /d "%PROJECT_DIR%"
+REM Set project directory (always ends with \)
+set "PROJECT_DIR=%~dp0"
 
-REM Set environment variables
-set DATABASE_URL=postgresql://postgres:ozair@localhost:5000/FYP_Intellisight?schema=public
-set NODE_ENV=development
-set PORT=3000
+REM Python conda env - intellisight_gpu (Python 3.10, deepface/flask/cv2)
+set "PYTHON_EXE=C:\Users\abdul\miniconda3\envs\intellisight_gpu\python.exe"
 
 echo [*] Project Directory: %PROJECT_DIR%
-echo [*] Database URL configured
 echo.
+
+REM ============================================================
+REM  Check .env file
+REM ============================================================
+if not exist "%PROJECT_DIR%.env" (
+    echo [ERROR] .env file not found!
+    echo         Copy .env.example to .env and fill in your values.
+    echo.
+    pause
+    exit /b 1
+)
+echo [OK] .env file found
 
 REM ============================================================
 REM  Check Node.js
 REM ============================================================
-echo [*] Checking Node.js installation...
+echo [*] Checking Node.js...
 where node >nul 2>nul
-if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] Node.js is not installed or not in PATH!
-    echo         Please install Node.js from https://nodejs.org
+if errorlevel 1 (
+    echo [ERROR] Node.js not found. Install from https://nodejs.org
     pause
     exit /b 1
 )
-for /f "tokens=*" %%i in ('node -v') do set NODE_VERSION=%%i
-echo [OK] Node.js %NODE_VERSION% found
+for /f "tokens=*" %%v in ('node -v 2^>nul') do echo [OK] Node.js %%v
 echo.
 
 REM ============================================================
-REM  Check Python
+REM  Check Python (intellisight_gpu conda environment)
 REM ============================================================
-echo [*] Checking Python installation...
-where python >nul 2>nul
-if %ERRORLEVEL% NEQ 0 (
-    echo [WARNING] Python is not installed or not in PATH!
-    echo           Face recognition features may not work.
-) else (
-    for /f "tokens=*" %%i in ('python --version 2^>^&1') do set PYTHON_VERSION=%%i
-    echo [OK] %PYTHON_VERSION% found
-)
+echo [*] Checking Python environment (intellisight_gpu)...
+if not exist "%PYTHON_EXE%" goto :python_missing
+for /f "tokens=*" %%v in ('"%PYTHON_EXE%" --version 2^>^&1') do echo [OK] %%v ^(intellisight_gpu env^)
+goto :python_ok
+
+:python_missing
+echo [WARNING] intellisight_gpu conda env not found at:
+echo           %PYTHON_EXE%
+echo           Camera streaming service will NOT start.
+echo           Setup: conda create -n intellisight_gpu python=3.10
+echo                  conda activate intellisight_gpu
+echo                  pip install -r Facerecongination\requirements.txt
+set "PYTHON_EXE="
+
+:python_ok
 echo.
 
 REM ============================================================
 REM  Install Backend Dependencies (if needed)
 REM ============================================================
-if not exist "node_modules\" (
+if not exist "%PROJECT_DIR%node_modules\" (
     echo [*] Installing backend dependencies...
+    cd /d "%PROJECT_DIR%"
     call npm install
-    if %ERRORLEVEL% NEQ 0 (
-        echo [ERROR] Failed to install backend dependencies!
+    if errorlevel 1 (
+        echo [ERROR] Backend npm install failed!
         pause
         exit /b 1
     )
@@ -79,9 +92,15 @@ if not exist "node_modules\" (
 REM ============================================================
 REM  Generate Prisma Client (if needed)
 REM ============================================================
-if not exist "node_modules\.prisma\" (
+if not exist "%PROJECT_DIR%node_modules\.prisma\" (
     echo [*] Generating Prisma client...
+    cd /d "%PROJECT_DIR%"
     call npx prisma generate
+    if errorlevel 1 (
+        echo [ERROR] Prisma generate failed!
+        pause
+        exit /b 1
+    )
     echo [OK] Prisma client generated
     echo.
 )
@@ -89,44 +108,29 @@ if not exist "node_modules\.prisma\" (
 REM ============================================================
 REM  Install Frontend Dependencies (if needed)
 REM ============================================================
-if not exist "admin-dashboard\node_modules\" (
+if not exist "%PROJECT_DIR%admin-dashboard\node_modules\" (
     echo [*] Installing frontend dependencies...
-    cd admin-dashboard
+    cd /d "%PROJECT_DIR%admin-dashboard"
     call npm install
-    if %ERRORLEVEL% NEQ 0 (
-        echo [ERROR] Failed to install frontend dependencies!
-        cd ..
+    if errorlevel 1 (
+        echo [ERROR] Frontend npm install failed!
+        cd /d "%PROJECT_DIR%"
         pause
         exit /b 1
     )
-    cd ..
+    cd /d "%PROJECT_DIR%"
     echo [OK] Frontend dependencies installed
     echo.
 )
 
 REM ============================================================
-REM  Setup Python Virtual Environment (if needed)
+REM  Auto-create frontend .env if missing
 REM ============================================================
-if not exist "Facerecongination\.venv\" (
-    if not exist "Facerecongination\venv\" (
-        echo [*] Creating Python virtual environment...
-        cd Facerecongination
-        python -m venv .venv
-        if %ERRORLEVEL% NEQ 0 (
-            echo [WARNING] Failed to create virtual environment
-            cd ..
-        ) else (
-            echo [*] Upgrading pip...
-            call .venv\Scripts\activate
-            python.exe -m pip install --upgrade pip
-            echo [*] Installing Python dependencies...
-            pip install -r requirements.txt
-            deactivate
-            cd ..
-            echo [OK] Python environment setup complete
-        )
-        echo.
-    )
+if not exist "%PROJECT_DIR%admin-dashboard\.env" (
+    echo [*] Creating admin-dashboard\.env from .env.example...
+    copy "%PROJECT_DIR%admin-dashboard\.env.example" "%PROJECT_DIR%admin-dashboard\.env" >nul
+    echo [OK] admin-dashboard\.env created
+    echo.
 )
 
 REM ============================================================
@@ -137,36 +141,30 @@ echo  ================================================================
 echo  ^|                  STARTING SERVICES                           ^|
 echo  ================================================================
 echo.
-
-echo [*] Starting Backend Server (Port 3000)...
-echo [*] Starting Frontend Dev Server (Port 3001)...
-echo [*] Starting Camera Streaming Service (Port 5001)...
+echo  Backend API:     http://localhost:3000
+echo  Frontend App:    http://localhost:3001
+echo  Camera Service:  http://localhost:5001
 echo.
-echo  ----------------------------------------------------------------
-echo  ^| Backend API:    http://localhost:3000                       ^|
-echo  ^| Frontend App:   http://localhost:3001                       ^|
-echo  ^| Camera Service: http://localhost:5001                       ^|
-echo  ^| Prisma Studio:  Run 'npx prisma studio' separately          ^|
-echo  ----------------------------------------------------------------
-echo.
-echo [!] Press Ctrl+C in either window to stop the servers
-echo [!] Close this window to stop all services
+echo  [!] Each service opens in its own window.
 echo.
 
-REM Start backend in a new window
-start "IntelliSight - Backend (Port 3000)" cmd /k "cd /d "%PROJECT_DIR%" && set DATABASE_URL=%DATABASE_URL% && npm run dev"
+REM --- Backend (Node.js / nodemon) ---
+start "IntelliSight - Backend (Port 3000)" /d "%PROJECT_DIR%" cmd /k "npm run dev"
+timeout /t 4 /nobreak >nul
 
-REM Wait a moment for backend to start
-timeout /t 3 /nobreak >nul
-
-REM Start frontend in a new window
-start "IntelliSight - Frontend (Port 3001)" cmd /k "cd /d "%PROJECT_DIR%\admin-dashboard" && npm run dev"
-
-REM Wait a moment for frontend to start
+REM --- Frontend (Vite / React) ---
+start "IntelliSight - Frontend (Port 3001)" /d "%PROJECT_DIR%admin-dashboard" cmd /k "npm run dev"
 timeout /t 2 /nobreak >nul
 
-REM Start Camera Streaming Service in a new window
-start "IntelliSight - Camera Service (Port 5001)" cmd /k "cd /d "%PROJECT_DIR%\Facerecongination" && python camera_streaming_service.py"
+REM --- Camera Streaming Service (Flask / Python) ---
+if not defined PYTHON_EXE goto :skip_camera
+start "IntelliSight - Camera Service (Port 5001)" /d "%PROJECT_DIR%Facerecongination" cmd /k ""%PYTHON_EXE%" camera_streaming_service.py"
+goto :camera_done
+
+:skip_camera
+echo [WARNING] Camera service skipped - intellisight_gpu env not found.
+
+:camera_done
 
 echo.
 echo [OK] All services started!
@@ -175,22 +173,18 @@ echo  ================================================================
 echo  ^|                  SYSTEM IS RUNNING                           ^|
 echo  ================================================================
 echo.
-echo  Backend API:      http://localhost:3000
-echo  Frontend App:     http://localhost:3001
-echo  Camera Service:   http://localhost:5001
+echo  Backend API:     http://localhost:3000
+echo  Frontend App:    http://localhost:3001
+echo  Camera Service:  http://localhost:5001
 echo.
-echo  Camera streaming service runs on port 5001 for live video feeds.
+echo  Python env:  intellisight_gpu  (FaceNet + RetinaFace)
 echo.
 echo  Press any key to open the frontend in your browser...
 pause >nul
 
-REM Open browser
 start http://localhost:3001
 
 echo.
-echo  ----------------------------------------------------------------
-echo  This window can be closed. The services will continue running
-echo  in their own windows.
-echo  ----------------------------------------------------------------
+echo  Close the individual service windows to stop each service.
 echo.
 pause

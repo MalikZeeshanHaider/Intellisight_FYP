@@ -31,7 +31,7 @@ import UnknownFaces from './pages/UnknownFaces';
 import Logs from './pages/Logs';
 import Settings from './pages/Settings';
 import ActivePresence from './pages/ActivePresence';
-import AttendanceLogs from './pages/AttendanceLogs';
+import AttendanceAnalytics from './pages/AttendanceAnalytics';
 
 console.log('%c📱 App.jsx - Component Loading', 'color: blue; font-size: 14px');
 
@@ -245,12 +245,12 @@ function App() {
             />
 
             <Route
-              path="/attendance-logs"
+              path="/attendance-analytics"
               element={
                 <ProtectedRoute>
                   <Layout>
                     <ErrorBoundary>
-                      <AttendanceLogs />
+                      <AttendanceAnalytics />
                     </ErrorBoundary>
                   </Layout>
                 </ProtectedRoute>

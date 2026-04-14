@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FiX, FiUpload, FiTrash2, FiChevronDown } from 'react-icons/fi';
 import { studentAPI } from '../api/api';
+import { sectionAPI, enrollmentAPI } from '../api/attendance';
 
 const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
     const isDarkMode = document.documentElement.classList.contains('dark');
@@ -9,7 +10,8 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
         RollNumber: '',
         Email: '',
         Gender: '',
-        Department: ''
+        Department: '',
+        Section_ID: ''
     });
     const [facePictures, setFacePictures] = useState({
         Face_Picture_1: null,
@@ -22,6 +24,8 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
     const [error, setError] = useState('');
     const [genderDropdownOpen, setGenderDropdownOpen] = useState(false);
     const genderDropdownRef = useRef(null);
+    const [sections, setSections] = useState([]);
+    const [sectionsLoading, setSectionsLoading] = useState(false);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -34,6 +38,39 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    // Load sections once — show all sections, Section_ID is optional
+    useEffect(() => {
+        setSectionsLoading(true);
+        sectionAPI.getAll()
+            .then(res => {
+                const list = Array.isArray(res) ? res : (res.data ?? []);
+                setSections(list);
+            })
+            .catch(() => setSections([]))
+            .finally(() => setSectionsLoading(false));
+    }, []);
+
+    // Load current enrollment for student
+    useEffect(() => {
+        async function loadEnrollment(studentId) {
+            if (!studentId) return;
+            try {
+                const res = await enrollmentAPI.getByStudent(studentId);
+                const sectionsList = Array.isArray(res?.sections) ? res.sections : [];
+                if (sectionsList.length) {
+                    setFormData(prev => ({ ...prev, Section_ID: String(sectionsList[0].Section_ID) }));
+                } else {
+                    setFormData(prev => ({ ...prev, Section_ID: '' }));
+                }
+            } catch {
+                setFormData(prev => ({ ...prev, Section_ID: '' }));
+            }
+        }
+        if (student?.Student_ID) {
+            loadEnrollment(student.Student_ID);
+        }
+    }, [student?.Student_ID]);
+
     // Populate form when student prop changes
     useEffect(() => {
         if (student) {
@@ -42,7 +79,8 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
                 RollNumber: student.RollNumber || '',
                 Email: student.Email || '',
                 Gender: student.Gender || '',
-                Department: student.Department || ''
+                Department: student.Department || '',
+                Section_ID: student.Section_ID ? String(student.Section_ID) : ''
             });
             setFacePictures({
                 Face_Picture_1: student.Face_Picture_1 || null,
@@ -99,7 +137,6 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
             setError('Email is required');
             return;
         }
-
         setLoading(true);
 
         try {
@@ -108,8 +145,13 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
                 RollNumber: formData.RollNumber.trim(),
                 Email: formData.Email.trim(),
                 Gender: formData.Gender,
-                Department: formData.Department.trim()
+                Department: formData.Department.trim(),
             };
+
+            // Section_ID is optional — only include if selected
+            if (formData.Section_ID) {
+                payload.Section_ID = parseInt(formData.Section_ID, 10);
+            }
 
             // Add pictures (only include changed ones)
             if (facePictures.Face_Picture_1) payload.Face_Picture_1 = facePictures.Face_Picture_1;
@@ -348,6 +390,47 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
                             )}
                         </div>
                     </div>
+
+                                    {/* Section */}
+                                    <div>
+                                        <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#1e293b' }}>
+                                            Section <span className="text-red-500">*</span>
+                                        </label>
+                                        <select
+                                            name="Section_ID"
+                                            value={formData.Section_ID}
+                                            onChange={handleInputChange}
+                                            required
+                                            disabled={sectionsLoading || sections.length === 0}
+                                            className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
+                                            style={{
+                                                background: isDarkMode ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                                                border: isDarkMode ? '2px solid rgba(129, 140, 248, 0.3)' : '2px solid rgba(148, 163, 184, 0.3)',
+                                                color: formData.Section_ID ? (isDarkMode ? '#c0f0f0' : '#0F172A') : (isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#9CA3AF'),
+                                                transition: 'border-color 0.15s ease, box-shadow 0.15s ease'
+                                            }}
+                                            onFocus={(e) => {
+                                                e.target.style.borderColor = isDarkMode ? '#818cf8' : '#6365baff';
+                                                if (isDarkMode) e.target.style.boxShadow = '0 0 15px rgba(129, 140, 248, 0.3)';
+                                            }}
+                                            onBlur={(e) => {
+                                                e.target.style.borderColor = isDarkMode ? 'rgba(129, 140, 248, 0.3)' : 'rgba(148, 163, 184, 0.3)';
+                                                e.target.style.boxShadow = 'none';
+                                            }}
+                                        >
+                                            <option value="" disabled>{sectionsLoading ? 'Loading sections...' : (sections.length ? 'Select section' : 'No attendance sections available')}</option>
+                                            {sections.map((section) => {
+                                                const labelParts = [section.Name || `Section ${section.Section_ID}`];
+                                                if (section.Semester) labelParts.push(`Sem ${section.Semester}`);
+                                                if (section.Shift) labelParts.push(section.Shift);
+                                                return (
+                                                    <option key={section.Section_ID} value={section.Section_ID}>
+                                                        {labelParts.join(' — ')}
+                                                    </option>
+                                                );
+                                            })}
+                                        </select>
+                                    </div>
 
                     {/* Department */}
                     <div>
