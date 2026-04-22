@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FaEnvelope, FaKey, FaCheckCircle, FaShieldAlt } from 'react-icons/fa';
+import { FaEnvelope, FaKey, FaCheckCircle } from 'react-icons/fa';
 import { HiLightningBolt } from 'react-icons/hi';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -51,7 +51,7 @@ const ForgotPassword = () => {
     setIsLoading(true);
 
     try {
-      const response = await axios.post(`${API_URL}/auth/forgot-password`, { email });
+      await axios.post(`${API_URL}/auth/forgot-password`, { email });
       setSuccess(true);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to send reset email. Please try again.');
@@ -62,10 +62,10 @@ const ForgotPassword = () => {
 
   if (success) {
     return (
-      <div 
+      <div
         className="h-screen flex items-center justify-center relative overflow-hidden transition-colors duration-300"
         style={{
-          background: isDarkMode 
+          background: isDarkMode
             ? 'linear-gradient(180deg, #0a0e27 0%, #1a1f3a 50%, #0f1729 100%)'
             : 'linear-gradient(180deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%)'
         }}
@@ -77,42 +77,48 @@ const ForgotPassword = () => {
           style={{
             background: isDarkMode ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.7)',
             backdropFilter: 'blur(20px)',
-            border: isDarkMode 
-              ? '1px solid rgba(255, 255, 255, 0.15)' 
+            border: isDarkMode
+              ? '1px solid rgba(255, 255, 255, 0.15)'
               : '1px solid rgba(15, 23, 42, 0.15)',
-            boxShadow: isDarkMode 
-              ? '0 8px 32px 0 rgba(0, 0, 0, 0.5)' 
+            boxShadow: isDarkMode
+              ? '0 8px 32px 0 rgba(0, 0, 0, 0.5)'
               : '0 8px 32px 0 rgba(0, 0, 0, 0.15)'
           }}
         >
-          <FaCheckCircle 
-            className="text-6xl mx-auto mb-4" 
+          <FaCheckCircle
+            className="text-6xl mx-auto mb-4"
             style={{ color: '#22c55e' }}
           />
-          <h2 
-            className="text-2xl font-bold mb-2 transition-colors duration-300"
+          <h2
+            className="text-2xl font-bold mb-1 transition-colors duration-300"
             style={{ color: isDarkMode ? '#E5E7EB' : '#0F172A' }}
           >
             Check Your Email
           </h2>
-          <p 
-            className="mb-4 text-sm transition-colors duration-300"
+          <p
+            className="mb-2 text-sm transition-colors duration-300"
             style={{ color: isDarkMode ? '#94a3b8' : '#475569' }}
           >
-            We've sent a password reset link to <strong>{email}</strong>
+            A password reset link has been sent to
           </p>
-          <p 
+          <p
+            className="mb-5 text-sm font-semibold transition-colors duration-300"
+            style={{ color: isDarkMode ? '#E5E7EB' : '#0F172A' }}
+          >
+            {email}
+          </p>
+          <p
             className="text-xs mb-6 transition-colors duration-300"
             style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}
           >
-            The link will expire in 15 minutes. Please check your spam folder if you don't see it.
+            The link expires in <strong>15 minutes</strong>. If you don't see it, check your spam folder.
           </p>
           <Link
             to="/login"
-            className="inline-block px-6 py-2.5 rounded-xl font-medium text-white text-sm transition-all duration-300"
+            className="inline-block px-6 py-2.5 rounded-xl font-medium text-sm transition-all duration-300"
             style={{
-              background: 'linear-gradient(135deg, #4f46e5 0%, #2563eb 100%)',
-              boxShadow: '0 2px 8px rgba(79, 70, 229, 0.25)'
+              color: isDarkMode ? '#94a3b8' : '#475569',
+              border: isDarkMode ? '1px solid rgba(148,163,184,0.3)' : '1px solid rgba(100,116,139,0.3)',
             }}
           >
             Back to Login

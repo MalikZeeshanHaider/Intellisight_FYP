@@ -192,7 +192,7 @@ export default function TimetableManager({ sections, setSections, selectedSectio
   // ── Time slot cell colors (empty vs occupied)
   function slotBg(slot) {
     if (!slot) return 'bg-slate-50 dark:bg-slate-800/40 border-dashed border-slate-200 dark:border-slate-700';
-    return 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-700/40';
+    return 'bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-700/40';
   }
 
   return (
@@ -212,7 +212,7 @@ export default function TimetableManager({ sections, setSections, selectedSectio
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => openAddModal()}
-            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 py-2.5 bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
           >
             <Plus size={16} /> Add Class Slot
           </button>
@@ -346,7 +346,7 @@ export default function TimetableManager({ sections, setSections, selectedSectio
                             </span>
                             <button
                               onClick={() => openAddModal(day)}
-                              className="p-0.5 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-500 transition-colors"
+                              className="p-0.5 rounded hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-500 transition-colors"
                               title={`Add slot on ${DAY_LABELS[day]}`}
                             >
                               <Plus size={12} strokeWidth={3} />
@@ -365,7 +365,7 @@ export default function TimetableManager({ sections, setSections, selectedSectio
                                   <p className="text-xs font-bold text-slate-800 dark:text-white leading-tight">
                                     {slot.SubjectName}
                                   </p>
-                                  <p className="text-[10px] text-indigo-500 dark:text-indigo-400 font-medium mt-0.5 flex items-center gap-0.5">
+                                  <p className="text-[10px] text-sky-500 dark:text-sky-400 font-medium mt-0.5 flex items-center gap-0.5">
                                     <Clock size={8} /> {fmt12(slot.StartTime)} – {fmt12(slot.EndTime)}
                                   </p>
                                   {(slot.teacher?.Name || slot.TeacherName) && (
@@ -381,7 +381,7 @@ export default function TimetableManager({ sections, setSections, selectedSectio
                                   <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button
                                       onClick={() => openEditModal(slot)}
-                                      className="p-1 rounded-lg bg-white/80 dark:bg-slate-800/80 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-500 transition-colors"
+                                      className="p-1 rounded-lg bg-white/80 dark:bg-slate-800/80 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-500 transition-colors"
                                       title="Edit slot"
                                     >
                                       <Edit3 size={11} />
@@ -418,8 +418,8 @@ export default function TimetableManager({ sections, setSections, selectedSectio
 
       {!selectedSectionId && (
         <div className="py-16 text-center">
-          <div className="inline-flex p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl mb-3">
-            <Users size={28} className="text-indigo-400" />
+          <div className="inline-flex p-4 bg-sky-50 dark:bg-sky-900/20 rounded-2xl mb-3">
+            <Users size={28} className="text-sky-400" />
           </div>
           <p className="text-slate-600 dark:text-slate-300 font-semibold">Select a section to manage its timetable</p>
           <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">

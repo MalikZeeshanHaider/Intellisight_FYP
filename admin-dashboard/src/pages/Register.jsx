@@ -489,7 +489,7 @@ const Register = () => {
                 />
                 <button
                   type="button"
-                  onClick={() => setShowConfirmPassword(!setShowConfirmPassword)}
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-base transition-colors duration-300"
                   style={{ color: isDarkMode ? '#06b6d4' : '#0891b2' }}
                 >

@@ -1,6 +1,12 @@
 import { prisma } from '../config/database.js';
 import { PERSON_TYPES } from '../config/constants.js';
 
+// PersonType values as written by the Python recognition script into
+// ActivePresence and AttendanceLog ('Student'/'Teacher' title-case).
+// ClassAttendance uses the all-caps PERSON_TYPES constants instead.
+const PY_STUDENT = 'Student';
+const PY_TEACHER = 'Teacher';
+
 /**
  * Attendance Aggregation Service
  * 
@@ -143,7 +149,7 @@ export async function aggregateAttendance(dateStr, sectionId = null, slotId = nu
         where: {
           Student_ID: student.Student_ID,
           Zone_id: slot.Zone_id || undefined,
-          PersonType: PERSON_TYPES.STUDENT,
+          PersonType: PY_STUDENT,
           EntryTime: { lte: windowEnd, gte: maxLogAge },
           OR: [
             { ExitTime: { gte: windowStart } },
@@ -158,7 +164,7 @@ export async function aggregateAttendance(dateStr, sectionId = null, slotId = nu
         where: {
           Student_ID: student.Student_ID,
           Zone_id: slot.Zone_id || undefined,
-          PersonType: PERSON_TYPES.STUDENT,
+          PersonType: PY_STUDENT,
           EntryTime: { lte: windowEnd, gte: maxLogAge }
         }
       });
@@ -192,10 +198,15 @@ export async function aggregateAttendance(dateStr, sectionId = null, slotId = nu
       // Determine status
       let status = 'ABSENT';
       const isActiveNow = combinedLogs.some(l => !l.ExitTime);
-      
+      // Use the later of firstSeen or windowStart so someone already in the zone
+      // before class isn't incorrectly tagged as late.
+      const effectiveFirstSeen = firstSeen
+        ? (firstSeen < windowStart ? windowStart : firstSeen)
+        : null;
+
       if (totalMinutes >= MIN_MINUTES || isActiveNow) {
-        // Check if late: first seen after class start + threshold
-        if (firstSeen && firstSeen > new Date(classStart.getTime() + LATE_THRESHOLD * 60000)) {
+        // Check if late: effective first seen after class start + threshold
+        if (effectiveFirstSeen && effectiveFirstSeen > new Date(classStart.getTime() + LATE_THRESHOLD * 60000)) {
           status = 'LATE';
         } else {
           status = 'PRESENT';
@@ -246,7 +257,7 @@ export async function aggregateAttendance(dateStr, sectionId = null, slotId = nu
         where: {
           Teacher_ID: slot.Teacher_ID,
           Zone_id: slot.Zone_id || undefined,
-          PersonType: PERSON_TYPES.TEACHER,
+          PersonType: PY_TEACHER,
           EntryTime: { lte: windowEnd, gte: maxLogAge },
           OR: [
             { ExitTime: { gte: windowStart } },
@@ -260,7 +271,7 @@ export async function aggregateAttendance(dateStr, sectionId = null, slotId = nu
         where: {
           Teacher_ID: slot.Teacher_ID,
           Zone_id: slot.Zone_id || undefined,
-          PersonType: PERSON_TYPES.TEACHER,
+          PersonType: PY_TEACHER,
           EntryTime: { lte: windowEnd, gte: maxLogAge }
         }
       });
@@ -288,8 +299,11 @@ export async function aggregateAttendance(dateStr, sectionId = null, slotId = nu
 
       let status = 'ABSENT';
       const isActiveNow = combinedTeacherLogs.some(l => !l.ExitTime);
+      const effectiveFirstSeen = firstSeen
+        ? (firstSeen < windowStart ? windowStart : firstSeen)
+        : null;
       if (totalMinutes >= MIN_MINUTES || isActiveNow) {
-        if (firstSeen && firstSeen > new Date(classStart.getTime() + LATE_THRESHOLD * 60000)) {
+        if (effectiveFirstSeen && effectiveFirstSeen > new Date(classStart.getTime() + LATE_THRESHOLD * 60000)) {
           status = 'LATE';
         } else {
           status = 'PRESENT';

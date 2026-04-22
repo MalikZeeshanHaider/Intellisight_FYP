@@ -105,7 +105,7 @@ export default function TimetableCell({ slot, attendance, teacherAttendance, mod
                 {Math.round(attendance.attendanceRate ?? 0)}%
               </span>
               <span className="text-[10px] text-slate-400">
-                ({attendance.present}/{attendance.totalEnrolled})
+                ({attendance.attended ?? attendance.present}/{attendance.totalEnrolled})
               </span>
             </div>
             {teacherAttendance && (

@@ -9,6 +9,8 @@
 
 import rateLimit from 'express-rate-limit';
 
+const IS_DEV = process.env.NODE_ENV !== 'production';
+
 /**
  * Shared handler — returns a consistent JSON error response
  * instead of the default plain-text HTML page.
@@ -21,6 +23,9 @@ const rateLimitHandler = (req, res, next, options) => {
   });
 };
 
+// In development, skip rate limiting entirely so testing is never blocked.
+const skipInDev = () => IS_DEV;
+
 /**
  * LOGIN — 20 attempts per 15 minutes per IP.
  * Blocks brute-force while giving legitimate users plenty of room.
@@ -28,8 +33,9 @@ const rateLimitHandler = (req, res, next, options) => {
 export const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15 minutes
   max: 20,
+  skip: skipInDev,
   message: 'Too many login attempts. Please try again after 15 minutes.',
-  standardHeaders: true,       // Return RateLimit-* headers
+  standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
 });
@@ -41,6 +47,7 @@ export const loginLimiter = rateLimit({
 export const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,   // 1 hour
   max: 5,
+  skip: skipInDev,
   message: 'Too many registration attempts. Please try again after 1 hour.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -54,6 +61,7 @@ export const registerLimiter = rateLimit({
 export const forgotPasswordLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,   // 1 hour
   max: 5,
+  skip: skipInDev,
   message: 'Too many password reset requests. Please try again after 1 hour.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -67,6 +75,7 @@ export const forgotPasswordLimiter = rateLimit({
 export const resetPasswordLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,   // 15 minutes
   max: 10,
+  skip: skipInDev,
   message: 'Too many password reset attempts. Please try again after 15 minutes.',
   standardHeaders: true,
   legacyHeaders: false,
