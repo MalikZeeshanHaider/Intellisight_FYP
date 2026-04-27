@@ -233,24 +233,32 @@ export default function AttendanceAnalytics() {
 
   const kpiCards = mode === 'section' ? sectionKpiCards : studentKpiCards;
 
+  const isDarkMode = document.documentElement.classList.contains('dark');
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-4 sm:p-6">
+    <div className="space-y-6 p-4 sm:p-6">
       {/* ── Page Header ─────────────────────────────────────── */}
-      <div className="mb-5">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="p-2.5 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200 dark:shadow-indigo-900/40">
-            <LayoutGrid size={22} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white tracking-tight">
-              Attendance
-            </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Manage timetable, track class attendance from camera detections
-            </p>
-          </div>
-        </div>
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative p-6 rounded-2xl"
+        style={{
+          background: isDarkMode
+            ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.90))'
+            : '#ffffff',
+          border: isDarkMode ? '1px solid rgba(123, 205, 237, 0.2)' : 'none',
+          boxShadow: isDarkMode
+            ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(123, 205, 237, 0.1)'
+            : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)',
+        }}
+      >
+        <h1 className="text-3xl font-bold mb-2" style={{ color: isDarkMode ? '#7bcded' : '#0369a1' }}>
+          Attendance
+        </h1>
+        <p className="text-sm font-medium" style={{ color: isDarkMode ? 'rgba(186, 230, 253, 0.7)' : '#6b7280' }}>
+          Manage timetable, track class attendance from camera detections
+        </p>
+      </motion.div>
 
       {/* ── Tab Bar ─────────────────────────────────────────── */}
       <div className="flex gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-1 mb-6 w-fit">
@@ -263,7 +271,7 @@ export default function AttendanceAnalytics() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
                 active
-                  ? 'bg-indigo-600 text-white shadow-sm'
+                  ? 'bg-sky-500 text-white shadow-sm'
                   : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
             >

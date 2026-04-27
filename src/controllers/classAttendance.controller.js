@@ -226,7 +226,13 @@ export const getStudentWeeklyView = asyncHandler(async (req, res) => {
   if (String(autoAggregate) !== 'false') {
     try {
       const today = new Date().toISOString().split('T')[0];
-      await aggregateAttendance(today, student.Section_ID || null);
+      const weekStartDate = new Date(weekStart);
+      const current = new Date(weekStartDate);
+      while (current.toISOString().split('T')[0] <= today) {
+        const dateStr = current.toISOString().split('T')[0];
+        await aggregateAttendance(dateStr, student.Section_ID || null);
+        current.setDate(current.getDate() + 1);
+      }
     } catch (e) {
       console.error('[AUTO-AGGREGATE ERROR]', e.message);
     }
@@ -367,12 +373,18 @@ export const getSectionWeeklyHeatmap = asyncHandler(async (req, res) => {
   const { sectionId } = req.params;
   const { weekStart, autoAggregate } = req.query;
 
-  // Real-time: auto-aggregate today's records implicitly if enabled
+  // Auto-aggregate all past days in the requested week so stale ABSENT records get refreshed.
   if (String(autoAggregate) !== 'false') {
     try {
       const today = new Date().toISOString().split('T')[0];
-      // Only do today to avoid heavy load
-      await aggregateAttendance(today, parseInt(sectionId));
+      const weekStartDate = new Date(weekStart);
+      const current = new Date(weekStartDate);
+      // Re-aggregate each day from weekStart up to (and including) today
+      while (current.toISOString().split('T')[0] <= today) {
+        const dateStr = current.toISOString().split('T')[0];
+        await aggregateAttendance(dateStr, parseInt(sectionId));
+        current.setDate(current.getDate() + 1);
+      }
     } catch (e) {
       console.error('[AUTO-AGGREGATE ERROR]', e.message);
     }

@@ -10,23 +10,29 @@ const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS) || 10;
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
-// Email configuration
-const emailConfig = {
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-};
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001';
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
+const ADMIN_EMAIL    = process.env.ADMIN_EMAIL    || process.env.EMAIL_USER;
+const FRONTEND_URL   = process.env.FRONTEND_URL   || 'http://localhost:3001';
+const BACKEND_URL    = process.env.BACKEND_URL    || 'http://localhost:3000';
+const IS_DEV         = process.env.NODE_ENV !== 'production';
 
 // Super Admin Configuration
-const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL;
+const SUPER_ADMIN_EMAIL    = process.env.SUPER_ADMIN_EMAIL;
 const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD;
-const SUPER_ADMIN_NAME = process.env.SUPER_ADMIN_NAME || 'Super Administrator';
+const SUPER_ADMIN_NAME     = process.env.SUPER_ADMIN_NAME || 'Super Administrator';
+
+// Ethereal fallback account (created once, reused across calls)
+let _etherealAccount = null;
+const getEtherealTransporter = async () => {
+  if (!_etherealAccount) {
+    _etherealAccount = await nodemailer.createTestAccount();
+    console.info('[EMAIL] Created Ethereal test account:', _etherealAccount.user);
+  }
+  return nodemailer.createTransport({
+    host: 'smtp.ethereal.email',
+    port: 587,
+    auth: { user: _etherealAccount.user, pass: _etherealAccount.pass },
+  });
+};
 
 /**
  * Hash password using bcrypt
@@ -68,17 +74,53 @@ const generateVerificationToken = () => {
 };
 
 /**
- * Send email
+ * Send email.
+ * 1. Tries real Gmail (EMAIL_USER / EMAIL_PASS from .env).
+ * 2. On failure, falls back to Ethereal — logs a browser preview URL so you
+ *    can view the email without needing any real mail account.
+ * Returns { sent: bool, previewUrl: string|null }. Never throws.
  */
 const sendEmail = async (to, subject, html) => {
-  const transporter = nodemailer.createTransport(emailConfig);
-  
-  await transporter.sendMail({
-    from: emailConfig.auth.user,
-    to,
-    subject,
-    html
-  });
+  // ── 1. Try Gmail SMTP ──────────────────────────────────────────────────────
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+    await transporter.sendMail({
+      from: `"IntelliSight" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html,
+    });
+    console.info(`[EMAIL] Sent via Gmail SMTP to ${to}`);
+    return { sent: true, previewUrl: null };
+  } catch (gmailErr) {
+    console.warn(`[EMAIL] Gmail SMTP failed (${gmailErr.message}) — falling back to Ethereal preview`);
+  }
+
+  // ── 2. Ethereal fallback (always works, shows email in browser) ───────────
+  try {
+    const transporter = await getEtherealTransporter();
+    const info = await transporter.sendMail({
+      from: `"IntelliSight" <${_etherealAccount.user}>`,
+      to,
+      subject,
+      html,
+    });
+    const previewUrl = nodemailer.getTestMessageUrl(info);
+    console.info('═══════════════════════════════════════════════════════');
+    console.info(`[EMAIL] Preview URL (open in browser to read the email):`);
+    console.info(`        ${previewUrl}`);
+    console.info('═══════════════════════════════════════════════════════');
+    return { sent: true, previewUrl };
+  } catch (etherealErr) {
+    console.error(`[EMAIL] Ethereal also failed: ${etherealErr.message}`);
+    return { sent: false, previewUrl: null };
+  }
 };
 
 /**
@@ -193,9 +235,19 @@ export const registerUser = async ({ name, email, password }) => {
     </div>
   `;
 
-  await sendEmail(ADMIN_EMAIL, 'New User Registration Request - IntelliSight', adminEmailHtml);
+  const { sent, previewUrl } = await sendEmail(ADMIN_EMAIL, 'New User Registration Request - IntelliSight', adminEmailHtml);
 
-  return { message: 'Registration request submitted. Awaiting admin approval. Check your email for updates.' };
+  if (!sent) {
+    console.info('[REGISTRATION] Use these links to approve/reject manually:');
+    console.info(`  APPROVE: ${approveLink}`);
+    console.info(`  REJECT:  ${rejectLink}`);
+  }
+
+  return {
+    message: 'Registration request submitted. Awaiting admin approval.',
+    ...(IS_DEV && previewUrl && { emailPreviewUrl: previewUrl }),
+    ...(IS_DEV && { approveLink, rejectLink }),
+  };
 };
 
 /**
@@ -295,6 +347,7 @@ export const verifyUserRegistration = async (token, action, rejectionReason = nu
       </div>
     `;
 
+    // Non-blocking — email failure doesn't prevent the rejection from completing
     await sendEmail(Email, 'Registration Update - IntelliSight', userEmailHtml);
 
     return { message: 'User registration rejected' };
@@ -313,8 +366,8 @@ export const loginAdmin = async ({ email, password }) => {
   const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD;
   const superAdminName     = process.env.SUPER_ADMIN_NAME || 'Super Administrator';
 
-  // Check if it's the super admin (plaintext comparison against env vars)
-  if (superAdminEmail && email === superAdminEmail && password === superAdminPassword) {
+  // Check if it's the super admin (case-insensitive email comparison)
+  if (superAdminEmail && email.trim().toLowerCase() === superAdminEmail.toLowerCase() && password === superAdminPassword) {
     const token = generateToken({
       adminId: 'super_admin',
       email: superAdminEmail,
@@ -333,9 +386,9 @@ export const loginAdmin = async ({ email, password }) => {
     return { admin: superAdmin, token };
   }
 
-  // Find admin by email
-  const admin = await prisma.admin.findUnique({
-    where: { Email: email },
+  // Find admin by email (case-insensitive)
+  const admin = await prisma.admin.findFirst({
+    where: { Email: { equals: email.trim(), mode: 'insensitive' } },
   });
 
   if (!admin) {
@@ -367,29 +420,43 @@ export const loginAdmin = async ({ email, password }) => {
  * Forgot password - send reset link
  */
 export const forgotPassword = async (email) => {
-  // Find admin by email
-  const admin = await prisma.admin.findUnique({
-    where: { Email: email },
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // Super admin uses env credentials — not resettable via this flow
+  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL;
+  if (superAdminEmail && normalizedEmail === superAdminEmail.toLowerCase()) {
+    throw new NotFoundError('This email is not registered in the system.');
+  }
+
+  // Check if the email is still pending admin approval
+  const pending = await prisma.pendingUsers.findFirst({
+    where: { Email: { equals: normalizedEmail, mode: 'insensitive' }, Status: 'PENDING' },
+  });
+  if (pending) {
+    throw new Error('Your account has not been approved by the admin yet. Please wait for approval before resetting your password.');
+  }
+
+  // Find approved admin account (case-insensitive)
+  const admin = await prisma.admin.findFirst({
+    where: { Email: { equals: normalizedEmail, mode: 'insensitive' } },
   });
 
   if (!admin) {
-    throw new NotFoundError('Email not found');
+    throw new NotFoundError('This email is not registered in the system.');
   }
 
-  // Generate reset token
+  // Generate reset token (15-minute expiry)
   const resetToken = generateVerificationToken();
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-  // Save reset token in database
   await prisma.passwordResets.create({
     data: {
-      Email: email,
+      Email: admin.Email,
       Token: resetToken,
       ExpiresAt: expiresAt,
     },
   });
 
-  // Send reset email
   const resetLink = `${FRONTEND_URL}/reset-password/${resetToken}`;
 
   const emailHtml = `
@@ -404,15 +471,28 @@ export const forgotPassword = async (email) => {
         <div style="text-align: center; margin: 30px 0;">
           <a href="${resetLink}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 40px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Reset Password</a>
         </div>
-        <p style="color: #666; line-height: 1.6;">If you didn't request this password reset, you can safely ignore this email. Your password will remain unchanged.</p>
+        <p style="color: #666; line-height: 1.6;">If you didn't request this password reset, you can safely ignore this email.</p>
         <p style="color: #999; font-size: 12px; text-align: center; margin-top: 30px;">IntelliSight - Facial Recognition System</p>
       </div>
     </div>
   `;
 
-  await sendEmail(email, 'Password Reset Request - IntelliSight', emailHtml);
+  const { sent, previewUrl } = await sendEmail(admin.Email, 'Password Reset Request - IntelliSight', emailHtml);
 
-  return { message: 'Password reset link sent to your email' };
+  // Log reset link to server console only — never expose it in the API response
+  if (IS_DEV) {
+    console.info('[FORGOT PASSWORD] Reset link (dev only — open in browser):');
+    console.info(`  ${resetLink}`);
+    if (previewUrl) {
+      console.info('[FORGOT PASSWORD] Ethereal preview:', previewUrl);
+    }
+  }
+
+  if (!sent) {
+    throw new Error('Failed to send the reset email. Please try again later.');
+  }
+
+  return { message: 'A password reset link has been sent to your email address. Please check your inbox.' };
 };
 
 /**

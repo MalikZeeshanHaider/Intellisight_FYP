@@ -1,0 +1,312 @@
+# ============================================================
+# IntelliSight — Entry / Exit REST API Tests
+# Use with VS Code "REST Client" extension (humao.rest-client)
+# ============================================================
+# HOW TO USE:
+#   1. Install "REST Client" extension in VS Code
+#   2. Click "Send Request" above any request
+#   3. Run requests in ORDER (login first to get the cookie)
+# ============================================================
+
+@baseUrl = http://localhost:3000/api
+
+# ── Seeded IDs (from prisma/seed.js) ────────────────────────
+# Students: 1=Bob Taylor, 2=Charlie Brown, 3=Alice Williams
+# Teachers: 1=first seeded teacher
+# Zones:    1=Main Building Floor 1
+# ────────────────────────────────────────────────────────────
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 1 — LOGIN  (must run first — sets the session cookie)
+# ════════════════════════════════════════════════════════════
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "221083@students.au.edu.pk",
+  "password": "abdullah123"
+}
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 2 — CHECK WHO IS CURRENTLY INSIDE (before any entry)
+# ════════════════════════════════════════════════════════════
+GET {{baseUrl}}/zones/1/current
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 3 — STUDENT ENTRY  (Student ID 1 enters via Entry cam)
+# ════════════════════════════════════════════════════════════
+# Expected: 201 Created — adds to ActivePresence + AttendanceLog
+POST {{baseUrl}}/zones/1/recognize
+Content-Type: application/json
+
+{
+  "personId": 9,
+  "personType": "Student",
+  "cameraType": "Entry",
+  "confidence": 0.92
+}
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 4 — TEACHER ENTRY  (Teacher ID 1 enters via Entry cam)
+# ════════════════════════════════════════════════════════════
+POST {{baseUrl}}/zones/1/recognize
+Content-Type: application/json
+
+{
+  "personId": 6,
+  "personType": "Teacher",
+  "cameraType": "Entry",
+  "confidence": 0.88
+}
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 5 — SECOND STUDENT ENTRY  (Student ID 2)
+# ════════════════════════════════════════════════════════════
+POST {{baseUrl}}/zones/1/recognize
+Content-Type: application/json
+
+{
+  "personId": 2,
+  "personType": "Student",
+  "cameraType": "Entry",
+  "confidence": 0.95
+}
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 6 — DUPLICATE ENTRY TEST
+# ════════════════════════════════════════════════════════════
+# Expected: 200 OK with "Person already in zone" (not a duplicate record)
+POST {{baseUrl}}/zones/1/recognize
+Content-Type: application/json
+
+{
+  "personId": 1,
+  "personType": "Student",
+  "cameraType": "Entry",
+  "confidence": 0.91
+}
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 7 — CHECK WHO IS INSIDE NOW  (should show 3 people)
+# ════════════════════════════════════════════════════════════
+GET {{baseUrl}}/zones/1/current
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 8 — STUDENT EXIT  (Student ID 1 exits via Exit cam)
+# ════════════════════════════════════════════════════════════
+# Expected: 200 OK — removes from ActivePresence, updates AttendanceLog with ExitTime + Duration
+POST {{baseUrl}}/zones/1/recognize
+Content-Type: application/json
+
+{
+  "personId": 9,
+  "personType": "Student",
+  "cameraType": "Exit",
+  "confidence": 0.90
+}
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 9 — TEACHER EXIT  (Teacher ID 1 exits via Exit cam)
+# ════════════════════════════════════════════════════════════
+POST {{baseUrl}}/zones/1/recognize
+Content-Type: application/json
+
+{
+  "personId": 6,
+  "personType": "Teacher",
+  "cameraType": "Exit",
+  "confidence": 0.87
+}
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 10 — CHECK WHO IS INSIDE AFTER EXITS  (should show 1)
+# ════════════════════════════════════════════════════════════
+GET {{baseUrl}}/zones/1/current
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 11 — MANUAL EXIT by Presence ID
+# ════════════════════════════════════════════════════════════
+# Replace 1 with the actual Presence_ID from Step 7's response
+PUT {{baseUrl}}/zones/1/exit/1
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 12 — VIEW ALL ENTRY/EXIT LOGS  (full attendance history)
+# ════════════════════════════════════════════════════════════
+GET {{baseUrl}}/zones/1/logs
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 13 — VIEW LOGS WITH ENTRY + EXIT DETAIL
+# ════════════════════════════════════════════════════════════
+GET {{baseUrl}}/zones/1/timetable-logs
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 14 — FILTER LOGS BY PERSON TYPE
+# ════════════════════════════════════════════════════════════
+GET {{baseUrl}}/zones/1/timetable-logs?personType=Student&limit=10
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 15 — ALL ACTIVE PRESENCE (all zones, not just Zone 1)
+# ════════════════════════════════════════════════════════════
+GET {{baseUrl}}/zones/1/current
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 16 — EXIT TEST: person not in zone
+# ════════════════════════════════════════════════════════════
+# Expected: 200 OK with "Exit detection acknowledged" (not an error)
+POST {{baseUrl}}/zones/1/recognize
+Content-Type: application/json
+
+{
+  "personId": 99,
+  "personType": "Student",
+  "cameraType": "Exit",
+  "confidence": 0.80
+}
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 17 — UNKNOWN PERSON DETECTION
+# ════════════════════════════════════════════════════════════
+# capturedImage must be a base64 string — using a 1x1 red pixel PNG as placeholder
+POST {{baseUrl}}/zones/1/unknown
+Content-Type: application/json
+
+{
+  "capturedImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg==",
+  "confidence": 0.45,
+  "notes": "Unrecognized face at main entrance"
+}
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 18 — VIEW UNKNOWN FACES LIST
+# ════════════════════════════════════════════════════════════
+GET {{baseUrl}}/zones/1/unknown-list
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 19 — COUNT UNKNOWN FACES
+# ════════════════════════════════════════════════════════════
+GET {{baseUrl}}/zones/1/unknown-count
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 20 — UPDATE UNKNOWN FACE STATUS
+# ════════════════════════════════════════════════════════════
+# Replace 1 with the actual Unknown_ID from Step 18's response
+PUT {{baseUrl}}/zones/1/unknown/1
+Content-Type: application/json
+
+{
+  "status": "IDENTIFIED",
+  "notes": "Identified as visitor - Ahmed Khan"
+}
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 21 — DEBUG: CHECK ALL STUDENTS/TEACHERS IN DB
+# ════════════════════════════════════════════════════════════
+GET {{baseUrl}}/zones/1/debug-database
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 22 — MULTI-ZONE: ENTRY TO ZONE 2  (any zone, not just 1)
+# ════════════════════════════════════════════════════════════
+# This uses the generic timetable entry endpoint (works for any zone)
+POST {{baseUrl}}/timetable/entry
+Content-Type: application/json
+
+{
+  "personId": 3,
+  "personType": "Student",
+  "zoneId": 2
+}
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 23 — MULTI-ZONE: EXIT FROM ZONE 2
+# ════════════════════════════════════════════════════════════
+POST {{baseUrl}}/timetable/exit
+Content-Type: application/json
+
+{
+  "personId": 3,
+  "personType": "Student",
+  "zoneId": 2
+}
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 24 — ALL ACTIVE PERSONS ACROSS ALL ZONES
+# ════════════════════════════════════════════════════════════
+GET {{baseUrl}}/timetable/active
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 25 — RECENT ACTIVITY FEED (last 10 events)
+# ════════════════════════════════════════════════════════════
+GET {{baseUrl}}/timetable/recent
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 26 — DAILY DETECTION STATS (last 7 days)
+# ════════════════════════════════════════════════════════════
+GET {{baseUrl}}/timetable/daily-stats?days=7
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 27 — DELETE UNKNOWN FACE ENTRY (cleanup)
+# ════════════════════════════════════════════════════════════
+# Replace 1 with the actual Unknown_ID from Step 18's response
+DELETE {{baseUrl}}/zones/1/unknown/1
+
+
+###
+# ════════════════════════════════════════════════════════════
+# STEP 28 — HEALTH CHECK (verify everything is up)
+# ════════════════════════════════════════════════════════════
+GET http://localhost:3000/health

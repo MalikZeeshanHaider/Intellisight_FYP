@@ -131,7 +131,7 @@ export default function SlotFormModal({
           className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700 bg-gradient-to-r from-indigo-500 to-violet-500">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700 bg-gradient-to-r from-sky-500 to-blue-600">
             <div className="flex items-center gap-2 text-white">
               <BookOpen size={18} />
               <h2 className="text-lg font-bold">{isEdit ? 'Edit Class Slot' : 'Add New Class Slot'}</h2>
@@ -181,7 +181,7 @@ export default function SlotFormModal({
                 <button
                   type="button"
                   onClick={() => { setUseCustomTeacher(!useCustomTeacher); set('Teacher_ID', ''); set('TeacherName', ''); }}
-                  className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                  className="text-[10px] font-semibold text-sky-600 dark:text-sky-400 hover:underline"
                 >
                   {useCustomTeacher ? 'Select from list' : 'Type name manually'}
                 </button>
@@ -240,7 +240,7 @@ export default function SlotFormModal({
               <button
                 type="submit"
                 disabled={saving}
-                className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
+                className="flex items-center gap-2 px-5 py-2 bg-sky-500 hover:bg-sky-600 disabled:opacity-60 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
               >
                 <Save size={14} />
                 {saving ? 'Saving…' : isEdit ? 'Update Slot' : 'Add Slot'}
@@ -272,6 +272,6 @@ function inputCls(hasError) {
   return `w-full text-sm rounded-xl border ${
     hasError
       ? 'border-rose-300 dark:border-rose-600 focus:ring-rose-400'
-      : 'border-slate-200 dark:border-slate-600 focus:ring-indigo-400'
+      : 'border-slate-200 dark:border-slate-600 focus:ring-sky-400'
   } bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-2 focus:ring-2 focus:border-transparent outline-none transition-all`;
 }

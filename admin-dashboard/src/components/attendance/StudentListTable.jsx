@@ -79,6 +79,7 @@ export default function StudentListTable({ students, isDarkMode, grid, kpis, mod
                 <th className="px-5 py-4 text-xs font-bold uppercase tracking-widest" style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>Department</th>
                 <th className="px-5 py-4 text-xs font-bold uppercase tracking-widest" style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>Gender</th>
                 <th className="px-5 py-4 text-xs font-bold uppercase tracking-widest text-center" style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>Present</th>
+                <th className="px-5 py-4 text-xs font-bold uppercase tracking-widest text-center" style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>Late</th>
                 <th className="px-5 py-4 text-xs font-bold uppercase tracking-widest text-center" style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>Absent</th>
                 <th className="px-5 py-4 text-xs font-bold uppercase tracking-widest text-center" style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>Status</th>
               </tr>
@@ -120,6 +121,9 @@ export default function StudentListTable({ students, isDarkMode, grid, kpis, mod
                     </td>
                     <td className="px-5 py-4 text-sm font-bold text-center" style={{ color: '#059669' }}>
                       {summary.present}
+                    </td>
+                    <td className="px-5 py-4 text-sm font-bold text-center" style={{ color: '#d97706' }}>
+                      {summary.late ?? 0}
                     </td>
                     <td className="px-5 py-4 text-sm font-bold text-center" style={{ color: '#e11d48' }}>
                       {summary.absent}

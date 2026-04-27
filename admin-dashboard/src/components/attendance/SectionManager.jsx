@@ -38,7 +38,7 @@ export default function SectionManager({ sections, selectedId, onSelect, onCreat
           <select
             value={selectedId || ''}
             onChange={e => onSelect(e.target.value ? parseInt(e.target.value) : null)}
-            className="w-full text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-2.5 focus:ring-2 focus:ring-indigo-400 focus:border-transparent outline-none"
+            className="w-full text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-2.5 focus:ring-2 focus:ring-sky-400 focus:border-transparent outline-none"
           >
             <option value="">— Select a section —</option>
             {sections.map(s => (
@@ -54,7 +54,7 @@ export default function SectionManager({ sections, selectedId, onSelect, onCreat
             className={`p-2.5 rounded-xl border transition-colors ${
               creating
                 ? 'bg-rose-50 dark:bg-rose-900/30 border-rose-200 dark:border-rose-700 text-rose-500'
-                : 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50'
+                : 'bg-sky-50 dark:bg-sky-900/30 border-sky-200 dark:border-sky-700 text-sky-600 dark:text-sky-400 hover:bg-sky-100 dark:hover:bg-sky-900/50'
             }`}
             title={creating ? 'Cancel' : 'Create new section'}
           >
@@ -73,8 +73,8 @@ export default function SectionManager({ sections, selectedId, onSelect, onCreat
             onSubmit={handleCreate}
             className="overflow-hidden"
           >
-            <div className="bg-indigo-50/50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/40 rounded-xl p-4 space-y-3">
-              <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">
+            <div className="bg-sky-50/50 dark:bg-sky-900/20 border border-sky-100 dark:border-sky-800/40 rounded-xl p-4 space-y-3">
+              <p className="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-widest">
                 New Section
               </p>
               <div className="grid grid-cols-2 gap-3">
@@ -84,7 +84,7 @@ export default function SectionManager({ sections, selectedId, onSelect, onCreat
                     value={form.Name}
                     onChange={e => { setForm(f => ({ ...f, Name: e.target.value })); setError(''); }}
                     placeholder="e.g. BSIT-VIII-A"
-                    className="w-full text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-2 focus:ring-2 focus:ring-indigo-400 outline-none"
+                    className="w-full text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-2 focus:ring-2 focus:ring-sky-400 outline-none"
                   />
                 </div>
                 <input
@@ -92,19 +92,19 @@ export default function SectionManager({ sections, selectedId, onSelect, onCreat
                   value={form.Department}
                   onChange={e => setForm(f => ({ ...f, Department: e.target.value }))}
                   placeholder="Department"
-                  className="text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-2 focus:ring-2 focus:ring-indigo-400 outline-none"
+                  className="text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-2 focus:ring-2 focus:ring-sky-400 outline-none"
                 />
                 <input
                   type="text"
                   value={form.Semester}
                   onChange={e => setForm(f => ({ ...f, Semester: e.target.value }))}
                   placeholder="Semester (e.g. 8th)"
-                  className="text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-2 focus:ring-2 focus:ring-indigo-400 outline-none"
+                  className="text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-2 focus:ring-2 focus:ring-sky-400 outline-none"
                 />
                 <select
                   value={form.Shift}
                   onChange={e => setForm(f => ({ ...f, Shift: e.target.value }))}
-                  className="text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-2 focus:ring-2 focus:ring-indigo-400 outline-none"
+                  className="text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-2 focus:ring-2 focus:ring-sky-400 outline-none"
                 >
                   <option value="Morning">Shift-I (Morning)</option>
                   <option value="Evening">Shift-II (Evening)</option>
@@ -112,7 +112,7 @@ export default function SectionManager({ sections, selectedId, onSelect, onCreat
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold rounded-xl py-2 transition-colors"
+                  className="flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-600 disabled:opacity-60 text-white text-sm font-semibold rounded-xl py-2 transition-colors"
                 >
                   <Check size={14} /> {saving ? 'Creating…' : 'Create'}
                 </button>

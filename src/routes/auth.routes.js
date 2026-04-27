@@ -25,13 +25,14 @@ import {
 } from '../middlewares/rateLimiter.js';
 
 const router = express.Router();
+const IS_DEV = process.env.NODE_ENV !== 'production';
 
-// Public routes — rate limited to block brute-force attacks
-router.post('/register', registerLimiter, register);
-router.post('/login', loginLimiter, login);
+// Public routes — rate limiters only applied in production
+router.post('/register',        ...(IS_DEV ? [] : [registerLimiter]),       register);
+router.post('/login',           ...(IS_DEV ? [] : [loginLimiter]),          login);
 router.get('/verify-user/:token/:action', verifyUser);
-router.post('/forgot-password', forgotPasswordLimiter, forgotPasswordHandler);
-router.post('/reset-password/:token', resetPasswordLimiter, resetPasswordHandler);
+router.post('/forgot-password', ...(IS_DEV ? [] : [forgotPasswordLimiter]), forgotPasswordHandler);
+router.post('/reset-password/:token', ...(IS_DEV ? [] : [resetPasswordLimiter]), resetPasswordHandler);
 
 // Protected routes
 router.post('/logout', authenticateToken, logout);

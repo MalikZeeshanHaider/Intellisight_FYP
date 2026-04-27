@@ -22,7 +22,14 @@
       "Bash(powershell -Command \"& 'C:\\\\Users\\\\abdul\\\\miniconda3\\\\envs\\\\Intellisight_FYP\\\\python.exe' -c 'import deepface; import cv2; print\\(deepface.__version__\\)'\")",
       "Bash(powershell -Command \"Get-ChildItem 'C:\\\\Users\\\\abdul\\\\miniconda3\\\\envs\\\\Intellisight_FYP\\\\Lib\\\\site-packages\\\\' | Select-Object -ExpandProperty Name\")",
       "Bash(powershell -Command \"& 'C:\\\\Users\\\\abdul\\\\miniconda3\\\\envs\\\\intellisight_gpu\\\\python.exe' -c 'import flask; import cv2; import deepface; import psycopg2; print\\(\\\\\"OK\\\\\"\\)'\")",
-      "Bash(powershell -Command \"& 'C:\\\\Users\\\\abdul\\\\miniconda3\\\\envs\\\\intellisight_gpu\\\\python.exe' -c 'import flask; import cv2; import deepface; import psycopg2; print\\(1\\)'\")"
+      "Bash(powershell -Command \"& 'C:\\\\Users\\\\abdul\\\\miniconda3\\\\envs\\\\intellisight_gpu\\\\python.exe' -c 'import flask; import cv2; import deepface; import psycopg2; print\\(1\\)'\")",
+      "Bash(\"C:/Program Files/PostgreSQL/18/bin/psql.exe\" -U postgres -p 5000 -c \"\\\\l\")",
+      "PowerShell($env:PGPASSWORD = \"zainab\"; & \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\" -U postgres -p 5000 -l 2>&1 | Select-Object -First 30)",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/forgot-password -H \"Content-Type: application/json\" -d '{\"email\":\"john.admin@intellisight.com\"}')",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/forgot-password -H \"Content-Type: application/json\" -d '{\"email\":\"221083@students.au.edu.pk\"}')",
+      "Bash(node --input-type=module -e ' *)",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/reset-password/__TRACKED_VAR__ -H 'Content-Type: application/json' -d '{\"password\":\"newpass123\"}')",
+      "Bash(python -m json.tool)"
     ]
   }
 }
