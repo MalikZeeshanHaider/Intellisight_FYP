@@ -7,6 +7,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiVideo, FiRefreshCw, FiPlus, FiAlertCircle, FiX, FiEdit2, FiTrash2, FiMapPin, FiChevronDown, FiPlay, FiSquare, FiEye, FiEyeOff, FiWifi, FiWifiOff } from 'react-icons/fi';
 import { cameraAPI, zoneAPI, streamAPI } from '../api/api';
+import { useWebRTCStream } from '../hooks/useWebRTCStream';
+import { useDetectionEvents } from '../hooks/useDetectionEvents';
+import DetectionOverlay from '../components/DetectionOverlay';
+import MjpegFeed from '../components/MjpegFeed';
 
 const Cameras = () => {
   const [cameras, setCameras] = useState([]);
@@ -1079,62 +1083,31 @@ const Cameras = () => {
   );
 };
 
-// Camera Card Component — with live stream preview and start/stop controls
+// Camera Card Component — WebRTC (primary) + MJPEG snapshot fallback.
+// AI detection overlay works in both modes via a forwarded ref on the media element.
 const CameraCard = ({
   camera, onEdit, onDelete, isDarkMode,
   isStreaming, streamActionLoading, streamServiceOnline,
   onStartStream, onStopStream,
 }) => {
   const [showPreview, setShowPreview] = useState(false);
-  const [frameSrc, setFrameSrc]       = useState(null);
-  const wsRef      = useRef(null);
-  const prevBlobRef = useRef(null);
+  // Ref for the MJPEG <img> — used by DetectionOverlay in fallback mode.
+  const mjpegRef = useRef(null);
 
   // Hide preview automatically when stream stops
   useEffect(() => {
     if (!isStreaming) setShowPreview(false);
   }, [isStreaming]);
 
-  // Open / close WebSocket connection whenever preview visibility changes
-  useEffect(() => {
-    // Close any existing WS first
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    if (prevBlobRef.current) {
-      URL.revokeObjectURL(prevBlobRef.current);
-      prevBlobRef.current = null;
-    }
-    setFrameSrc(null);
-
-    if (!showPreview || !isStreaming) return;  // nothing to open
-
-    const wsUrl = streamAPI.getWsStreamUrl(camera.Camara_Id);
-    const ws    = new WebSocket(wsUrl);
-    ws.binaryType = 'arraybuffer';
-    wsRef.current = ws;
-
-    ws.onmessage = (event) => {
-      const blob = new Blob([event.data], { type: 'image/jpeg' });
-      const url  = URL.createObjectURL(blob);
-      // Revoke the previous blob URL to free memory
-      if (prevBlobRef.current) URL.revokeObjectURL(prevBlobRef.current);
-      prevBlobRef.current = url;
-      setFrameSrc(url);
-    };
-
-    ws.onerror = () => setShowPreview(false);
-    ws.onclose = () => setFrameSrc(null);
-
-    return () => {
-      ws.close();
-      if (prevBlobRef.current) {
-        URL.revokeObjectURL(prevBlobRef.current);
-        prevBlobRef.current = null;
-      }
-    };
-  }, [showPreview, isStreaming, camera.Camara_Id]);
+  // Only open WebRTC / subscribe to events when preview is actually shown.
+  const previewActive = showPreview && isStreaming;
+  const whepUrl = streamAPI.getWebRTCUrl(camera.Camara_Id);
+  const { videoRef, state: wrtcState, error: wrtcError } = useWebRTCStream(
+    whepUrl,
+    previewActive,
+  );
+  const events = useDetectionEvents(previewActive ? [camera.Camara_Id] : []);
+  const useMjpeg = wrtcState === 'error';
 
   return (
     <motion.div
@@ -1146,9 +1119,9 @@ const CameraCard = ({
           : (isDarkMode ? 'rgba(6, 182, 212, 0.2)' : '#e5e7eb'),
       }}
     >
-      {/* Live stream preview panel — WebSocket push frames */}
+      {/* Live stream preview panel — WebRTC (MediaMTX) with MJPEG fallback */}
       <AnimatePresence>
-        {showPreview && isStreaming && (
+        {previewActive && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -1156,26 +1129,49 @@ const CameraCard = ({
             className="overflow-hidden"
           >
             <div className="relative bg-black" style={{ aspectRatio: '16/9' }}>
-              {frameSrc ? (
-                <img
-                  src={frameSrc}
-                  alt={`Camera ${camera.Camara_Id} live feed`}
+
+              {/* Media element — MJPEG snapshot polling or WebRTC <video> */}
+              {useMjpeg ? (
+                <MjpegFeed
+                  ref={mjpegRef}
+                  cameraId={camera.Camara_Id}
+                  fps={8}
                   className="w-full h-full object-contain"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-contain"
+                />
+              )}
+
+              {/* AI bbox overlay — works over both <img> and <video> */}
+              <DetectionOverlay
+                cameraId={camera.Camara_Id}
+                videoRef={useMjpeg ? mjpegRef : videoRef}
+                events={events}
+              />
+
+              {/* Spinner while WebRTC is negotiating */}
+              {wrtcState === 'connecting' && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                   <div className="text-center">
                     <div className="inline-block w-8 h-8 border-2 border-white/40 border-t-white rounded-full animate-spin mb-2" />
-                    <p className="text-white/60 text-xs">Connecting...</p>
+                    <p className="text-white/60 text-xs">Connecting to MediaMTX...</p>
                   </div>
                 </div>
               )}
+
               {/* Live badge */}
               <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold text-white"
                 style={{ backgroundColor: 'rgba(239, 68, 68, 0.9)' }}>
                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                LIVE
+                {useMjpeg ? 'LIVE (MJPEG)' : 'LIVE'}
               </div>
+
             </div>
           </motion.div>
         )}

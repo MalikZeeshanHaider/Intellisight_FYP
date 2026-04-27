@@ -472,7 +472,7 @@ class EmbeddingIndex:
         if not best_by_group:
             return None, float('inf')
 
-        best_meta, best_dist = min(best_by_group.values(), key=lambda x: x[0])
+        best_dist, best_meta = min(best_by_group.values(), key=lambda x: x[0])
 
         if best_dist <= threshold:
             return best_meta, best_dist

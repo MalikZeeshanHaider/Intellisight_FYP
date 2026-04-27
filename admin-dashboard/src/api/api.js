@@ -285,11 +285,13 @@ export const dailyResetAPI = {
   },
 };
 
-// ============== CAMERA STREAMING APIs (Python Flask — port 5001) ==============
-// These calls go directly to the Python face-recognition streaming service,
-// NOT to the Node.js backend. The base URL is configured via VITE_STREAM_BASE_URL.
+// ============== CAMERA STREAMING APIs ==============================
+// Video is delivered by MediaMTX directly (WebRTC/WHEP on port 8889).
+// Detection metadata is delivered by the Python AI service (port 5001)
+// over a single /ws/events WebSocket. Python is NOT in the video path.
 
 const STREAM_BASE_URL = import.meta.env.VITE_STREAM_BASE_URL || 'http://localhost:5001';
+const WEBRTC_BASE_URL = import.meta.env.VITE_WEBRTC_BASE_URL || 'http://localhost:8889';
 
 const streamFetch = async (path, options = {}) => {
   const res = await fetch(`${STREAM_BASE_URL}${path}`, {
@@ -304,26 +306,32 @@ const streamFetch = async (path, options = {}) => {
 };
 
 export const streamAPI = {
-  /** URL of the MJPEG stream for a given camera ID (fallback) */
-  getStreamUrl: (cameraId) => `${STREAM_BASE_URL}/stream/${cameraId}`,
+  /** WebRTC (WHEP) URL for a camera — attach to useWebRTCStream hook. */
+  getWebRTCUrl: (cameraId) => `${WEBRTC_BASE_URL}/cam${cameraId}/whep`,
 
-  /** WebSocket URL for low-latency push streaming of a given camera ID */
-  getWsStreamUrl: (cameraId) => {
+  /** MJPEG fallback URL — works without MediaMTX, served directly by Python. */
+  getMjpegUrl: (cameraId) => `${STREAM_BASE_URL}/stream/${cameraId}`,
+
+  /** Single JPEG snapshot URL — append ?t=Date.now() to force a fresh fetch. */
+  getSnapshotUrl: (cameraId) => `${STREAM_BASE_URL}/snapshot/${cameraId}`,
+
+  /** Single WebSocket URL for detection metadata (all cameras multiplexed). */
+  getEventsWsUrl: () => {
     const wsBase = STREAM_BASE_URL.replace(/^http/, 'ws');
-    return `${wsBase}/ws/stream/${cameraId}`;
+    return `${wsBase}/ws/events`;
   },
 
-  /** Health check for the Python streaming service */
+  /** Health check for the Python AI service */
   health: () => streamFetch('/health'),
 
-  /** Start a camera in the streaming service */
+  /** Start a camera — registers it with MediaMTX and begins AI processing */
   startCamera: (cameraId, cameraUrl, cameraType, zoneId) =>
     streamFetch('/cameras/start', {
       method: 'POST',
       body: JSON.stringify({ camera_id: cameraId, camera_url: cameraUrl, camera_type: cameraType, zone_id: zoneId }),
     }),
 
-  /** Stop a camera in the streaming service */
+  /** Stop a camera */
   stopCamera: (cameraId) =>
     streamFetch(`/cameras/stop/${cameraId}`, { method: 'POST' }),
 
@@ -333,7 +341,7 @@ export const streamAPI = {
   /** Get status of all active camera streams */
   getCameraStatuses: () => streamFetch('/cameras/status'),
 
-  /** Reload face embeddings in the streaming service */
+  /** Reload face embeddings in the AI service */
   reloadEmbeddings: () =>
     streamFetch('/embeddings/reload', { method: 'POST' }),
 

@@ -71,7 +71,7 @@ FRAME_SKIP = 3  # Legacy — kept for import compatibility; AI sampling now queu
 # a single high-confidence hit is sufficient for immediate confirmation.
 # Raise toward 0.90 for stricter environments; lower toward 0.65 if false
 # negatives become a problem (e.g. poor lighting / side-on faces).
-RECOGNITION_CONFIDENCE_THRESHOLD = 0.75
+RECOGNITION_CONFIDENCE_THRESHOLD = 0.60   # distance ≤ 3.2 passes (was 0.75 → ≤ 2.0)
 
 # Folder paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -86,6 +86,14 @@ UNIDENTIFIED_SAVE_PATH = os.path.join(BASE_DIR, "unidentified_images")
 
 # Cache settings
 KNOWN_FACES_CACHE = os.path.join(BASE_DIR, "known_faces_cache.pkl")
+
+# ── MediaMTX (video-only media server) ─────────────────────────────────────────
+# MediaMTX is a separate process that owns the RTSP → WebRTC/HLS bridge. This
+# service registers each active camera as a MediaMTX path via the HTTP API.
+# The browser then pulls video from MediaMTX directly — Python is never in
+# the video path.
+MEDIAMTX_API_URL    = os.getenv('MEDIAMTX_API_URL',    'http://localhost:9997')
+MEDIAMTX_WEBRTC_URL = os.getenv('MEDIAMTX_WEBRTC_URL', 'http://localhost:8889')
 
 # Create necessary directories
 for directory in [IMAGES_FOLDER, EMBEDDINGS_FOLDER, UNIDENTIFIED_SAVE_PATH]:

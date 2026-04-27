@@ -4,11 +4,15 @@
  * Supports IP camera configuration and real-time face recognition
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FiRefreshCw, FiAlertCircle, FiArrowLeft, FiCamera, FiPlus, FiX, FiVideo, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cameraAPI, zoneAPI } from '../api/api';
+import { cameraAPI, zoneAPI, streamAPI } from '../api/api';
+import { useWebRTCStream } from '../hooks/useWebRTCStream';
+import { useDetectionEvents } from '../hooks/useDetectionEvents';
+import DetectionOverlay from '../components/DetectionOverlay';
+import MjpegFeed from '../components/MjpegFeed';
 import { RealtimeDetectionChart, LiveDetectionCounter } from '../components/RealtimeDetectionChart';
 import { RecognitionRateDonut, MiniRecognitionRate } from '../components/RecognitionRateDonut';
 
@@ -527,36 +531,13 @@ const ZoneLive = () => {
                 </div>
               </div>
 
-              {/* Live Video Stream */}
-              <div className="relative bg-black aspect-video">
-                {cameraStatuses[camera.Camara_Id]?.is_connected ? (
-                  <img
-                    src={`http://localhost:5001/stream/${camera.Camara_Id}?t=${Date.now()}`}
-                    alt={`Camera ${camera.Camara_Id}`}
-                    className="w-full h-full object-contain"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
-                    }}
-                  />
-                ) : null}
-                <div className={`${cameraStatuses[camera.Camara_Id]?.is_connected ? 'hidden' : 'flex'} absolute inset-0 flex-col items-center justify-center bg-gray-900 text-white`}>
-                  <FiVideo size={48} className="mb-4 opacity-50" />
-                  <p className="text-sm opacity-75">Camera Offline</p>
-                  <p className="text-xs opacity-50 mt-2">Check connection</p>
-                  <button
-                    onClick={() => startCamera(camera.Camara_Id, camera.Camera_URL, camera.Camera_Type)}
-                    className="mt-4 px-4 py-2 rounded-lg text-sm font-medium transition"
-                    style={{
-                      backgroundColor: isDarkMode ? 'rgba(0, 255, 255, 0.2)' : '#2563eb',
-                      color: isDarkMode ? '#00ffff' : '#fff',
-                      border: isDarkMode ? '1px solid rgba(0, 255, 255, 0.4)' : 'none'
-                    }}
-                  >
-                    Retry Connection
-                  </button>
-                </div>
-              </div>
+              {/* Live Video Stream — WebRTC from MediaMTX + AI overlay */}
+              <ZoneCameraVideo
+                camera={camera}
+                isConnected={!!cameraStatuses[camera.Camara_Id]?.is_connected}
+                onRetry={() => startCamera(camera.Camara_Id, camera.Camera_URL, camera.Camera_Type)}
+                isDarkMode={isDarkMode}
+              />
 
               {/* Camera Info */}
               {camera.Camera_URL && (
@@ -946,6 +927,86 @@ const ZoneLive = () => {
         )}
       </AnimatePresence>
     </motion.div>
+  );
+};
+
+// Camera video tile — WebRTC from MediaMTX + AI bbox overlay.
+// Connects only when the camera is reported connected by /cameras/status.
+const ZoneCameraVideo = ({ camera, isConnected, onRetry, isDarkMode }) => {
+  const whepUrl = streamAPI.getWebRTCUrl(camera.Camara_Id);
+  const { videoRef, state: wrtcState, error: wrtcError } = useWebRTCStream(
+    whepUrl,
+    isConnected,
+  );
+  const mjpegRef = useRef(null);
+  const useMjpeg = wrtcState === 'error';
+  const events = useDetectionEvents(isConnected ? [camera.Camara_Id] : []);
+
+  if (!isConnected) {
+    return (
+      <div className="relative bg-black aspect-video flex flex-col items-center justify-center text-white">
+        <FiVideo size={48} className="mb-4 opacity-50" />
+        <p className="text-sm opacity-75">Camera Offline</p>
+        <p className="text-xs opacity-50 mt-2">Check connection</p>
+        <button
+          onClick={onRetry}
+          className="mt-4 px-4 py-2 rounded-lg text-sm font-medium transition"
+          style={{
+            backgroundColor: isDarkMode ? 'rgba(0, 255, 255, 0.2)' : '#2563eb',
+            color: isDarkMode ? '#00ffff' : '#fff',
+            border: isDarkMode ? '1px solid rgba(0, 255, 255, 0.4)' : 'none',
+          }}
+        >
+          Retry Connection
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative bg-black aspect-video">
+
+      {/* Snapshot-polling fallback when MediaMTX is unreachable */}
+      {useMjpeg ? (
+        <MjpegFeed
+          ref={mjpegRef}
+          cameraId={camera.Camara_Id}
+          fps={8}
+          className="w-full h-full object-contain"
+        />
+      ) : (
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          className="w-full h-full object-contain"
+        />
+      )}
+      <DetectionOverlay
+        cameraId={camera.Camara_Id}
+        videoRef={useMjpeg ? mjpegRef : videoRef}
+        events={events}
+      />
+
+      {/* Spinner only while WebRTC is negotiating */}
+      {wrtcState === 'connecting' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+          <div className="text-center">
+            <div className="inline-block w-8 h-8 border-2 border-white/40 border-t-white rounded-full animate-spin mb-2" />
+            <p className="text-white/60 text-xs">Connecting to MediaMTX...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Live badge */}
+      <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold text-white"
+        style={{ backgroundColor: 'rgba(239, 68, 68, 0.9)' }}>
+        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+        {wrtcState === 'error' ? 'LIVE (MJPEG)' : 'LIVE'}
+      </div>
+
+    </div>
   );
 };
 

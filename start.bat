@@ -25,6 +25,11 @@ set "PROJECT_DIR=%~dp0"
 REM Python conda env - intellisight_gpu (Python 3.10, deepface/flask/cv2)
 set "PYTHON_EXE=C:\Users\abdul\miniconda3\envs\intellisight_gpu\python.exe"
 
+REM MediaMTX binary location (Go single-binary media server: RTSP -> WebRTC/HLS)
+set "MEDIAMTX_DIR=%~dp0Facerecongination\mediamtx"
+set "MEDIAMTX_EXE=%MEDIAMTX_DIR%\mediamtx.exe"
+set "MEDIAMTX_CFG=%MEDIAMTX_DIR%\mediamtx.yml"
+
 echo [*] Project Directory: %PROJECT_DIR%
 echo.
 
@@ -143,9 +148,27 @@ echo  ================================================================
 echo.
 echo  Backend API:     http://localhost:3000
 echo  Frontend App:    http://localhost:3001
-echo  Camera Service:  http://localhost:5001
+echo  Camera Service:  http://localhost:5001  (AI metadata only)
+echo  MediaMTX WebRTC: http://localhost:8889  (browser video source)
+echo  MediaMTX API:    http://localhost:9997  (path management)
 echo.
 echo  [!] Each service opens in its own window.
+echo.
+
+REM --- MediaMTX (RTSP -> WebRTC/HLS) ---
+REM Must start BEFORE the Python camera service because the camera service
+REM registers RTSP paths against MediaMTX's HTTP API on port 9997.
+if exist "%MEDIAMTX_EXE%" (
+    start "IntelliSight - MediaMTX (8889/9997)" /d "%MEDIAMTX_DIR%" cmd /k ""%MEDIAMTX_EXE%" "%MEDIAMTX_CFG%""
+    timeout /t 2 /nobreak >nul
+    echo [OK] MediaMTX launched
+) else (
+    echo [WARNING] MediaMTX binary not found at:
+    echo           %MEDIAMTX_EXE%
+    echo           Browser video preview will NOT work until you install it.
+    echo           Download: https://github.com/bluenviron/mediamtx/releases
+    echo           Place mediamtx.exe in: %MEDIAMTX_DIR%
+)
 echo.
 
 REM --- Backend (Node.js / nodemon) ---

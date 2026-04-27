@@ -1,14 +1,15 @@
 """
-IntelliSight - Live Camera Stream with Face Recognition
-Backend service that processes RTSP camera feeds and streams results to frontend
-Supports multiple cameras with face detection and recognition
+IntelliSight - Face Recognition AI Service (metadata only)
 
-*** OPTIMIZED FOR CPU-ONLY PROCESSING ***
-- Frame throttling: Process every 3rd frame
-- Parallel processing: Separate threads for capture/detection/recognition
-- Fast detector: OpenCV Haar Cascade as primary (faster than DeepFace SSD on CPU)
-- Histogram equalization for lighting normalization
-- Memory-cached embeddings (no DB hits per frame)
+Responsibility: detect + recognise faces from RTSP camera streams and broadcast
+the results as JSON events over WebSocket. This service does NOT serve video
+to browsers — that is MediaMTX's job (RTSP → WebRTC/HLS). Python is not in
+the video path.
+
+Architecture:
+  RTSP camera  ─┬─▶ MediaMTX ─────────▶ browser <video> (WebRTC/WHEP)
+                │
+                └─▶ This service (AI) ─▶ /ws/events ─▶ browser canvas overlay
 """
 
 import os
@@ -20,7 +21,10 @@ import time
 import threading
 import gc
 import queue
-from flask import Flask, Response, jsonify, request
+import signal
+import atexit
+import traceback
+from flask import Flask, Response, jsonify, request, stream_with_context
 from flask_cors import CORS
 from flask_sock import Sock
 from datetime import datetime
@@ -30,15 +34,44 @@ from deepface import DeepFace
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
+# ── Exit diagnostics ──────────────────────────────────────────────────────────
+# Silent process exit (prompt returns to shell with no traceback) is hard to
+# debug. These hooks log the cause so the next termination tells us *why*.
+def _log_exit():
+    print(f"[EXIT] Camera service shutting down at {datetime.now().isoformat()}",
+          flush=True)
+
+def _log_signal(signum, _frame):
+    name = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
+    print(f"[SIGNAL] Received {name} ({signum}) — exiting", flush=True)
+    sys.exit(0)
+
+def _log_uncaught(exc_type, exc_value, exc_tb):
+    print("[FATAL] Uncaught exception in main thread:", flush=True)
+    traceback.print_exception(exc_type, exc_value, exc_tb)
+
+atexit.register(_log_exit)
+sys.excepthook = _log_uncaught
+for _sig in ('SIGINT', 'SIGTERM', 'SIGBREAK'):
+    if hasattr(signal, _sig):
+        try:
+            signal.signal(getattr(signal, _sig), _log_signal)
+        except (ValueError, OSError):
+            pass   # not all signals are settable on all platforms
+
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
 from config import (
     DB_CONFIG, MODEL_NAME, DISTANCE_THRESHOLD, MIN_FACE_SIZE,
     RECOGNITION_CONFIDENCE_THRESHOLD, DETECTOR_BACKEND, FRAME_SKIP,
+    MEDIAMTX_WEBRTC_URL,
 )
 from utils import load_embeddings_from_json, FPSCounter, preprocess_face_crop, EmbeddingIndex
 from database_handler import DatabaseHandler
+from event_bus import bus
+import mediamtx_client
 
 app = Flask(__name__)
 CORS(app)
@@ -50,53 +83,24 @@ embeddings_data = []    # raw list — kept for len() / reload responses
 embedding_index = None  # EmbeddingIndex — built once at startup
 db_handler      = None
 
-# Fine-grained lock strategy
+# Lock strategy
 # ─────────────────────────────────────────────────────────────────────────────
-# _reload_lock  — protects the reload code path only (prevents two concurrent
-#                 /embeddings/reload calls from racing).  Recognition threads
-#                 do NOT acquire this lock — they take a local snapshot of the
-#                 embedding_index reference instead (see _recognize_face).
+# _tf_inference_lock — serialises ALL calls to DeepFace.represent() across
+#   every camera thread.  TensorFlow's Keras model is NOT thread-safe for
+#   concurrent inference in eager mode: two threads calling model(x) at the
+#   same time can corrupt internal allocator state and trigger a C-level abort
+#   that kills the process instantly (no Python traceback, no atexit).  One
+#   lock call costs ~0-1ms overhead — far cheaper than a process crash.
 #
-# Why no global recognition lock?
-#   • DeepFace.represent() in TF2 eager mode is safe to call concurrently —
-#     the loaded Keras model is read-only during inference.
-#   • EmbeddingIndex.search() only reads numpy arrays — safe for many readers.
-#   • Python's GIL makes reference assignment atomic:
-#       embedding_index = new_index
-#     Any camera thread already inside search() holds a reference to the OLD
-#     index object; it will complete safely before GC reclaims that object.
-#
-# Result: Camera 1 and Camera 2 can run face recognition simultaneously.
+# _reload_lock — protects the reload code path only.  Recognition threads
+#   take a local snapshot of embedding_index before the DeepFace call so a
+#   concurrent /embeddings/reload cannot swap the index mid-search.
 # ─────────────────────────────────────────────────────────────────────────────
-_reload_lock = threading.Lock()
+_tf_inference_lock = threading.Lock()   # ONE TF call at a time across all cameras
+_reload_lock       = threading.Lock()
 
-# ── WebSocket client registry ─────────────────────────────────────────────────
-# Each browser tab that opens /ws/stream/<id> gets its own queue (maxsize=1).
-# _push_ws_frame() is called from the capture thread; WS handler threads read
-# from their queues and forward bytes to the browser over the WebSocket.
-# _ws_clients_lock protects dict mutations only — frame delivery is lock-free.
-_ws_clients      = {}               # {camera_id: set of queue.Queue}
-_ws_clients_lock = threading.Lock()
-
-
-def _push_ws_frame(camera_id, jpeg_bytes):
-    """Push the latest JPEG frame to every WebSocket client watching this camera.
-
-    Uses the same drain-replace pattern as the AI queue: each client queue
-    holds at most 1 frame, so a slow browser never causes back-pressure on
-    the capture thread.
-    """
-    with _ws_clients_lock:
-        clients = set(_ws_clients.get(camera_id, set()))   # snapshot
-    for q in clients:
-        try:
-            q.get_nowait()          # drop stale frame
-        except queue.Empty:
-            pass
-        try:
-            q.put_nowait(jpeg_bytes)
-        except queue.Full:
-            pass
+# Video frames are no longer pushed over WebSocket — MediaMTX owns video.
+# Metadata events fan out via event_bus.bus (see /ws/events below).
 
 
 # ============================================================================
@@ -165,19 +169,25 @@ class CameraStream:
         self.camera_type = camera_type
         self.zone_id = zone_id
         self.cap = None
-        self.frame = None
         self.is_running = False
         self.fps_counter = FPSCounter()
         self.last_recognition_time = {}
         self.recognized_persons = []
         self.frame_count = 0
-        
-        # Cache for face detections (avoid detecting every frame)
+
+        # Cache for most recent detection result (used by /cameras/status for diagnostics)
         self.cached_faces = []
         self.last_detection_frame = 0
 
-        # Per-face labels drawn by the fast path (set by AI thread)
-        self.cached_face_labels = []   # list of {x,y,fw,fh,label,color}
+        # Resolution AI is operating in — published with each detection event so
+        # the browser can scale bbox coordinates to its <video> element size.
+        self._ai_frame_w = TARGET_WIDTH
+        self._ai_frame_h = TARGET_HEIGHT
+
+        # Latest decoded frame — used by the MJPEG /stream/<id> fallback endpoint.
+        # Written by the RTSP reader thread, read by Flask request threads.
+        self._latest_frame = None
+        self._frame_lock   = threading.Lock()
 
         # ── Confidence EMA cache ───────────────────────────────────────────────
         # Short-term exponential moving average of recognition confidence per
@@ -187,28 +197,32 @@ class CameraStream:
         # stays high.  Keyed by person_key; cleared in stop().
         self._conf_ema = {}   # {person_key: float}
 
-        # ── RTSP reader → capture pipeline ────────────────────────────────────────
-        # _live_frame is written by _rtsp_reader_loop (one writer, fast loop).
-        # _capture_loop reads it to annotate and encode — never touches cap directly.
-        # Python's GIL makes reference assignment atomic so no lock is needed.
-        self._live_frame = None  # latest raw numpy frame from camera
-
-        # ── Streaming output (written by capture thread, read by Flask) ──────────
-        # Pre-encoded JPEG bytes so the streaming generator never does CPU work.
-        self.jpeg_frame = None   # bytes | None
-
-        # ── AI worker queue (capture → AI thread) ─────────────────────────────
-        # maxsize=1: capture thread always replaces stale frames with the freshest
-        # one available.  The AI worker is naturally rate-limited by its own speed —
-        # it simply processes as fast as the CPU allows, never accumulating a backlog.
+        # ── AI worker queue (RTSP reader → AI thread) ─────────────────────────
+        # Producer : _rtsp_reader_loop calls _enqueue_for_ai() after each decoded frame.
+        # Consumer : _ai_loop        blocks on ai_queue.get(timeout=…) and calls _run_ai().
+        #
+        # maxsize=1 enforces the "most-recent frame only" guarantee:
+        #   • If the AI worker is still processing the previous frame when a new
+        #     one arrives, the stale frame is evicted and the fresh one takes its
+        #     place — the AI never builds a backlog of delayed frames.
+        #   • If the queue is empty the capture thread just adds the frame without
+        #     blocking — the AI worker picks it up as soon as it is free.
+        #
+        # This is the drain-replace (swap) pattern: see _enqueue_for_ai().
         self.ai_queue = queue.Queue(maxsize=1)
+
+        # ── Queue metrics (written by capture + AI threads, read by /cameras/status) ──
+        self.ai_frames_produced = 0   # unique frames offered to the queue
+        self.ai_frames_dropped  = 0   # stale frames evicted because AI was busy
+        self.ai_frames_consumed = 0   # frames actually pulled and processed by AI
 
         # Connect to camera
         self.connect()
 
         # Start AI background thread — runs independently of capture success.
         # If camera failed to connect, is_running=False and the thread exits immediately.
-        self._ai_thread = threading.Thread(target=self._ai_loop, daemon=True)
+        self._ai_thread = threading.Thread(target=self._ai_loop, daemon=True,
+                                           name=f"cam{self.camera_id}-ai")
         self._ai_thread.start()
     
     def connect(self):
@@ -289,20 +303,23 @@ class CameraStream:
         return False
 
     def _start_threads(self):
-        """Start the RTSP reader thread and the capture/annotation thread."""
-        threading.Thread(target=self._rtsp_reader_loop, daemon=True).start()
-        threading.Thread(target=self._capture_loop,     daemon=True).start()
+        """Start the RTSP reader thread. The reader now feeds the AI queue directly;
+        there is no separate capture/annotation thread anymore (video is delivered
+        to browsers by MediaMTX, not this service)."""
+        threading.Thread(target=self._rtsp_reader_loop, daemon=True,
+                         name=f"cam{self.camera_id}-reader").start()
     
     def _rtsp_reader_loop(self):
         """Dedicated RTSP reader — the ONLY thread that calls cap.read().
 
-        Runs in a tight loop at the camera's native frame rate.  Every decoded
-        frame immediately replaces self._live_frame (atomic reference swap via
-        GIL), so _capture_loop always reads the most recent camera image with
-        zero buffering delay.
+        Runs in a tight loop at the camera's native frame rate. Each decoded
+        frame is downscaled to TARGET resolution (if needed) and immediately
+        fed to the AI worker queue via _enqueue_for_ai() — no separate
+        capture/annotation thread exists anymore since this service no longer
+        produces video output.
 
         Also owns reconnection: if the stream fails it releases cap, waits with
-        exponential backoff, and reconnects — _capture_loop is never involved.
+        exponential backoff, and reconnects.
         """
         consecutive_failures = 0
         reconnect_attempts   = 0
@@ -357,17 +374,34 @@ class CameraStream:
                     continue
 
                 # ── Normal read — blocks until next camera frame arrives ───────
-                # cap.read() = grab() + retrieve() in one call, but the key
-                # difference is we do this in a DEDICATED thread so the annotation
-                # / JPEG-encode thread (_capture_loop) is never network-blocked.
+                # cap.read() = grab() + retrieve() in one call. Running it on a
+                # dedicated thread means the Flask event loop is never
+                # network-blocked by slow/stalled cameras.
                 ret, frame = self.cap.read()
 
                 if ret and frame is not None:
                     consecutive_failures = 0
                     reconnect_attempts   = 0
-                    # Atomic swap — GIL guarantees _capture_loop sees a complete
-                    # frame object, never a half-written one.
-                    self._live_frame = frame
+
+                    # Downscale if camera resolution exceeds TARGET — keeps AI
+                    # cost predictable and defines the coordinate space reported
+                    # in detection events.
+                    h, w = frame.shape[:2]
+                    if w > TARGET_WIDTH:
+                        frame = cv2.resize(frame, (TARGET_WIDTH, TARGET_HEIGHT),
+                                           interpolation=cv2.INTER_LINEAR)
+                        self._ai_frame_w = TARGET_WIDTH
+                        self._ai_frame_h = TARGET_HEIGHT
+                    else:
+                        self._ai_frame_w = int(w)
+                        self._ai_frame_h = int(h)
+
+                    # Keep a reference for the MJPEG fallback endpoint.
+                    with self._frame_lock:
+                        self._latest_frame = frame
+
+                    # Hand the frame to the AI worker (drain-replace, maxsize=1).
+                    self._enqueue_for_ai(frame)
                 else:
                     consecutive_failures += 1
                     if consecutive_failures > 10:
@@ -384,99 +418,46 @@ class CameraStream:
                 print(f"[Camera {self.camera_id}] RTSP reader error: {e}")
                 time.sleep(0.3)
 
-    def _capture_loop(self):
-        """Annotation + encode thread — pure CPU work, never touches the network.
+    # ── Producer helper ───────────────────────────────────────────────────────
 
-        Reads the latest raw frame from self._live_frame (written by the RTSP
-        reader thread), draws cached AI labels, encodes to JPEG once, and stores
-        the bytes in self.jpeg_frame for the Flask streaming generator to serve.
-        Also feeds the AI worker queue.
+    def _enqueue_for_ai(self, frame):
+        """Producer step — push the most recent frame to the AI worker queue.
+
+        Implements the drain-replace (swap) pattern for a maxsize=1 queue:
+
+          1. Try to evict any stale frame that is still waiting (the AI worker
+             has not consumed it yet).  If one is found, increment the drop
+             counter — this frame represents delay we are actively discarding.
+          2. Try to insert the fresh frame.  If the AI worker picked up the
+             evicted frame in the tiny gap between steps 1 and 2, the queue is
+             still empty and put_nowait succeeds trivially.  In the rare case
+             where the queue is still full (AI is mid-process AND another
+             producer racing — impossible here since only one capture thread
+             exists), the frame is silently skipped; the next camera tick will
+             try again.
+
+        Thread safety: queue.Queue is internally synchronised.  No external
+        lock is required.  This is the only place ai_queue receives items.
         """
-        while self.is_running:
-            try:
-                frame = self._live_frame   # atomic read — no lock needed
-                if frame is None:
-                    time.sleep(0.01)       # wait for first frame from reader
-                    continue
+        try:
+            self.ai_queue.get_nowait()      # evict stale frame
+            self.ai_frames_dropped += 1
+        except queue.Empty:
+            pass                             # queue was idle — nothing to evict
 
-                h, w = frame.shape[:2]
-                if w > TARGET_WIDTH:
-                    frame = cv2.resize(frame, (TARGET_WIDTH, TARGET_HEIGHT),
-                                       interpolation=cv2.INTER_LINEAR)
+        try:
+            self.ai_queue.put_nowait(frame)
+            self.ai_frames_produced += 1
+        except queue.Full:
+            pass                             # AI still mid-process; skip this frame
 
-                self.frame_count += 1
-
-                # ── Feed AI worker (non-blocking, always-fresh) ───────────────
-                try:
-                    self.ai_queue.get_nowait()   # drain stale frame
-                except queue.Empty:
-                    pass
-                try:
-                    self.ai_queue.put_nowait(frame.copy())
-                except queue.Full:
-                    pass   # AI mid-process — safe to skip
-
-                # ── Annotate + encode (zero network wait) ─────────────────────
-                annotated = self._draw_annotated_frame(frame)
-                self.frame = annotated   # numpy ref for debug access
-
-                ok, jpeg = cv2.imencode(
-                    '.jpg', annotated,
-                    [cv2.IMWRITE_JPEG_QUALITY, 80, cv2.IMWRITE_JPEG_OPTIMIZE, 1]
-                )
-                if ok:
-                    jpeg_bytes = jpeg.tobytes()
-                    self.jpeg_frame = jpeg_bytes          # for MJPEG fallback
-                    _push_ws_frame(self.camera_id, jpeg_bytes)   # WebSocket push
-
-                self.fps_counter.update()
-
-                if self.frame_count % 300 == 0:
-                    gc.collect()
-
-                time.sleep(0.005)   # ~200 Hz ceiling; actual rate = camera FPS
-
-            except Exception as e:
-                print(f"[Camera {self.camera_id}] Capture loop error: {e}")
-                time.sleep(0.1)
-    
-    def _draw_annotated_frame(self, frame):
-        """Draw cached face boxes and recognition labels from the last AI run.
-        Pure drawing — no AI calls. Called on EVERY captured frame for smooth streaming."""
-        display = frame.copy()
-
-        # Take a local reference so the AI thread can replace the list mid-frame
-        # without causing iteration errors (Python GIL guarantees atomic ref swap).
-        face_labels = self.cached_face_labels
-
-        for fl in face_labels:
-            x, y, fw, fh = fl['x'], fl['y'], fl['fw'], fl['fh']
-            color  = fl['color']
-            label  = fl['label']
-            cv2.rectangle(display, (x, y), (x + fw, y + fh), color, 2)
-            label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
-            cv2.rectangle(display, (x, y - 28), (x + label_size[0] + 10, y), color, -1)
-            cv2.putText(display, label, (x + 5, y - 8),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-
-        fps = self.fps_counter.get_fps()
-        cv2.putText(display, f"FPS: {fps:.1f}", (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-        cv2.putText(display, f"Faces: {len(face_labels)}", (10, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-        cv2.putText(display, f"Type: {self.camera_type}", (10, 90),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-
-        return display
-    
     # ── AI background thread ──────────────────────────────────────────────────
 
     def _ai_loop(self):
-        """AI worker thread — completely independent of the capture / streaming thread.
+        """AI worker thread — consumes frames from the RTSP reader.
 
-        Blocks on ai_queue.get() until the capture thread delivers a fresh frame,
-        then runs detection + recognition.  It never touches self.jpeg_frame and
-        never makes the streaming generator wait.
+        Blocks on ai_queue.get() until the reader delivers a fresh frame, then
+        runs detection + recognition and publishes the result to event_bus.
 
         Natural rate-limiting: the worker processes as fast as the CPU allows.
         The queue (maxsize=1) ensures it always gets the freshest available frame
@@ -484,35 +465,43 @@ class CameraStream:
         """
         while self.is_running:
             try:
-                # Block until the capture thread puts a frame in the queue.
+                # Block until the RTSP reader puts a frame in the queue.
                 # timeout=0.5 s lets us re-check is_running on camera stop.
-                frame = self.ai_queue.get(timeout=0.5)
+                frame = self.ai_queue.get(timeout=0.5)   # consumer step
             except queue.Empty:
                 continue   # timed out — loop back and check is_running
 
-            # frame is a raw numpy array copy — safe to process without locks.
+            self.ai_frames_consumed += 1   # track how many frames actually ran AI
+            self.frame_count += 1
+            self.fps_counter.update()      # FPS meter now reflects AI throughput
+
             try:
                 self._run_ai(frame)
             except Exception as e:
                 print(f"[Camera {self.camera_id}] AI worker error: {e}")
 
+            if self.frame_count % 300 == 0:
+                gc.collect()
+
     def _run_ai(self, frame):
         """Run face detection + recognition on a frame snapshot.
-        Updates self.cached_faces, self.cached_face_labels, self.recognized_persons.
-        Runs entirely in _ai_loop thread — does NOT touch self.frame."""
+
+        Produces ONE detection event per AI frame (published to event_bus).
+        The browser is responsible for drawing overlays on top of the WebRTC
+        video using the bboxes + timestamp in the event.
+        """
         h, w = frame.shape[:2]
         scale = w / PROCESS_WIDTH
         small_frame = cv2.resize(frame, (PROCESS_WIDTH, PROCESS_HEIGHT))
 
-        # Detect faces on the downscaled frame
         small_faces = self._detect_faces(small_frame)
 
         new_cached_faces = []
-        new_face_labels  = []
         new_recognized   = []
+        detections       = []
 
         for face in small_faces:
-            # Scale coordinates back to display resolution
+            # Scale coordinates back to AI (== browser overlay) resolution
             x  = int(face['x'] * scale)
             y  = int(face['y'] * scale)
             fw = int(face['w'] * scale)
@@ -523,6 +512,12 @@ class CameraStream:
                 'confidence': face['confidence'],
             })
 
+            detection = {
+                'bbox':       {'x': x, 'y': y, 'w': fw, 'h': fh},
+                'person':     {'recognized': False},
+                'confidence': 0.0,
+            }
+
             # Extract face crop with margin
             margin = int(fw * 0.2)
             y1 = max(0, y - margin);  y2 = min(h, y + fh + margin)
@@ -532,16 +527,22 @@ class CameraStream:
             if (face_crop.size == 0
                     or face_crop.shape[0] < MIN_FACE_SIZE
                     or face_crop.shape[1] < MIN_FACE_SIZE):
-                new_face_labels.append({'x': x, 'y': y, 'fw': fw, 'fh': fh,
-                                        'label': 'Detecting...', 'color': (255, 255, 0)})
+                # Too small for recognition — emit bbox only (unrecognised)
+                detections.append(detection)
                 continue
 
             person_dict, distance = self._recognize_face(face_crop)
 
             if person_dict is not None:
                 confidence = max(0.0, 1.0 - (distance / DISTANCE_THRESHOLD))
-                label = f"{person_dict['name']} ({confidence:.0%})"
-                color = (0, 255, 0)   # Green
+                detection['person'] = {
+                    'recognized': True,
+                    'id':   person_dict['person_id'],
+                    'name': person_dict['name'],
+                    'role': person_dict['role'],
+                }
+                detection['confidence'] = round(float(confidence), 3)
+
                 new_recognized.append({
                     'name':       person_dict['name'],
                     'role':       person_dict['role'],
@@ -557,28 +558,27 @@ class CameraStream:
                 if confidence >= RECOGNITION_CONFIDENCE_THRESHOLD:
                     self._handle_recognition(person_dict, confidence)
             elif distance is not None:
-                label = f"Unknown ({distance:.1f})" if distance < 100 else "Unknown"
-                color = (0, 0, 255)   # Red
                 self._handle_unknown_face(face_crop, distance)
-            else:
-                label = "Detecting..."
-                color = (255, 255, 0)  # Yellow
 
-            new_face_labels.append({
-                'x': x, 'y': y, 'fw': fw, 'fh': fh,
-                'label': label, 'color': color,
-            })
+            detections.append(detection)
 
         self.last_detection_frame = self.frame_count
 
-        # Atomically replace cached state.
-        # Python's GIL makes reference assignment atomic, so the capture thread
-        # will always see a complete list, never a half-written one.
-        self.cached_faces      = new_cached_faces
-        self.cached_face_labels = new_face_labels
+        # Atomically replace diagnostic cache (read by /cameras/status).
+        self.cached_faces = new_cached_faces
         if new_recognized:
-            # Keep a rolling window of the last 20 recognitions
             self.recognized_persons = (self.recognized_persons + new_recognized)[-20:]
+
+        # ── Publish detection event ────────────────────────────────────────────
+        # One event per processed AI frame, even if no faces were found —
+        # the frontend uses the event's timestamp to decay stale overlays.
+        bus.publish({
+            'type':       'detection',
+            'camera_id':  self.camera_id,
+            'timestamp':  int(time.time() * 1000),
+            'frame_size': {'w': self._ai_frame_w, 'h': self._ai_frame_h},
+            'detections': detections,
+        })
     
     def _detect_faces(self, frame):
         """Locate faces in a small detection frame using a lightweight detector.
@@ -669,13 +669,13 @@ class CameraStream:
     def _recognize_face(self, face_crop):
         """Recognize a face using DeepFace — runs in parallel across all camera AI threads.
 
-        No global lock is acquired here.  Instead:
-          1. A local reference to embedding_index is captured before the DeepFace call.
-             If reload() swaps the global mid-call, this thread keeps using the old
-             (still-valid) index object; GC won't free it until we're done.
-          2. DeepFace.represent() is safe to call concurrently in TF2 eager mode —
-             the Keras model is read-only during inference.
-          3. EmbeddingIndex.search() is a pure numpy read — safe for many readers.
+        Uses _tf_inference_lock to serialise the DeepFace.represent() call —
+        TF/Keras is NOT safe for concurrent inference across threads.
+
+          1. A local reference to embedding_index is captured before the call.
+             If reload() swaps the global mid-call, this thread keeps the old
+             (still-valid) object alive until the search completes.
+          2. EmbeddingIndex.search() is a pure numpy read — safe for many readers.
         """
         # Snapshot the current index — atomic read (GIL), no lock needed.
         index_ref = embedding_index
@@ -691,14 +691,16 @@ class CameraStream:
             face_preprocessed = preprocess_face_crop(face_crop)
             face_resized = cv2.resize(face_preprocessed, (160, 160), interpolation=cv2.INTER_LINEAR)
 
-            # No lock — Camera 1 and Camera 2 run this concurrently.
-            results = DeepFace.represent(
-                img_path=face_resized,
-                model_name=MODEL_NAME,
-                detector_backend="skip",   # face already cropped — skip re-detection
-                enforce_detection=False,
-                align=True
-            )
+            # Serialise TF inference — Keras is NOT safe for concurrent calls.
+            # The lock is process-global so Camera 12 and Camera 13 take turns.
+            with _tf_inference_lock:
+                results = DeepFace.represent(
+                    img_path=face_resized,
+                    model_name=MODEL_NAME,
+                    detector_backend="skip",   # face already cropped — skip re-detection
+                    enforce_detection=False,
+                    align=True,
+                )
 
             if results and len(results) > 0:
                 embedding = results[0]["embedding"]
@@ -832,14 +834,6 @@ class CameraStream:
         except Exception as e:
             print(f"[Database Error] {e}")
 
-    def get_frame(self):
-        """Return the latest pre-encoded JPEG frame as bytes.
-
-        Zero CPU work here — encoding happens once in the capture thread.
-        Multiple browser tabs / consumers all read the same bytes for free.
-        """
-        return self.jpeg_frame   # bytes | None
-    
     def stop(self):
         """Stop camera stream with proper cleanup"""
         print(f"[Camera {self.camera_id}] Stopping...")
@@ -869,8 +863,105 @@ def health():
     return jsonify({
         'status': 'ok',
         'active_cameras': len(active_cameras),
-        'known_persons': len(embeddings_data)
+        'known_persons': len(embeddings_data),
+        'mediamtx_alive': mediamtx_client.is_alive(),
+        'event_subscribers': bus.subscriber_count(),
     })
+
+
+def _enhance_frame_for_display(frame):
+    """Boost brightness on dark/IR frames so the MJPEG preview is visible.
+
+    Security cameras in night-vision mode output near-black frames (mean pixel
+    value < 60) even though face recognition works because the AI model handles
+    low-contrast images well.  CLAHE on the Y channel brings out detail without
+    blowing out well-lit scenes.
+    """
+    try:
+        gray_mean = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).mean()
+        if gray_mean < 60:
+            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+            yuv = cv2.cvtColor(frame, cv2.COLOR_BGR2YUV)
+            yuv[:, :, 0] = clahe.apply(yuv[:, :, 0])
+            return cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR)
+    except Exception:
+        pass
+    return frame
+
+
+@app.route('/snapshot/<int:camera_id>')
+def snapshot_camera(camera_id):
+    """Single JPEG snapshot — polled by the React frontend every ~150 ms.
+
+    More React-friendly than multipart/x-mixed-replace because each request
+    is independent; React component remounts don't break the feed.
+    """
+    cam = active_cameras.get(camera_id)
+    if cam is None or not cam.is_running:
+        return jsonify({'error': 'Camera not active'}), 404
+
+    with cam._frame_lock:
+        frame = cam._latest_frame
+
+    if frame is None:
+        return jsonify({'error': 'No frame yet'}), 503
+
+    frame = _enhance_frame_for_display(frame)
+    ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+    if not ret:
+        return jsonify({'error': 'Encode failed'}), 500
+
+    return Response(
+        jpeg.tobytes(),
+        mimetype='image/jpeg',
+        headers={
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Access-Control-Allow-Origin': '*',
+        },
+    )
+
+
+@app.route('/stream/<int:camera_id>')
+def stream_camera_mjpeg(camera_id):
+    """MJPEG stream (kept for backward compatibility / non-React clients)."""
+    cam = active_cameras.get(camera_id)
+    if cam is None or not cam.is_running:
+        return jsonify({'error': 'Camera not active'}), 404
+
+    @stream_with_context
+    def generate():
+        while cam.is_running:
+            with cam._frame_lock:
+                frame = cam._latest_frame
+            if frame is None:
+                time.sleep(0.05)
+                continue
+            frame = _enhance_frame_for_display(frame)
+            ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+            if not ret:
+                time.sleep(0.05)
+                continue
+            jpeg_bytes = jpeg.tobytes()
+            yield (
+                b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n'
+                b'Content-Length: ' + str(len(jpeg_bytes)).encode() + b'\r\n'
+                b'\r\n' +
+                jpeg_bytes +
+                b'\r\n'
+            )
+            time.sleep(0.1)
+
+    return Response(
+        generate(),
+        mimetype='multipart/x-mixed-replace; boundary=frame',
+        headers={
+            'Cache-Control': 'no-cache, no-store',
+            'Access-Control-Allow-Origin': '*',
+            'X-Accel-Buffering': 'no',
+        },
+    )
 
 
 @app.route('/cameras/start', methods=['POST'])
@@ -890,8 +981,13 @@ def start_camera():
     
     if camera.is_running:
         active_cameras[camera_id] = camera
+        # Register the camera with MediaMTX so browsers can pull video via WebRTC.
+        # Best-effort: if MediaMTX is down the AI pipeline still runs.
+        mediamtx_client.register_path(camera_id, camera_url)
+        bus.publish_status(camera_id, 'online')
         return jsonify({'success': True, 'message': f'Camera {camera_id} started'})
     else:
+        bus.publish_status(camera_id, 'error', 'Failed to connect to camera')
         return jsonify({'error': 'Failed to connect to camera'}), 500
 
 
@@ -901,6 +997,8 @@ def stop_camera(camera_id):
     if camera_id in active_cameras:
         active_cameras[camera_id].stop()
         del active_cameras[camera_id]
+        mediamtx_client.unregister_path(camera_id)
+        bus.publish_status(camera_id, 'offline')
         gc.collect()  # Force garbage collection
         return jsonify({'success': True, 'message': f'Camera {camera_id} stopped'})
     else:
@@ -930,17 +1028,26 @@ def cameras_status():
     cameras_status = {}
     
     for camera_id, camera in active_cameras.items():
+        produced = camera.ai_frames_produced
+        dropped  = camera.ai_frames_dropped
         cameras_status[str(camera_id)] = {
             'camera_id': camera_id,
             'zone_id': camera.zone_id,
             'camera_type': camera.camera_type,
             'is_running': camera.is_running,
-            'is_connected': camera.is_running,  # Alias for frontend compatibility
+            'is_connected': camera.is_running,  # alias for frontend compatibility
             'fps': camera.fps_counter.get_fps(),
             'frame_count': camera.frame_count,
             'faces_detected': len(camera.cached_faces),
             'recognized_persons': camera.recognized_persons[-10:],
-            'stream_url': f'/stream/{camera_id}'
+            'webrtc_url':  f'{MEDIAMTX_WEBRTC_URL}/cam{camera_id}/whep',
+            'frame_size':  {'w': camera._ai_frame_w, 'h': camera._ai_frame_h},
+            # ── AI queue health ───────────────────────────────────────────────
+            # drop_rate near 0 = AI keeping up; near 1 = AI heavily overloaded
+            'ai_frames_produced': produced,
+            'ai_frames_dropped':  dropped,
+            'ai_frames_consumed': camera.ai_frames_consumed,
+            'ai_drop_rate': round(dropped / produced, 3) if produced > 0 else 0.0,
         }
     
     return jsonify({
@@ -970,64 +1077,76 @@ def debug_embeddings():
     })
 
 
-@app.route('/stream/<int:camera_id>')
-def stream_camera(camera_id):
-    """Stream camera feed with optimized FPS"""
-    def generate():
-        while camera_id in active_cameras:
-            frame = active_cameras[camera_id].get_frame()
-            if frame:
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-            time.sleep(0.02)  # 50 FPS max for smoother streaming
-    
-    if camera_id in active_cameras:
-        return Response(generate(), 
-                       mimetype='multipart/x-mixed-replace; boundary=frame')
-    else:
-        return jsonify({'error': 'Camera not found'}), 404
+@sock.route('/ws/events')
+def ws_events_endpoint(ws):
+    """WebSocket endpoint — pushes detection metadata as JSON to browsers.
 
+    Protocol (all messages JSON):
+      Client → server:
+        {"type": "subscribe",   "camera_ids": [1, 3, 7]}
+        {"type": "unsubscribe", "camera_ids": [3]}
 
-@sock.route('/ws/stream/<int:camera_id>')
-def ws_stream_endpoint(ws, camera_id):
-    """WebSocket endpoint — pushes annotated JPEG frames in binary to the browser.
+      Server → client:
+        {"type": "hello", "server_time": <ms>}
+        {"type": "detection", "camera_id": N, "timestamp": <ms>,
+         "frame_size": {"w": W, "h": H},
+         "detections": [{"bbox": {...}, "person": {...}, "confidence": F}, ...]}
+        {"type": "camera_status", "camera_id": N,
+         "status": "online"|"offline"|"error", "message": "..."}
 
-    Protocol:
-      • Client opens  ws://host:5001/ws/stream/<camera_id>
-      • Server sends binary messages; each message is one complete JPEG image.
-      • No client→server messages expected (one-way push).
-
-    Back-pressure handling:
-      Each connected client gets its own queue (maxsize=1).  The capture thread
-      always replaces stale frames using the drain-replace pattern, so a slow
-      browser tab simply misses frames rather than growing a backlog.
-
-    Lifecycle:
-      • If the camera is not running, the handler returns immediately.
-      • If the camera stops while streaming, the loop exits and the client
-        will see the WebSocket close, prompting a reconnect in the frontend.
+    The client opens ONE connection per browser tab and selects cameras via
+    subscribe / unsubscribe — no need to reconnect when switching views.
     """
-    if camera_id not in active_cameras:
-        return
-
-    client_q = queue.Queue(maxsize=1)
-    with _ws_clients_lock:
-        _ws_clients.setdefault(camera_id, set()).add(client_q)
-
+    sub = bus.subscribe()
     try:
-        cam = active_cameras.get(camera_id)
-        while cam and cam.is_running and camera_id in active_cameras:
+        ws.send(json.dumps({
+            'type': 'hello',
+            'server_time': int(time.time() * 1000),
+        }))
+
+        stop = threading.Event()
+
+        # Reader thread: parses subscribe/unsubscribe control messages.
+        # Blocks on ws.receive() — no timeout — so only a real connection
+        # close (exception or None) triggers stop and ends the writer loop.
+        def _reader():
             try:
-                frame_bytes = client_q.get(timeout=1.0)
-                ws.send(frame_bytes)
+                while not stop.is_set():
+                    raw = ws.receive()      # blocks until message or close
+                    if raw is None:
+                        break               # connection closed cleanly
+                    try:
+                        msg = json.loads(raw)
+                    except (ValueError, TypeError):
+                        continue
+                    mtype = msg.get('type')
+                    cams  = msg.get('camera_ids') or []
+                    if mtype == 'subscribe':
+                        sub.add_cameras(cams)
+                    elif mtype == 'set':
+                        sub.set_cameras(cams)
+                    elif mtype == 'unsubscribe':
+                        sub.remove_cameras(cams)
+            except Exception:
+                pass   # connection closed abruptly
+            finally:
+                stop.set()
+
+        threading.Thread(target=_reader, daemon=True,
+                         name='ws-events-reader').start()
+
+        # Writer loop (this thread): fan-out from the subscriber's queue.
+        while not stop.is_set():
+            try:
+                event = sub.queue.get(timeout=1.0)
             except queue.Empty:
-                continue   # no frame yet — keep waiting
-    except Exception:
-        pass   # client disconnected or WebSocket error
+                continue
+            try:
+                ws.send(json.dumps(event))
+            except Exception:
+                break
     finally:
-        with _ws_clients_lock:
-            if camera_id in _ws_clients:
-                _ws_clients[camera_id].discard(client_q)
+        bus.unsubscribe(sub)
 
 
 @app.route('/embeddings/reload', methods=['POST'])
@@ -1106,6 +1225,8 @@ def start_zone_cameras(zone_id):
                 
                 if cam_stream.is_running:
                     active_cameras[camera_id] = cam_stream
+                    mediamtx_client.register_path(camera_id, camera['Camera_URL'])
+                    bus.publish_status(camera_id, 'online')
                     started.append(camera_id)
                 else:
                     failed.append(camera_id)
@@ -1224,6 +1345,8 @@ def auto_start_all_cameras():
                 
                 if cam_stream.is_running:
                     active_cameras[camera_id] = cam_stream
+                    mediamtx_client.register_path(camera_id, camera_url)
+                    bus.publish_status(camera_id, 'online')
                     print(f"[OK] Camera {camera_id} started successfully")
                     started += 1
                 else:
@@ -1239,6 +1362,42 @@ def auto_start_all_cameras():
         print(f"[ERROR] Failed to auto-start cameras: {e}")
 
 
+def _configure_tensorflow():
+    """Configure TF before any model is loaded.
+
+    - memory_growth=True: TF allocates GPU VRAM on demand instead of reserving
+      all of it upfront.  Prevents OOM crashes when multiple processes share the
+      same GPU.
+    - Limit inter/intra-op threads: avoids CPU oversubscription when 2+ cameras
+      are running AI threads simultaneously.  4 total threads is plenty for
+      FaceNet on a modern CPU.
+    """
+    try:
+        import tensorflow as tf
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        # Bound the thread pool so two AI threads don't each spin up 16 workers
+        tf.config.threading.set_inter_op_parallelism_threads(2)
+        tf.config.threading.set_intra_op_parallelism_threads(2)
+        print(f"[TF] Configured: {len(gpus)} GPU(s), memory_growth=True, threads=2/2",
+              flush=True)
+    except Exception as e:
+        print(f"[TF] Config skipped ({e})", flush=True)
+
+
 if __name__ == '__main__':
-    initialize()
-    app.run(host='0.0.0.0', port=5001, threaded=True, debug=False)
+    _configure_tensorflow()
+    try:
+        initialize()
+        print(f"[BOOT] Flask app.run starting on :5001 — PID {os.getpid()}", flush=True)
+        app.run(host='0.0.0.0', port=5001, threaded=True, debug=False, use_reloader=False)
+    except SystemExit:
+        raise
+    except KeyboardInterrupt:
+        print("[EXIT] KeyboardInterrupt received — shutting down", flush=True)
+    except Exception as e:
+        print(f"[FATAL] Main loop crashed: {type(e).__name__}: {e}", flush=True)
+        traceback.print_exc()
+        sys.exit(1)
+    print(f"[EXIT] app.run returned normally at {datetime.now().isoformat()}", flush=True)
