@@ -420,7 +420,10 @@ class EmbeddingIndex:
 
             person_id  = data.get('person_id')
             role       = (data.get('role') or '').upper()
-            name       = data.get('name', '')
+            # Fall back to legacy 'person' field (folder name) when 'name' is
+            # absent — embeddings generated before the DB-sync enrichment step
+            # only stored "person": folder_name, not the canonical "name" field.
+            name       = data.get('name') or data.get('person', '')
             person_key = data.get('person_key') or data.get('person', '')
 
             group_key = (f"{person_id}|{role}"
@@ -436,23 +439,28 @@ class EmbeddingIndex:
             })
             self._group_keys.append(group_key)
 
-        self._matrix = (np.array(vectors, dtype=np.float32)
-                        if vectors else np.empty((0, 0), dtype=np.float32))
+        if vectors:
+            mat = np.array(vectors, dtype=np.float32)
+            # L2-normalise rows so dot-product == cosine similarity
+            norms = np.linalg.norm(mat, axis=1, keepdims=True)
+            norms[norms == 0] = 1.0
+            self._matrix = mat / norms
+        else:
+            self._matrix = np.empty((0, 0), dtype=np.float32)
 
     def __len__(self):
         return len(self._meta)
 
     def search(self, embedding, threshold=DISTANCE_THRESHOLD):
         """
-        Vectorized nearest-neighbour search.
+        Vectorized nearest-neighbour search using cosine distance.
 
-        Computes all N euclidean distances in a single np.linalg.norm call,
-        groups by person identity, and returns the person whose closest enrolled
-        embedding is within threshold.
+        Stored vectors are L2-normalised in __init__, so cosine distance is
+        computed as: 1 - dot(normalised_query, normalised_stored_row).
 
         Args:
-            embedding : query embedding (list or 1-D numpy array, 128-D)
-            threshold : max euclidean distance to accept as a match
+            embedding : query embedding (list or 1-D numpy array, 512-D ArcFace)
+            threshold : max cosine distance to accept as a match (default 0.68)
 
         Returns:
             (person_dict | None, float distance)
@@ -460,8 +468,11 @@ class EmbeddingIndex:
         if self._matrix.ndim < 2 or self._matrix.shape[0] == 0:
             return None, float('inf')
 
-        query     = np.array(embedding, dtype=np.float32)           # (D,)
-        distances = np.linalg.norm(self._matrix - query, axis=1)    # (N,)
+        query = np.array(embedding, dtype=np.float32)
+        norm  = np.linalg.norm(query)
+        if norm > 0:
+            query = query / norm
+        distances = 1.0 - (self._matrix @ query)    # cosine distance (N,)
 
         # Keep minimum distance per person group
         best_by_group = {}  # group_key → (min_dist, meta)
@@ -501,8 +512,11 @@ class EmbeddingIndex:
         if self._matrix.ndim < 2 or self._matrix.shape[0] == 0:
             return None, float('inf'), 0.0
 
-        query     = np.array(embedding, dtype=np.float32)
-        distances = np.linalg.norm(self._matrix - query, axis=1)
+        query = np.array(embedding, dtype=np.float32)
+        norm  = np.linalg.norm(query)
+        if norm > 0:
+            query = query / norm
+        distances = 1.0 - (self._matrix @ query)    # cosine distance (N,)
 
         # Accumulate per-group: min distance + count of embeddings within threshold
         groups = {}  # group_key → {'min': float, 'within': int, 'meta': dict}

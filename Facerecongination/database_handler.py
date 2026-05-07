@@ -8,7 +8,7 @@ from psycopg2.extras import RealDictCursor
 import pickle
 import json
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timezone
 from config import DB_CONFIG, UNIDENTIFIED_SAVE_PATH, EMBEDDINGS_FILE
 from utils import build_person_key
 
@@ -21,10 +21,32 @@ class DatabaseHandler:
         """Connect to PostgreSQL database"""
         try:
             self.conn = psycopg2.connect(**DB_CONFIG)
-            print("[DB] Connected successfully")
+            # Force UTC session timezone so TIMESTAMP columns always store/read UTC values
+            # regardless of the PostgreSQL server's local timezone setting.
+            with self.conn.cursor() as cur:
+                cur.execute("SET TIME ZONE 'UTC'")
+            self.conn.commit()
+            print("[DB] Connected successfully (session timezone = UTC)")
         except Exception as e:
             print(f"[DB ERROR] Connection failed: {e}")
             raise
+
+    def _ensure_connection(self):
+        """Re-establish the PostgreSQL connection if it has been closed or timed out."""
+        try:
+            if self.conn is None or self.conn.closed:
+                raise Exception("connection closed")
+            # Cheap ping to detect a silently-dropped connection
+            with self.conn.cursor() as cur:
+                cur.execute("SELECT 1")
+        except Exception:
+            print("[DB] Connection lost — reconnecting...")
+            try:
+                if self.conn and not self.conn.closed:
+                    self.conn.close()
+            except Exception:
+                pass
+            self.connect()  # connect() already sets TIME ZONE UTC
 
     def close(self):
         """Close database connection"""
@@ -234,6 +256,7 @@ class DatabaseHandler:
 
     def get_zone_cameras_list(self, zone_id):
         """Get all cameras for a zone as a list"""
+        self._ensure_connection()
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
@@ -274,94 +297,285 @@ class DatabaseHandler:
         normalised = 'Teacher' if str(person_type).upper() == 'TEACHER' else 'Student'
         return self.remove_from_active_presence(person_id, normalised, zone_id)
 
+    def _mark_class_attendance(self, cur, person_id, person_type, zone_id, now_utc):
+        """
+        Real-time ClassAttendance upsert when a person is detected.
+        Finds the active TimetableSlot for this zone/day/local-time and marks PRESENT or LATE.
+        Slot times are stored in local clock (PKT), so we compare against local datetime.now().
+        Non-fatal — exceptions are logged but never propagate.
+        """
+        try:
+            is_student  = person_type == 'Student'
+            pt_upper    = 'STUDENT' if is_student else 'TEACHER'
+            days        = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+            now_local   = datetime.now()  # local clock — matches TimetableSlot time strings
+            cur_day     = days[now_local.weekday()]
+            cur_time    = now_local.strftime('%H:%M')
+            cur_date    = now_local.date()
+
+            if is_student:
+                cur.execute("""
+                    SELECT ts."Slot_ID", ts."StartTime"
+                    FROM   "TimetableSlot" ts
+                    JOIN   "Enrollment" e
+                           ON  e."Section_ID" = ts."Section_ID"
+                           AND e."Student_ID" = %s
+                    WHERE  ts."Zone_id"    = %s
+                      AND  ts."DayOfWeek"  = %s
+                      AND  ts."StartTime" <= %s
+                      AND  ts."EndTime"   >  %s
+                      AND  ts."IsActive"   = true
+                    LIMIT 1
+                """, (person_id, zone_id, cur_day, cur_time, cur_time))
+            else:
+                cur.execute("""
+                    SELECT "Slot_ID", "StartTime"
+                    FROM   "TimetableSlot"
+                    WHERE  "Teacher_ID" = %s
+                      AND  "Zone_id"    = %s
+                      AND  "DayOfWeek"  = %s
+                      AND  "StartTime" <= %s
+                      AND  "EndTime"   >  %s
+                      AND  "IsActive"   = true
+                    LIMIT 1
+                """, (person_id, zone_id, cur_day, cur_time, cur_time))
+
+            slot = cur.fetchone()
+            if not slot:
+                return  # No active class in this zone right now
+
+            slot_id    = slot[0]
+            slot_start = slot[1]
+            start_h, start_m = map(int, slot_start.split(':'))
+            now_mins   = now_local.hour * 60 + now_local.minute
+            status     = 'LATE' if now_mins > start_h * 60 + start_m + 10 else 'PRESENT'
+
+            if is_student:
+                cur.execute("""
+                    INSERT INTO "ClassAttendance"
+                      ("Slot_ID","Date","PersonType","Student_ID","Status",
+                       "FirstSeenAt","LastSeenAt","TotalMinutes","DetectionsCount",
+                       "CreatedAt","UpdatedAt")
+                    VALUES (%s,%s,'STUDENT',%s,%s,%s,%s,0,1,NOW(),NOW())
+                    ON CONFLICT ("Slot_ID","Date","Student_ID") DO UPDATE SET
+                      "LastSeenAt"      = EXCLUDED."LastSeenAt",
+                      "DetectionsCount" = "ClassAttendance"."DetectionsCount" + 1,
+                      "UpdatedAt"       = NOW()
+                """, (slot_id, cur_date, person_id, status, now_utc, now_utc))
+            else:
+                cur.execute("""
+                    INSERT INTO "ClassAttendance"
+                      ("Slot_ID","Date","PersonType","Teacher_ID","Status",
+                       "FirstSeenAt","LastSeenAt","TotalMinutes","DetectionsCount",
+                       "CreatedAt","UpdatedAt")
+                    VALUES (%s,%s,'TEACHER',%s,%s,%s,%s,0,1,NOW(),NOW())
+                    ON CONFLICT ("Slot_ID","Date","Teacher_ID") DO UPDATE SET
+                      "LastSeenAt"      = EXCLUDED."LastSeenAt",
+                      "DetectionsCount" = "ClassAttendance"."DetectionsCount" + 1,
+                      "UpdatedAt"       = NOW()
+                """, (slot_id, cur_date, person_id, status, now_utc, now_utc))
+
+            print(f"[DB] ✓ ClassAttendance: {pt_upper} {person_id} → Slot {slot_id} [{status}]")
+        except Exception as e:
+            print(f"[DB WARNING] _mark_class_attendance: {e}")
+
+    def _update_class_attendance_exit(self, cur, person_id, person_type, zone_id, entry_time, exit_time):
+        """Update ClassAttendance TotalMinutes + LastSeenAt when person exits."""
+        try:
+            is_student  = person_type == 'Student'
+            days        = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+            now_local   = datetime.now()
+            cur_day     = days[now_local.weekday()]
+            cur_date    = now_local.date()
+            entry_aware = entry_time.replace(tzinfo=timezone.utc) if entry_time.tzinfo is None else entry_time
+            exit_aware  = exit_time if exit_time.tzinfo else exit_time.replace(tzinfo=timezone.utc)
+            total_mins  = max(0, int((exit_aware - entry_aware).total_seconds() / 60))
+
+            if is_student:
+                cur.execute("""
+                    UPDATE "ClassAttendance" ca SET
+                      "LastSeenAt"   = %s,
+                      "TotalMinutes" = %s,
+                      "UpdatedAt"    = NOW()
+                    WHERE ca."Student_ID" = %s
+                      AND ca."Date"       = %s
+                      AND ca."Slot_ID" IN (
+                          SELECT ts."Slot_ID"
+                          FROM   "TimetableSlot" ts
+                          JOIN   "Enrollment" e
+                                 ON  e."Section_ID" = ts."Section_ID"
+                                 AND e."Student_ID" = %s
+                          WHERE  ts."Zone_id"   = %s
+                            AND  ts."DayOfWeek" = %s
+                            AND  ts."IsActive"  = true
+                      )
+                """, (exit_time, total_mins, person_id, cur_date, person_id, zone_id, cur_day))
+            else:
+                cur.execute("""
+                    UPDATE "ClassAttendance" ca SET
+                      "LastSeenAt"   = %s,
+                      "TotalMinutes" = %s,
+                      "UpdatedAt"    = NOW()
+                    WHERE ca."Teacher_ID" = %s
+                      AND ca."Date"       = %s
+                      AND ca."Slot_ID" IN (
+                          SELECT "Slot_ID" FROM "TimetableSlot"
+                          WHERE  "Teacher_ID" = %s
+                            AND  "Zone_id"    = %s
+                            AND  "DayOfWeek"  = %s
+                            AND  "IsActive"   = true
+                      )
+                """, (exit_time, total_mins, person_id, cur_date, person_id, zone_id, cur_day))
+
+            print(f"[DB] ✓ ClassAttendance exit: {person_type} {person_id} → {total_mins}m")
+        except Exception as e:
+            print(f"[DB WARNING] _update_class_attendance_exit: {e}")
+
     def add_to_active_presence(self, person_id, person_type, zone_id):
         """
         Add person to ActivePresence table (entry detected).
+        Also opens an AttendanceLog row with ExitTime=NULL so the Logs page
+        shows the person as 'Inside' until the exit camera completes the session.
+        Simultaneously marks real-time ClassAttendance for the active timetable slot.
         Checks if already present to avoid duplicates.
         """
+        self._ensure_connection()
         try:
             with self.conn.cursor() as cur:
-                # Check if already in zone
+                # Check if already in this zone
                 id_field = '"Student_ID"' if person_type == 'Student' else '"Teacher_ID"'
                 cur.execute(f"""
-                    SELECT "Presence_ID" FROM "ActivePresence" 
+                    SELECT "Presence_ID" FROM "ActivePresence"
                     WHERE {id_field} = %s AND "Zone_id" = %s
                 """, (person_id, zone_id))
-                
+
                 if cur.fetchone():
                     print(f"[DB] {person_type} {person_id} already in Zone {zone_id}")
                     return False
 
-                # Insert new active presence
+                now_utc = datetime.now(timezone.utc).replace(tzinfo=None)  # naive UTC — safe for TIMESTAMP col
+                person_type_upper = 'STUDENT' if person_type == 'Student' else 'TEACHER'
+
                 if person_type == 'Student':
                     cur.execute("""
-                        INSERT INTO "ActivePresence" 
+                        INSERT INTO "ActivePresence"
                         ("PersonType", "Student_ID", "Zone_id", "EntryTime")
-                        VALUES (%s, %s, %s, NOW())
-                    """, ('STUDENT', person_id, zone_id))
+                        VALUES (%s, %s, %s, %s)
+                    """, (person_type_upper, person_id, zone_id, now_utc))
+                    cur.execute("""
+                        INSERT INTO "AttendanceLog"
+                        ("PersonType", "Student_ID", "Zone_id", "EntryTime", "ExitTime", "Duration")
+                        VALUES (%s, %s, %s, %s, NULL, NULL)
+                    """, (person_type_upper, person_id, zone_id, now_utc))
                 else:
                     cur.execute("""
-                        INSERT INTO "ActivePresence" 
+                        INSERT INTO "ActivePresence"
                         ("PersonType", "Teacher_ID", "Zone_id", "EntryTime")
-                        VALUES (%s, %s, %s, NOW())
-                    """, ('TEACHER', person_id, zone_id))
-                
+                        VALUES (%s, %s, %s, %s)
+                    """, (person_type_upper, person_id, zone_id, now_utc))
+                    cur.execute("""
+                        INSERT INTO "AttendanceLog"
+                        ("PersonType", "Teacher_ID", "Zone_id", "EntryTime", "ExitTime", "Duration")
+                        VALUES (%s, %s, %s, %s, NULL, NULL)
+                    """, (person_type_upper, person_id, zone_id, now_utc))
+
+                # Mark ClassAttendance for the active timetable slot (non-fatal)
+                self._mark_class_attendance(cur, person_id, person_type, zone_id, now_utc)
+
                 self.conn.commit()
-                print(f"[DB] ✓ Added {person_type} {person_id} to Zone {zone_id}")
+                print(f"[DB] ✓ Added {person_type} {person_id} to Zone {zone_id} + opened AttendanceLog")
                 return True
-                
+
         except Exception as e:
             self.conn.rollback()
             print(f"[DB ERROR] add_to_active_presence: {e}")
             return False
 
-    def remove_from_active_presence(self, person_id, person_type, zone_id):
+    def remove_from_active_presence(self, person_id, person_type, exit_zone_id):
         """
-        Remove person from ActivePresence and log to AttendanceLog.
-        Calculates duration automatically.
+        Remove person from ActivePresence and complete their AttendanceLog row.
+
+        Searches across ALL zones — entry and exit cameras may belong to different
+        zones, so filtering by exit_zone_id would miss the record.
+
+        Preferred path: UPDATE the open AttendanceLog row (ExitTime IS NULL) that
+        was created by add_to_active_presence, filling in ExitTime + Duration.
+        Fallback: INSERT a new completed row if no open row exists (e.g. legacy data).
+
+        Duration is stored in MINUTES to match the Node.js path.
         """
+        self._ensure_connection()
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
                 id_field = '"Student_ID"' if person_type == 'Student' else '"Teacher_ID"'
-                
-                # Get active presence record
+
+                # Search ALL zones — person may have entered via a different zone
                 cur.execute(f"""
-                    SELECT "Presence_ID", "EntryTime" FROM "ActivePresence" 
-                    WHERE {id_field} = %s AND "Zone_id" = %s
-                """, (person_id, zone_id))
-                
+                    SELECT "Presence_ID", "EntryTime", "Zone_id"
+                    FROM   "ActivePresence"
+                    WHERE  {id_field} = %s
+                    ORDER  BY "EntryTime" DESC
+                    LIMIT  1
+                """, (person_id,))
+
                 presence = cur.fetchone()
                 if not presence:
-                    print(f"[DB] {person_type} {person_id} not in Zone {zone_id}")
+                    print(f"[DB] {person_type} {person_id} not in ActivePresence (no entry recorded)")
                     return False
 
-                entry_time = presence['EntryTime']
-                exit_time = datetime.now()
-                duration = int((exit_time - entry_time).total_seconds())
+                entry_zone_id = presence['Zone_id']
+                entry_time    = presence['EntryTime']
 
-                # Insert into AttendanceLog
-                if person_type == 'Student':
-                    cur.execute("""
-                        INSERT INTO "AttendanceLog" 
-                        ("PersonType", "Student_ID", "Zone_id", "EntryTime", "ExitTime", "Duration")
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """, ('STUDENT', person_id, zone_id, entry_time, exit_time, duration))
-                else:
-                    cur.execute("""
-                        INSERT INTO "AttendanceLog" 
-                        ("PersonType", "Teacher_ID", "Zone_id", "EntryTime", "ExitTime", "Duration")
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """, ('TEACHER', person_id, zone_id, entry_time, exit_time, duration))
+                # UTC-consistent duration calculation — stored in MINUTES
+                exit_time   = datetime.now(timezone.utc)
+                entry_aware = entry_time.replace(tzinfo=timezone.utc) if entry_time.tzinfo is None else entry_time
+                duration_mins = max(0, int((exit_time - entry_aware).total_seconds() / 60))
+
+                person_type_upper = 'STUDENT' if person_type == 'Student' else 'TEACHER'
+
+                # UPDATE the open AttendanceLog row that was created at entry time.
+                # Uses a subquery because PostgreSQL does not support ORDER BY / LIMIT in UPDATE.
+                cur.execute(f"""
+                    UPDATE "AttendanceLog"
+                    SET    "ExitTime" = %s, "Duration" = %s
+                    WHERE  "Log_ID" = (
+                        SELECT "Log_ID" FROM "AttendanceLog"
+                        WHERE  {id_field} = %s
+                          AND  "Zone_id"   = %s
+                          AND  "ExitTime"  IS NULL
+                        ORDER  BY "EntryTime" DESC
+                        LIMIT  1
+                    )
+                """, (exit_time, duration_mins, person_id, entry_zone_id))
+
+                if cur.rowcount == 0:
+                    # No open log found (legacy data or missed entry) — insert completed row
+                    if person_type == 'Student':
+                        cur.execute("""
+                            INSERT INTO "AttendanceLog"
+                            ("PersonType", "Student_ID", "Zone_id", "EntryTime", "ExitTime", "Duration")
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, (person_type_upper, person_id, entry_zone_id, entry_time, exit_time, duration_mins))
+                    else:
+                        cur.execute("""
+                            INSERT INTO "AttendanceLog"
+                            ("PersonType", "Teacher_ID", "Zone_id", "EntryTime", "ExitTime", "Duration")
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, (person_type_upper, person_id, entry_zone_id, entry_time, exit_time, duration_mins))
+
+                # Update ClassAttendance TotalMinutes for the active slot (non-fatal)
+                self._update_class_attendance_exit(cur, person_id, person_type, entry_zone_id, entry_time, exit_time)
 
                 # Remove from ActivePresence
                 cur.execute("""
                     DELETE FROM "ActivePresence" WHERE "Presence_ID" = %s
                 """, (presence['Presence_ID'],))
-                
+
                 self.conn.commit()
-                print(f"[DB] ✓ Removed {person_type} {person_id} from Zone {zone_id} (Duration: {duration}s)")
+                print(f"[DB] ✓ EXIT {person_type} {person_id} — Zone {entry_zone_id} "
+                      f"duration={duration_mins}m → AttendanceLog completed")
                 return True
-                
+
         except Exception as e:
             self.conn.rollback()
             print(f"[DB ERROR] remove_from_active_presence: {e}")
@@ -369,6 +583,7 @@ class DatabaseHandler:
 
     def save_unknown_face(self, image_bytes, zone_id, confidence=None):
         """Save unknown face to database"""
+        self._ensure_connection()
         try:
             with self.conn.cursor() as cur:
                 cur.execute("""

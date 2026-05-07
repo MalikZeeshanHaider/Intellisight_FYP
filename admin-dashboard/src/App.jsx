@@ -24,7 +24,6 @@ import Teachers from './pages/Teachers';
 import TeacherDetail from './pages/TeacherDetail';
 import Zones from './pages/Zones';
 import ZoneDetail from './pages/ZoneDetail';
-import Zone1 from './pages/Zone1';
 import ZoneLive from './pages/ZoneLive';
 import Cameras from './pages/Cameras';
 import UnknownFaces from './pages/UnknownFaces';
@@ -140,17 +139,10 @@ function App() {
               }
             />
 
+            {/* Legacy route — redirect to the unified ZoneLive page */}
             <Route
               path="/zones/zone1-live"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <ErrorBoundary>
-                      <Zone1 />
-                    </ErrorBoundary>
-                  </Layout>
-                </ProtectedRoute>
-              }
+              element={<Navigate to="/zones/1/live" replace />}
             />
 
             <Route

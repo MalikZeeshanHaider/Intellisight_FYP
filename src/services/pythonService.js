@@ -235,11 +235,46 @@ export const getProcessStatus = () => {
   return status;
 };
 
+/**
+ * Notify the live AI service to (re-)enroll one person and hot-reload the
+ * embedding index. Fire-and-forget — controllers must not wait on this,
+ * because embedding generation takes ~1s per face image. Failures only log;
+ * they never block the CRUD response.
+ *
+ * @param {'student'|'teacher'} personType
+ * @param {number} personId
+ * @param {'enroll'|'unenroll'} action
+ */
+const STREAM_BASE_URL = process.env.STREAM_BASE_URL || 'http://localhost:5001';
+
+export const notifyAIEnrollment = (personType, personId, action = 'enroll') => {
+  const method = action === 'unenroll' ? 'DELETE' : 'POST';
+  const url    = `${STREAM_BASE_URL}/enroll/${personType}/${personId}`;
+
+  // Don't await — the AI service runs DeepFace inline which is slow, and we
+  // don't want the user's create/update/delete request to wait for it.
+  fetch(url, { method })
+    .then(async (res) => {
+      const body = await res.json().catch(() => ({}));
+      if (res.ok && body.success) {
+        logger.info(`[AI] ${action} ${personType} ${personId} — total embeddings: ${body.total_embeddings}`);
+      } else {
+        logger.warn(`[AI] ${action} ${personType} ${personId} failed: ${body.error || res.statusText}`);
+      }
+    })
+    .catch((err) => {
+      // Most likely the AI service isn't running — that's OK, embeddings
+      // will be picked up on its next start.
+      logger.warn(`[AI] Could not reach AI service for ${action}: ${err.message}`);
+    });
+};
+
 export default {
   startRecognitionForZone,
   stopRecognitionForZone,
   runTraining,
   initializePythonServices,
   stopAllProcesses,
-  getProcessStatus
+  getProcessStatus,
+  notifyAIEnrollment,
 };

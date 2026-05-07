@@ -195,18 +195,22 @@ export const getActivePresence = async (req, res) => {
       orderBy: { EntryTime: 'desc' }
     });
 
+    const now = new Date();
     const formatted = activePersons.map(p => ({
       presenceId: p.Presence_ID,
       personType: p.PersonType,
       person: p.student || p.teacher,
       zone: p.zone,
-      entryTime: p.EntryTime
+      entryTime: p.EntryTime instanceof Date ? p.EntryTime.toISOString() : p.EntryTime,
+      entryTimestamp: p.EntryTime instanceof Date ? p.EntryTime.getTime() : new Date(p.EntryTime).getTime(),
     }));
 
     res.json({
       success: true,
       data: formatted,
-      count: formatted.length
+      count: formatted.length,
+      serverTime: now.toISOString(),
+      serverTimestamp: now.getTime(),
     });
 
   } catch (error) {
@@ -254,18 +258,22 @@ export const getAllActivePresence = async (req, res) => {
       orderBy: { EntryTime: 'desc' }
     });
 
+    const now = new Date();
     const formatted = activePersons.map(p => ({
       presenceId: p.Presence_ID,
       personType: p.PersonType,
       person: p.student || p.teacher,
       zone: p.zone,
-      entryTime: p.EntryTime
+      entryTime: p.EntryTime instanceof Date ? p.EntryTime.toISOString() : p.EntryTime,
+      entryTimestamp: p.EntryTime instanceof Date ? p.EntryTime.getTime() : new Date(p.EntryTime).getTime(),
     }));
 
     res.json({
       success: true,
       data: formatted,
-      count: formatted.length
+      count: formatted.length,
+      serverTime: now.toISOString(),
+      serverTimestamp: now.getTime(),
     });
 
   } catch (error) {

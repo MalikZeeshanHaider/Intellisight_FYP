@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FiRefreshCw, FiAlertCircle, FiArrowLeft, FiCamera, FiPlus, FiX, FiVideo, FiEdit2, FiTrash2 } from 'react-icons/fi';
+import { FiRefreshCw, FiAlertCircle, FiArrowLeft, FiCamera, FiPlus, FiX, FiVideo, FiEdit2, FiTrash2, FiCheckCircle } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cameraAPI, zoneAPI, streamAPI } from '../api/api';
 import { useWebRTCStream } from '../hooks/useWebRTCStream';
@@ -20,7 +20,7 @@ const ZoneLive = () => {
   const isDarkMode = document.documentElement.classList.contains('dark');
   const { zoneId } = useParams();
   const navigate = useNavigate();
-  
+
   const [zone, setZone] = useState(null);
   const [cameras, setCameras] = useState([]);
   const [cameraStatuses, setCameraStatuses] = useState({});
@@ -31,11 +31,17 @@ const ZoneLive = () => {
   const [editingCamera, setEditingCamera] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serviceOnline, setServiceOnline] = useState(false);
+  const [isReloading, setIsReloading] = useState(false);
   const [newCamera, setNewCamera] = useState({
     Camera_URL: '',
     Camera_Type: 'Entry',
     Password: ''
   });
+
+  // Live stats — fetched from DB + Python service
+  const [knownInZone, setKnownInZone] = useState(0);
+  const [unknownInZone, setUnknownInZone] = useState(0);
+  const [embeddingStats, setEmbeddingStats] = useState(null); // {total_embeddings, persons}
 
   // Fetch zone details and cameras
   const fetchZoneData = async () => {
@@ -68,19 +74,50 @@ const ZoneLive = () => {
     }
   };
 
-  // Check camera service status
+  // Check camera service status + grab embedding info in one call
   const checkServiceStatus = async () => {
     try {
       const response = await fetch('http://localhost:5001/health');
       const data = await response.json();
       if (data.status === 'ok') {
         setServiceOnline(true);
+        // Grab embedding details from the debug endpoint
+        try {
+          const embRes = await fetch('http://localhost:5001/debug/embeddings');
+          const embData = await embRes.json();
+          setEmbeddingStats(embData);
+        } catch (_) {}
         return true;
       }
     } catch (err) {
       setServiceOnline(false);
     }
     return false;
+  };
+
+  // Fetch live zone stats from Node.js DB
+  const fetchZoneStats = async () => {
+    try {
+      const [knownRes, unknownRes] = await Promise.all([
+        zoneAPI.getPersonsInZone(zoneId),
+        zoneAPI.getZoneUnknownCount(zoneId),
+      ]);
+      if (knownRes.success) setKnownInZone(knownRes.data?.length ?? 0);
+      if (unknownRes.success) setUnknownInZone(unknownRes.data?.count ?? 0);
+    } catch (_) {}
+  };
+
+  // Reload face embeddings in the Python AI service
+  const handleReloadEmbeddings = async () => {
+    try {
+      setIsReloading(true);
+      await streamAPI.reloadEmbeddings();
+      await checkServiceStatus(); // refresh embedding count display
+    } catch (err) {
+      console.error('Failed to reload embeddings:', err);
+    } finally {
+      setIsReloading(false);
+    }
   };
 
   // Fetch camera statuses from persistent service
@@ -144,12 +181,17 @@ const ZoneLive = () => {
     fetchZoneData();
     checkServiceStatus();
     
-    // Poll for camera statuses every 3 seconds
-    const statusInterval = setInterval(() => {
-      fetchCameraStatuses();
-    }, 3000);
-    
-    return () => clearInterval(statusInterval);
+    // Initial DB stats fetch
+    fetchZoneStats();
+
+    // Poll camera statuses every 3 s, DB stats every 10 s
+    const statusInterval = setInterval(fetchCameraStatuses, 3000);
+    const statsInterval  = setInterval(fetchZoneStats, 10000);
+
+    return () => {
+      clearInterval(statusInterval);
+      clearInterval(statsInterval);
+    };
   }, [zoneId]);
 
   // Auto-start cameras when service is online and cameras are loaded
@@ -165,7 +207,8 @@ const ZoneLive = () => {
     await Promise.all([
       fetchZoneData(),
       fetchCameraStatuses(),
-      checkServiceStatus()
+      checkServiceStatus(),
+      fetchZoneStats(),
     ]);
   };
 
@@ -305,14 +348,34 @@ const ZoneLive = () => {
           </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap justify-end">
+          {/* Embedding stats badge */}
+          {embeddingStats && (
+            <div
+              className="flex items-center space-x-3 px-4 py-2 rounded-xl border"
+              style={{
+                backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.9)' : 'white',
+                border: isDarkMode ? '1px solid rgba(0, 255, 255, 0.2)' : '1px solid #e5e7eb'
+              }}
+            >
+              {Object.entries(embeddingStats.persons || {}).map(([name, count]) => (
+                <span key={name} className="text-xs font-medium" style={{ color: isDarkMode ? 'rgba(192,240,240,0.8)' : '#374151' }}>
+                  {name} ({count})
+                </span>
+              ))}
+              <span className="text-xs font-bold" style={{ color: isDarkMode ? '#00ffff' : '#003d82' }}>
+                {embeddingStats.total_embeddings} embeddings
+              </span>
+            </div>
+          )}
+
           {!serviceOnline && (
-            <div 
+            <div
               className="flex items-center space-x-2 px-4 py-2 rounded-xl border"
-              style={{ 
-                backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(245, 158, 11, 0.1)', 
-                borderColor: 'rgba(245, 158, 11, 0.3)', 
-                color: '#d97706' 
+              style={{
+                backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(245, 158, 11, 0.1)',
+                borderColor: 'rgba(245, 158, 11, 0.3)',
+                color: '#d97706'
               }}
             >
               <FiAlertCircle size={18} />
@@ -320,18 +383,36 @@ const ZoneLive = () => {
             </div>
           )}
           {serviceOnline && (
-            <div 
+            <div
               className="flex items-center space-x-2 px-4 py-2 rounded-xl border"
-              style={{ 
-                backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)', 
-                borderColor: 'rgba(16, 185, 129, 0.3)', 
-                color: isDarkMode ? '#34d399' : '#10b981' 
+              style={{
+                backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)',
+                borderColor: 'rgba(16, 185, 129, 0.3)',
+                color: isDarkMode ? '#34d399' : '#10b981'
               }}
             >
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-sm font-semibold">Service Running</span>
+              <span className="text-sm font-semibold">AI Service Active</span>
             </div>
           )}
+
+          {/* Reload embeddings — re-reads the JSON embedding file into memory */}
+          {serviceOnline && (
+            <button
+              onClick={handleReloadEmbeddings}
+              disabled={isReloading}
+              className="flex items-center space-x-2 px-4 py-2 rounded-xl font-semibold transition disabled:opacity-50"
+              style={{
+                backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#10b981',
+                color: isDarkMode ? '#34d399' : '#fff',
+                border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.5)' : 'none',
+              }}
+            >
+              <FiCheckCircle size={16} className={isReloading ? 'animate-spin' : ''} />
+              <span>{isReloading ? 'Reloading...' : 'Reload Embeddings'}</span>
+            </button>
+          )}
+
           <button
             onClick={handleRefresh}
             className="flex items-center space-x-2 px-4 py-2 rounded-xl font-semibold transition"
@@ -562,9 +643,9 @@ const ZoneLive = () => {
         )}
       </div>
 
-      {/* Stats */}
+      {/* Stats — live from ActivePresence + UnknownFaces tables */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div 
+        <div
           className="rounded-xl p-6 shadow-sm"
           style={{
             backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
@@ -572,27 +653,30 @@ const ZoneLive = () => {
           }}
         >
           <h3 className="text-sm font-medium mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>Known in Zone</h3>
-          <p className="text-3xl font-bold" style={{ color: isDarkMode ? '#34d399' : '#059669' }}>0</p>
+          <p className="text-3xl font-bold" style={{ color: isDarkMode ? '#34d399' : '#059669' }}>{knownInZone}</p>
+          <p className="text-xs mt-1" style={{ color: isDarkMode ? 'rgba(192,240,240,0.4)' : '#9ca3af' }}>People recognised by AI</p>
         </div>
-        <div 
+        <div
           className="rounded-xl p-6 shadow-sm"
           style={{
             backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
             border: isDarkMode ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid #e5e7eb'
           }}
         >
-          <h3 className="text-sm font-medium mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>Unknown in Zone</h3>
-          <p className="text-3xl font-bold" style={{ color: '#d97706' }}>0</p>
+          <h3 className="text-sm font-medium mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>Unknown Detected</h3>
+          <p className="text-3xl font-bold" style={{ color: '#d97706' }}>{unknownInZone}</p>
+          <p className="text-xs mt-1" style={{ color: isDarkMode ? 'rgba(192,240,240,0.4)' : '#9ca3af' }}>Faces not in database</p>
         </div>
-        <div 
+        <div
           className="rounded-xl p-6 shadow-sm"
           style={{
             backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'white',
             border: isDarkMode ? '1px solid rgba(0, 255, 255, 0.3)' : '1px solid #e5e7eb'
           }}
         >
-          <h3 className="text-sm font-medium mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>Total Recognized</h3>
-          <p className="text-3xl font-bold" style={{ color: isDarkMode ? '#00ffff' : '#003d82' }}>0</p>
+          <h3 className="text-sm font-medium mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>Total Detected</h3>
+          <p className="text-3xl font-bold" style={{ color: isDarkMode ? '#00ffff' : '#003d82' }}>{knownInZone + unknownInZone}</p>
+          <p className="text-xs mt-1" style={{ color: isDarkMode ? 'rgba(192,240,240,0.4)' : '#9ca3af' }}>Known + unknown</p>
         </div>
       </div>
 

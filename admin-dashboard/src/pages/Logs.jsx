@@ -9,6 +9,18 @@ import { zone1API } from '../api/zone1';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 
+const calcDuration = (entryTime, exitTime, dbMinutes) => {
+  if (dbMinutes === null || dbMinutes === undefined) return null;
+  if (dbMinutes >= 1) return `${dbMinutes} min`;
+  // DB stored 0 min (sub-minute visit) — calculate precise seconds from timestamps
+  if (entryTime && exitTime) {
+    const secs = Math.max(0, Math.floor((new Date(exitTime) - new Date(entryTime)) / 1000));
+    if (secs < 60) return `${secs} sec`;
+    return `${Math.floor(secs / 60)} min`;
+  }
+  return '< 1 min';
+};
+
 const Logs = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -113,7 +125,7 @@ const Logs = () => {
       log.Zone || '',
       log.EntryTime ? format(new Date(log.EntryTime), 'yyyy-MM-dd HH:mm:ss') : '',
       log.ExitTime ? format(new Date(log.ExitTime), 'yyyy-MM-dd HH:mm:ss') : '',
-      log.Duration ?? '',
+      calcDuration(log.EntryTime, log.ExitTime, log.Duration) ?? '',
       log.Status || '',
     ]);
     const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -481,14 +493,17 @@ const Logs = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: isDarkMode ? '#c0f0f0' : '#111827' }}>
-                      {log.Duration !== null ? (
-                        <div className="flex items-center space-x-1">
-                          <FiClock style={{ color: isDarkMode ? '#22d3ee' : '#3b82f6' }} size={14} />
-                          <span className="font-medium">{log.Duration} min</span>
-                        </div>
-                      ) : (
-                        <span style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.4)' : '#9ca3af' }}>-</span>
-                      )}
+                      {(() => {
+                        const dur = calcDuration(log.EntryTime, log.ExitTime, log.Duration);
+                        return dur !== null ? (
+                          <div className="flex items-center space-x-1">
+                            <FiClock style={{ color: isDarkMode ? '#22d3ee' : '#3b82f6' }} size={14} />
+                            <span className="font-medium">{dur}</span>
+                          </div>
+                        ) : (
+                          <span style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.4)' : '#9ca3af' }}>-</span>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${

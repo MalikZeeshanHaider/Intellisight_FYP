@@ -2,10 +2,10 @@ import { prisma } from '../config/database.js';
 import { PERSON_TYPES } from '../config/constants.js';
 
 // PersonType values as written by the Python recognition script into
-// ActivePresence and AttendanceLog ('Student'/'Teacher' title-case).
+// ActivePresence and AttendanceLog — uppercase, matching DB values.
 // ClassAttendance uses the all-caps PERSON_TYPES constants instead.
-const PY_STUDENT = 'Student';
-const PY_TEACHER = 'Teacher';
+const PY_STUDENT = 'STUDENT';
+const PY_TEACHER = 'TEACHER';
 
 /**
  * Attendance Aggregation Service
@@ -34,13 +34,14 @@ function parseTime(timeStr) {
 }
 
 /**
- * Build an absolute Date for a given date + "HH:mm" time string
+ * Build an absolute Date for a given date + "HH:mm" time string.
+ * Uses explicit year/month/day constructor so the result is local time,
+ * matching TimetableSlot StartTime/EndTime strings which are local clock values.
  */
 function buildDateTime(dateStr, timeStr, offsetMinutes = 0) {
-  const date = new Date(dateStr);
+  const [year, month, day] = dateStr.split('-').map(Number);
   const { hours, minutes } = parseTime(timeStr);
-  date.setHours(hours, minutes + offsetMinutes, 0, 0);
-  return date;
+  return new Date(year, month - 1, day, hours, minutes + offsetMinutes, 0, 0);
 }
 
 /**
@@ -66,11 +67,16 @@ function dayOfWeekToNumber(day) {
 }
 
 /**
- * Get the day name from a Date
+ * Get the day name from a Date or YYYY-MM-DD string.
+ * When passed a string, parse as local midnight to avoid UTC-day-shift issues.
  */
-function getDayName(date) {
+function getDayName(dateOrStr) {
   const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-  return days[date.getDay()];
+  if (typeof dateOrStr === 'string') {
+    const [y, m, d] = dateOrStr.split('-').map(Number);
+    return days[new Date(y, m - 1, d).getDay()];
+  }
+  return days[dateOrStr.getDay()];
 }
 
 /**
@@ -83,8 +89,10 @@ function getDayName(date) {
  * @returns {object} Summary of aggregation results
  */
 export async function aggregateAttendance(dateStr, sectionId = null, slotId = null) {
-  const targetDate = new Date(dateStr);
-  const dayName = getDayName(targetDate);
+  // Parse as local midnight so targetDate.getDay() and time comparisons are correct.
+  const [ty, tm, td] = dateStr.split('-').map(Number);
+  const targetDate = new Date(Date.UTC(ty, tm - 1, td));
+  const dayName = getDayName(dateStr);
 
   // Build slot filter
   const slotWhere = {
@@ -132,8 +140,11 @@ export async function aggregateAttendance(dateStr, sectionId = null, slotId = nu
     const windowEnd = buildDateTime(dateStr, slot.EndTime, GRACE_AFTER);
     const classStart = buildDateTime(dateStr, slot.StartTime);
     
-    // Skip future slots that haven't even started their grace period yet
-    if (windowStart > new Date() && dateStr === new Date().toISOString().split('T')[0]) {
+    // Skip future slots that haven't even started their grace period yet.
+    // Compare against local date string to avoid UTC day-shift.
+    const now = new Date();
+    const todayLocal = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    if (windowStart > now && dateStr === todayLocal) {
       continue;
     }
 

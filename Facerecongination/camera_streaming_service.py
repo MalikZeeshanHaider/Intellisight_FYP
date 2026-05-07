@@ -64,8 +64,8 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 from config import (
-    DB_CONFIG, MODEL_NAME, DISTANCE_THRESHOLD, MIN_FACE_SIZE,
-    RECOGNITION_CONFIDENCE_THRESHOLD, DETECTOR_BACKEND, FRAME_SKIP,
+    DB_CONFIG, MODEL_NAME, DISTANCE_THRESHOLD, DISTANCE_METRIC, MIN_FACE_SIZE,
+    RECOGNITION_CONFIDENCE_THRESHOLD, EMA_ALPHA, DETECTOR_BACKEND, FRAME_SKIP,
     MEDIAMTX_WEBRTC_URL,
 )
 from utils import load_embeddings_from_json, FPSCounter, preprocess_face_crop, EmbeddingIndex
@@ -134,6 +134,26 @@ DETECT_MIN_PX = 20
 
 FACE_SIZE = 160   # FaceNet input size — do not change
 
+# ── Motion-detection pre-filter constants ─────────────────────────────────────
+# Mean pixel change (0-255) in the 320×180 grayscale frame between consecutive
+# AI frames.  Static empty corridor: ~1-3.  Person walking: ~10-50.
+MOTION_THRESHOLD   = 5.0   # below this → scene is static, skip detector
+STATIC_SKIP_AFTER  = 15    # only engage gate after N consecutive empty frames
+
+# ── Detector quality gates ────────────────────────────────────────────────────
+# YuNet returns a per-detection confidence in [0.0, 1.0]. Real human faces
+# usually score > 0.85; texture / corner / shadow false positives sit in
+# 0.50–0.80. A 0.85 threshold near-eliminates ceiling-and-wall false hits
+# without rejecting real (even side-on) faces.
+FACE_DETECT_CONFIDENCE = 0.85
+
+# Crops that are nearly black (IR night frame with no subject) or nearly
+# uniform (blank wall) cannot be real faces. Use mean-brightness and
+# standard-deviation gates on the cropped grayscale to discard them before
+# they ever reach the embedding model or the unknown-faces table.
+CROP_MIN_MEAN_BRIGHTNESS = 25   # 0–255 — full-black IR frames sit below ~15
+CROP_MIN_STD_DEV         = 18   # uniform regions (walls/ceilings) sit below ~10
+
 # ── Low-latency RTSP / FFMPEG options ────────────────────────────────────────
 # Applied via OPENCV_FFMPEG_CAPTURE_OPTIONS (key;value|key;value format).
 #
@@ -196,6 +216,19 @@ class CameraStream:
         # A borderline first reading decays slightly; a consistent high reading
         # stays high.  Keyed by person_key; cleared in stop().
         self._conf_ema = {}   # {person_key: float}
+
+        # ── Motion-detection pre-filter ────────────────────────────────────────
+        # Comparing consecutive detection frames (320×180 grayscale) lets us skip
+        # the yunet detector entirely on truly static scenes — empty corridors,
+        # parked cameras pointing at walls, etc.  Only engaged after
+        # STATIC_SKIP_AFTER consecutive frames with no face to avoid suppressing
+        # detection of someone who just walked in and stopped.
+        self._prev_gray      = None   # previous grayscale detection frame
+        self._no_face_streak = 0      # consecutive AI frames with zero faces
+
+        # ── Recognition summary timer ──────────────────────────────────────────
+        self._last_summary_t = time.time()
+        self._summary_matches = 0     # confirmed DB writes since last summary
 
         # ── AI worker queue (RTSP reader → AI thread) ─────────────────────────
         # Producer : _rtsp_reader_loop calls _enqueue_for_ai() after each decoded frame.
@@ -484,16 +517,45 @@ class CameraStream:
                 gc.collect()
 
     def _run_ai(self, frame):
-        """Run face detection + recognition on a frame snapshot.
+        """Run face detection + recognition on a single frame.
 
-        Produces ONE detection event per AI frame (published to event_bus).
-        The browser is responsible for drawing overlays on top of the WebRTC
-        video using the bboxes + timestamp in the event.
+        Pipeline:
+          1. Motion pre-filter  — skip yunet entirely on static empty scenes.
+          2. YuNet detection    — find face bounding boxes in a 320×180 thumbnail.
+          3. Quality gates      — drop crops that are too small, dark, uniform,
+                                  or have a non-face aspect ratio.
+          4. FaceNet embedding  — represent() with detector_backend='skip'.
+          5. EmbeddingIndex     — nearest-neighbour search against stored embeddings.
+          6. Entry / Exit write — update ActivePresence and AttendanceLog in DB.
+          7. WebSocket event    — publish detection metadata to browser overlay.
         """
         h, w = frame.shape[:2]
         scale = w / PROCESS_WIDTH
         small_frame = cv2.resize(frame, (PROCESS_WIDTH, PROCESS_HEIGHT))
 
+        # ── Step 1: Motion pre-filter ──────────────────────────────────────────
+        # Convert to grayscale and compare with previous frame.  If the scene is
+        # completely static AND we've seen no faces for a while, skip the detector
+        # so we don't waste CPU on an empty corridor.
+        gray = cv2.cvtColor(small_frame, cv2.COLOR_BGR2GRAY)
+        if self._prev_gray is not None:
+            motion_score = float(cv2.absdiff(gray, self._prev_gray).mean())
+        else:
+            motion_score = 999.0   # force detection on first frame
+        self._prev_gray = gray
+
+        if self._no_face_streak >= STATIC_SKIP_AFTER and motion_score < MOTION_THRESHOLD:
+            # Scene is static and no recent faces — publish empty event and return.
+            bus.publish({
+                'type':       'detection',
+                'camera_id':  self.camera_id,
+                'timestamp':  int(time.time() * 1000),
+                'frame_size': {'w': self._ai_frame_w, 'h': self._ai_frame_h},
+                'detections': [],
+            })
+            return
+
+        # ── Step 2: Face detection ─────────────────────────────────────────────
         small_faces = self._detect_faces(small_frame)
 
         new_cached_faces = []
@@ -501,7 +563,7 @@ class CameraStream:
         detections       = []
 
         for face in small_faces:
-            # Scale coordinates back to AI (== browser overlay) resolution
+            # Scale bbox from detection frame (320×180) back to full resolution.
             x  = int(face['x'] * scale)
             y  = int(face['y'] * scale)
             fw = int(face['w'] * scale)
@@ -518,8 +580,9 @@ class CameraStream:
                 'confidence': 0.0,
             }
 
-            # Extract face crop with margin
-            margin = int(fw * 0.2)
+            # ── Step 3: Quality gates ──────────────────────────────────────────
+            # Gate A: minimum size — crop must be large enough for FaceNet.
+            margin = int(max(fw, fh) * 0.25)
             y1 = max(0, y - margin);  y2 = min(h, y + fh + margin)
             x1 = max(0, x - margin);  x2 = min(w, x + fw + margin)
             face_crop = frame[y1:y2, x1:x2]
@@ -527,10 +590,23 @@ class CameraStream:
             if (face_crop.size == 0
                     or face_crop.shape[0] < MIN_FACE_SIZE
                     or face_crop.shape[1] < MIN_FACE_SIZE):
-                # Too small for recognition — emit bbox only (unrecognised)
                 detections.append(detection)
                 continue
 
+            # Gate B: aspect ratio — real faces are roughly square (0.4–2.5).
+            # Horizontal "faces" detected on ceiling rails or shelves are rejected.
+            aspect = fw / fh if fh > 0 else 0
+            if not (0.4 <= aspect <= 2.5):
+                detections.append(detection)
+                continue
+
+            # Gate C: brightness / uniformity — reject dark IR frames and blank
+            # walls that somehow passed the yunet confidence threshold.
+            if not _crop_looks_like_face(face_crop):
+                detections.append(detection)
+                continue
+
+            # ── Step 4 & 5: Embed + search ────────────────────────────────────
             person_dict, distance = self._recognize_face(face_crop)
 
             if person_dict is not None:
@@ -544,34 +620,51 @@ class CameraStream:
                 detection['confidence'] = round(float(confidence), 3)
 
                 new_recognized.append({
-                    'name':       person_dict['name'],
-                    'role':       person_dict['role'],
-                    'person_id':  person_dict['person_id'],
-                    'distance':   distance,
-                    'confidence': confidence,
-                    'timestamp':  datetime.now().isoformat(),
-                    'camera_id':  self.camera_id,
+                    'name':        person_dict['name'],
+                    'role':        person_dict['role'],
+                    'person_id':   person_dict['person_id'],
+                    'distance':    distance,
+                    'confidence':  confidence,
+                    'timestamp':   datetime.now().isoformat(),
+                    'camera_id':   self.camera_id,
                     'camera_type': self.camera_type,
                 })
-                # Confidence gate — only forward high-confidence detections.
-                # EMA smoothing inside _handle_recognition handles borderline cases.
+
+                # ── Step 6: Entry / Exit DB write ─────────────────────────────
                 if confidence >= RECOGNITION_CONFIDENCE_THRESHOLD:
                     self._handle_recognition(person_dict, confidence)
-            elif distance is not None:
+            else:
+                # Unrecognised face — log as unknown (with cooldown).
                 self._handle_unknown_face(face_crop, distance)
 
             detections.append(detection)
 
-        self.last_detection_frame = self.frame_count
+        # Update no-face streak for motion gate.
+        if small_faces:
+            self._no_face_streak = 0
+        else:
+            self._no_face_streak = min(self._no_face_streak + 1, STATIC_SKIP_AFTER + 50)
 
-        # Atomically replace diagnostic cache (read by /cameras/status).
+        self.last_detection_frame = self.frame_count
         self.cached_faces = new_cached_faces
         if new_recognized:
             self.recognized_persons = (self.recognized_persons + new_recognized)[-20:]
 
-        # ── Publish detection event ────────────────────────────────────────────
-        # One event per processed AI frame, even if no faces were found —
-        # the frontend uses the event's timestamp to decay stale overlays.
+        # ── Step 7: Periodic recognition summary (every 60 s) ─────────────────
+        now = time.time()
+        if now - self._last_summary_t >= 60:
+            cam_label = f"Camera {self.camera_id} ({self.camera_type})"
+            if self._summary_matches:
+                names = list({r['name'] for r in self.recognized_persons[-10:]})
+                print(f"[{cam_label}] 60s summary: {self._summary_matches} DB write(s), "
+                      f"seen: {', '.join(names) or 'none'}")
+            else:
+                print(f"[{cam_label}] 60s summary: no confirmed detections "
+                      f"(streak={self._no_face_streak}, motion≈{motion_score:.1f})")
+            self._last_summary_t = now
+            self._summary_matches = 0
+
+        # ── Step 7: WebSocket event ────────────────────────────────────────────
         bus.publish({
             'type':       'detection',
             'camera_id':  self.camera_id,
@@ -600,24 +693,38 @@ class CameraStream:
         def _parse(results):
             out = []
             for face_obj in results:
-                conf        = face_obj.get('confidence', 0)
+                conf        = float(face_obj.get('confidence', 0) or 0)
                 facial_area = face_obj.get('facial_area', {})
                 x  = facial_area.get('x', 0)
                 y  = facial_area.get('y', 0)
                 fw = facial_area.get('w', 0)
                 fh = facial_area.get('h', 0)
-                if fw >= DETECT_MIN_PX and fh >= DETECT_MIN_PX:
-                    out.append({'x': x, 'y': y, 'w': fw, 'h': fh, 'confidence': conf})
+                if fw < DETECT_MIN_PX or fh < DETECT_MIN_PX:
+                    continue
+                # Reject low-confidence detections — these are almost always
+                # texture artefacts (ceiling beams, corners, IR noise) and
+                # produce the polluted "unknown faces" log the user is seeing.
+                if conf < FACE_DETECT_CONFIDENCE:
+                    continue
+                out.append({'x': x, 'y': y, 'w': fw, 'h': fh, 'confidence': conf})
             return out
 
         # ── Primary detector (yunet by default) ──────────────────────────────
+        # CRITICAL: _tf_inference_lock must wrap this call even though it is
+        # only detection (not FaceNet embedding). OpenCV's DNN BlobManager is
+        # shared across threads and is NOT thread-safe: two cameras calling
+        # DeepFace.extract_faces() with yunet simultaneously trigger a C-level
+        # assertion abort (mapIt != reuseMap.end()) that kills the process with
+        # no Python traceback. The lock is cheap (~0 ms when uncontested) and
+        # is the only safe way to serialise DNN calls across camera threads.
         try:
-            results = DeepFace.extract_faces(
-                img_path=frame,
-                detector_backend=DETECTOR_BACKEND,
-                enforce_detection=False,
-                align=False,   # coordinates only — no landmark alignment needed
-            )
+            with _tf_inference_lock:
+                results = DeepFace.extract_faces(
+                    img_path=frame,
+                    detector_backend=DETECTOR_BACKEND,
+                    enforce_detection=False,
+                    align=False,   # coordinates only — no landmark alignment needed
+                )
             faces = _parse(results)
             return faces
         except Exception as primary_err:
@@ -687,19 +794,27 @@ class CameraStream:
             return None, None
 
         try:
-            # Preprocess: upscale small faces + CLAHE for low-light, then resize to FaceNet input size
+            # Preprocessing pipeline — must match train.py / enrollment.py exactly:
+            #   1. preprocess_face_crop : CLAHE contrast enhancement + upscale small crops
+            #   2. resize to FACE_SIZE×FACE_SIZE : FaceNet's canonical input dimensions
+            #   3. detector_backend='skip' : do NOT re-run a face detector on the crop.
+            #      The crop was already located by yunet in _detect_faces; asking yunet
+            #      to re-detect inside the tight crop often fails (low confidence, face
+            #      fills the frame) and returns an unaligned embedding that lives in a
+            #      different feature space from the stored training embeddings.
+            #      With 'skip', DeepFace passes the image straight to FaceNet — fully
+            #      consistent with how train.py generates the stored embeddings.
             face_preprocessed = preprocess_face_crop(face_crop)
-            face_resized = cv2.resize(face_preprocessed, (160, 160), interpolation=cv2.INTER_LINEAR)
+            face_resized = cv2.resize(face_preprocessed, (FACE_SIZE, FACE_SIZE),
+                                      interpolation=cv2.INTER_LINEAR)
 
-            # Serialise TF inference — Keras is NOT safe for concurrent calls.
-            # The lock is process-global so Camera 12 and Camera 13 take turns.
             with _tf_inference_lock:
                 results = DeepFace.represent(
                     img_path=face_resized,
                     model_name=MODEL_NAME,
-                    detector_backend="skip",   # face already cropped — skip re-detection
+                    detector_backend='skip',   # crop already extracted — skip re-detection
                     enforce_detection=False,
-                    align=True,
+                    align=False,               # 'skip' backend ignores align anyway
                 )
 
             if results and len(results) > 0:
@@ -708,10 +823,11 @@ class CameraStream:
                 # index underneath us between the DeepFace call and the search.
                 person_dict, distance = index_ref.search(embedding, DISTANCE_THRESHOLD)
 
+                dist_str = f"{distance:.4f}" if distance is not None and distance != float('inf') else "inf"
                 if person_dict is not None:
-                    print(f"[Camera {self.camera_id}] ✓ MATCH: {person_dict['name']} (dist: {distance:.4f})")
+                    print(f"[Camera {self.camera_id}] ✓ MATCH: {person_dict['name']} (dist: {dist_str})")
                 else:
-                    print(f"[Camera {self.camera_id}] ✗ NO MATCH: best dist {distance:.4f} > {DISTANCE_THRESHOLD}")
+                    print(f"[Camera {self.camera_id}] ✗ NO MATCH: best dist {dist_str} > {DISTANCE_THRESHOLD}")
 
                 del results
                 return person_dict, distance
@@ -744,95 +860,133 @@ class CameraStream:
             
             # Confidence for an unknown face: how close it was to the threshold.
             # A face just above the threshold gets a small positive value;
-            # a face far from any known person gets 0.0.
-            confidence = max(0.0, 1.0 - (distance / DISTANCE_THRESHOLD)) if distance else 0.0
+            # a face far from any known person (or no embeddings loaded) gets 0.0.
+            confidence = max(0.0, 1.0 - (distance / DISTANCE_THRESHOLD)) if distance is not None else 0.0
             
             # Save to database
-            db_handler.save_unknown_face(image_bytes, self.zone_id, confidence)
-            print(f"[Camera {self.camera_id}] ⚠ Unknown face saved to database (distance: {distance:.2f})")
+            saved_id = db_handler.save_unknown_face(image_bytes, self.zone_id, confidence)
+            dist_str = f"{distance:.2f}" if distance is not None and distance != float('inf') else "inf"
+            if saved_id is not None:
+                print(f"[Camera {self.camera_id}] ⚠ Unknown face saved (id={saved_id}, distance={dist_str}, zone={self.zone_id})")
+            else:
+                print(f"[Camera {self.camera_id}] ✗ Unknown face DB write FAILED (distance={dist_str}, zone={self.zone_id})")
             
         except Exception as e:
             print(f"[Camera {self.camera_id}] Error saving unknown face: {e}")
     
     def _handle_recognition(self, person_dict, confidence):
-        """Confirm a recognized person and write to the database.
+        """Confirm a recognised person and write to the database.
 
-        Replaces the old consecutive-frame requirement with a two-stage gate:
+        Two-stage gate before any DB write:
 
-        Stage 1 — EMA smoothing (non-blocking stabiliser)
-          An exponential moving average (α = 0.6) of confidence per person is
-          maintained across AI frames.  This dampens one-off high readings from
-          noise while letting genuinely consistent detections accumulate quickly.
+        Stage 1 — EMA smoothing
+          Exponential moving average (α=0.6) per person key across AI frames.
+          Seeds from the first confidence reading so a strong single hit passes
+          immediately.  Dampens borderline flickering readings.
 
-          α = 0.6 means:
-            • First reading  → ema  = confidence  (no history yet, pass-through)
-            • Second reading → ema  = 0.6 × new + 0.4 × old
-          A single very-high reading (e.g. 0.95) passes immediately because ema
-          initialises to that value on first sight.  A borderline first reading
-          (e.g. 0.76 when threshold is 0.75) is slightly smoothed on the next
-          frame but never blocks indefinitely.
+        Stage 2 — Per-person cooldown (RECOGNITION_COOLDOWN seconds)
+          Prevents duplicate DB rows when the same person is detected on
+          consecutive frames.
 
-        Stage 2 — Per-person cooldown
-          After a confirmed detection, RECOGNITION_COOLDOWN seconds must elapse
-          before the same person can trigger another DB write.  This prevents
-          spam without needing consecutive frames.
+        Entry camera  →  add_to_active_presence()   → inserts into ActivePresence
+        Exit  camera  →  remove_from_active_presence() → deletes from ActivePresence
+                                                         AND inserts into AttendanceLog
+                                                         with EntryTime, ExitTime, Duration
         """
         global db_handler
 
         person_key = person_dict.get('person_key') or f"{person_dict['person_id']}|{person_dict['role']}"
 
         # ── Stage 1: EMA smoothing ────────────────────────────────────────────
-        _EMA_ALPHA = 0.6
-        prev_ema   = self._conf_ema.get(person_key, confidence)  # seed with current on first sight
+        _EMA_ALPHA = EMA_ALPHA
+        prev_ema   = self._conf_ema.get(person_key, confidence)
         ema        = _EMA_ALPHA * confidence + (1.0 - _EMA_ALPHA) * prev_ema
         self._conf_ema[person_key] = ema
 
         if ema < RECOGNITION_CONFIDENCE_THRESHOLD:
-            # EMA not yet high enough — keep accumulating without blocking
-            print(f"[Camera {self.camera_id}] Stabilising {person_dict['name']} "
-                  f"(ema={ema:.2f} < {RECOGNITION_CONFIDENCE_THRESHOLD})")
-            return
+            return   # accumulating — not yet confident enough
 
-        # ── Stage 2: cooldown gate ────────────────────────────────────────────
-        current_time = time.time()
-        if current_time - self.last_recognition_time.get(person_key, 0) < RECOGNITION_COOLDOWN:
-            return   # recently confirmed — suppress duplicate DB write
+        # ── Stage 2: cooldown ─────────────────────────────────────────────────
+        now = time.time()
+        if now - self.last_recognition_time.get(person_key, 0) < RECOGNITION_COOLDOWN:
+            return   # duplicate suppressed
 
-        self.last_recognition_time[person_key] = current_time
-
-        # Evict oldest entry if cache is full
+        self.last_recognition_time[person_key] = now
         if len(self.last_recognition_time) > MAX_CACHE_SIZE:
             oldest = min(self.last_recognition_time, key=self.last_recognition_time.get)
             del self.last_recognition_time[oldest]
 
-        # ── Write to database ─────────────────────────────────────────────────
-        try:
-            person_id   = person_dict['person_id']
-            role        = person_dict['role']
-            name        = person_dict['name']
+        # ── Validate identity ─────────────────────────────────────────────────
+        person_id   = person_dict.get('person_id')
+        role        = (person_dict.get('role') or '').upper()
+        name        = person_dict.get('name') or f"ID-{person_id}"
 
-            if person_id is None or role not in ('STUDENT', 'TEACHER'):
-                print(f"[Warning] Invalid identity in person dict: {person_dict!r}")
-                return
+        if person_id is None or role not in ('STUDENT', 'TEACHER'):
+            print(f"[Camera {self.camera_id}] WARN: invalid person dict — {person_dict!r}")
+            return
 
-            person_type = 'Student' if role == 'STUDENT' else 'Teacher'
+        person_type = 'Student' if role == 'STUDENT' else 'Teacher'
+        cam_type    = (self.camera_type or '').strip().capitalize()   # 'Entry' or 'Exit'
 
-            if self.camera_type == 'Entry':
-                result = db_handler.add_to_active_presence(person_id, person_type, self.zone_id)
-                if result:
-                    print(f"[Entry] ✓ {name} ({role}) entered Zone {self.zone_id} — conf {ema:.0%}")
+        # ── DB write — Entry camera ────────────────────────────────────────────
+        # add_to_active_presence() inserts one row into ActivePresence
+        # (Zone_id, PersonType, Student_ID or Teacher_ID, EntryTime=NOW).
+        # It is a no-op if the person is already present (prevents duplicates).
+        if cam_type == 'Entry':
+            try:
+                added = db_handler.add_to_active_presence(person_id, person_type, self.zone_id)
+                if added:
+                    self._summary_matches += 1
+                    print(f"[ENTRY  Cam {self.camera_id}] + {name} ({role}) "
+                          f"→ Zone {self.zone_id}  conf={ema:.0%}")
                 else:
-                    print(f"[Entry] {name} already in Zone {self.zone_id}")
+                    print(f"[ENTRY  Cam {self.camera_id}] = {name} already present "
+                          f"in Zone {self.zone_id}")
+            except Exception as e:
+                print(f"[ENTRY  Cam {self.camera_id}] DB ERROR: {e}")
 
-            elif self.camera_type == 'Exit':
-                result = db_handler.remove_from_active_presence(person_id, person_type, self.zone_id)
-                if result:
-                    print(f"[Exit] ✅ {name} ({role}) left Zone {self.zone_id} — conf {ema:.0%}")
+        # ── DB write — Exit camera ─────────────────────────────────────────────
+        # remove_from_active_presence() does two things atomically:
+        #   1. Reads EntryTime from ActivePresence for this person+zone.
+        #   2. Inserts a completed row into AttendanceLog
+        #      (EntryTime, ExitTime=NOW, Duration=seconds).
+        #   3. Deletes the row from ActivePresence.
+        # Returns False if the person was not in ActivePresence (they didn't use
+        # the entry camera, or already exited).
+        elif cam_type == 'Exit':
+            try:
+                removed = db_handler.remove_from_active_presence(person_id, person_type, self.zone_id)
+                if removed:
+                    self._summary_matches += 1
+                    print(f"[EXIT   Cam {self.camera_id}] - {name} ({role}) "
+                          f"← Zone {self.zone_id}  conf={ema:.0%}  → AttendanceLog written")
                 else:
-                    print(f"[Exit] ℹ️ {name} was not in Zone {self.zone_id}")
+                    print(f"[EXIT   Cam {self.camera_id}] ? {name} not in Zone {self.zone_id} "
+                          f"(no entry recorded or already exited)")
+            except Exception as e:
+                print(f"[EXIT   Cam {self.camera_id}] DB ERROR: {e}")
 
-        except Exception as e:
-            print(f"[Database Error] {e}")
+        elif cam_type == 'Both':
+            # Smart bidirectional: act as entry if person not yet present, exit if they are.
+            try:
+                added = db_handler.add_to_active_presence(person_id, person_type, self.zone_id)
+                if added:
+                    self._summary_matches += 1
+                    print(f"[BOTH   Cam {self.camera_id}] + {name} ({role}) "
+                          f"→ Zone {self.zone_id}  conf={ema:.0%}  [entry]")
+                else:
+                    # Already present — treat as exit
+                    removed = db_handler.remove_from_active_presence(person_id, person_type, self.zone_id)
+                    if removed:
+                        self._summary_matches += 1
+                        print(f"[BOTH   Cam {self.camera_id}] - {name} ({role}) "
+                              f"← Zone {self.zone_id}  conf={ema:.0%}  [exit → log]")
+            except Exception as e:
+                print(f"[BOTH   Cam {self.camera_id}] DB ERROR: {e}")
+
+        else:
+            print(f"[Camera {self.camera_id}] WARN: unknown camera_type={self.camera_type!r} "
+                  f"— must be 'Entry', 'Exit', or 'Both'")
 
     def stop(self):
         """Stop camera stream with proper cleanup"""
@@ -848,6 +1002,8 @@ class CameraStream:
 
         self.last_recognition_time.clear()
         self._conf_ema.clear()
+        self._prev_gray      = None
+        self._no_face_streak = 0
         if self.cap:
             self.cap.release()
             self.cap = None
@@ -867,6 +1023,32 @@ def health():
         'mediamtx_alive': mediamtx_client.is_alive(),
         'event_subscribers': bus.subscriber_count(),
     })
+
+
+def _crop_looks_like_face(face_crop):
+    """Cheap sanity check on a face crop before running the embedding model.
+
+    Rejects:
+      - near-black IR frames with no subject (mean brightness very low)
+      - blank walls / ceilings (std-dev very low → almost uniform colour)
+
+    Both classes show up repeatedly in the unknown-faces log when the
+    detector mis-fires on textured surfaces, even after the confidence gate.
+    """
+    if face_crop is None or face_crop.size == 0:
+        return False
+    try:
+        gray = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY) \
+            if face_crop.ndim == 3 else face_crop
+        mean = float(gray.mean())
+        std  = float(gray.std())
+        if mean < CROP_MIN_MEAN_BRIGHTNESS:
+            return False
+        if std < CROP_MIN_STD_DEV:
+            return False
+    except Exception:
+        return True   # if we can't measure, don't block
+    return True
 
 
 def _enhance_frame_for_display(frame):
@@ -1064,16 +1246,126 @@ def debug_embeddings():
     """Debug endpoint to view loaded embeddings"""
     persons = {}
     for data in embeddings_data:
-        person = data.get('person', 'Unknown')
+        person = data.get('name') or data.get('person') or 'Unknown'
         if person not in persons:
             persons[person] = 0
         persons[person] += 1
-    
+
     return jsonify({
         'total_embeddings': len(embeddings_data),
+        'index_size': len(embedding_index) if embedding_index else 0,
         'threshold': DISTANCE_THRESHOLD,
+        'confidence_threshold': RECOGNITION_CONFIDENCE_THRESHOLD,
         'model': MODEL_NAME,
-        'persons': persons
+        'persons': persons,
+        'warning': 'No embeddings loaded — run python train.py first' if not embeddings_data else None,
+    })
+
+
+@app.route('/debug/recognition/<int:camera_id>', methods=['GET'])
+def debug_recognition(camera_id):
+    """Force-run recognition on the latest frame and return raw distances.
+
+    Useful for diagnosing why a face shows as Unknown — returns the top-3
+    closest persons and their distances so you can see how far off the match is.
+    """
+    cam = active_cameras.get(camera_id)
+    if cam is None or not cam.is_running:
+        return jsonify({'error': 'Camera not active'}), 404
+
+    with cam._frame_lock:
+        frame = cam._latest_frame
+    if frame is None:
+        return jsonify({'error': 'No frame captured yet'}), 503
+
+    if embedding_index is None or len(embedding_index) == 0:
+        return jsonify({
+            'error': 'No embeddings loaded',
+            'fix': 'Run python train.py in Facerecongination/ to generate embeddings',
+        }), 400
+
+    small = cv2.resize(frame, (PROCESS_WIDTH, PROCESS_HEIGHT))
+    try:
+        with _tf_inference_lock:
+            face_results = DeepFace.extract_faces(
+                img_path=small,
+                detector_backend=DETECTOR_BACKEND,
+                enforce_detection=False,
+                align=False,
+            )
+    except Exception as e:
+        return jsonify({'error': f'Detection failed: {e}'}), 500
+
+    h, w = frame.shape[:2]
+    scale = w / PROCESS_WIDTH
+    faces_info = []
+
+    for fr in face_results:
+        fa = fr.get('facial_area', {})
+        fw = fa.get('w', 0)
+        fh = fa.get('h', 0)
+        if fw < DETECT_MIN_PX or fh < DETECT_MIN_PX:
+            continue
+
+        x  = int(fa.get('x', 0) * scale)
+        y  = int(fa.get('y', 0) * scale)
+        fw = int(fw * scale)
+        fh = int(fh * scale)
+        margin = int(fw * 0.2)
+        y1 = max(0, y - margin); y2 = min(h, y + fh + margin)
+        x1 = max(0, x - margin); x2 = min(w, x + fw + margin)
+        crop = frame[y1:y2, x1:x2]
+
+        if crop.size == 0 or crop.shape[0] < MIN_FACE_SIZE or crop.shape[1] < MIN_FACE_SIZE:
+            faces_info.append({'bbox': {'x': x,'y': y,'w': fw,'h': fh}, 'skip': 'too small'})
+            continue
+
+        try:
+            from utils import preprocess_face_crop
+            processed = preprocess_face_crop(crop)
+            resized = cv2.resize(processed, (160, 160))
+            with _tf_inference_lock:
+                reps = DeepFace.represent(
+                    img_path=resized,
+                    model_name=MODEL_NAME,
+                    detector_backend='skip',
+                    enforce_detection=False,
+                    align=True,
+                )
+            if not reps:
+                faces_info.append({'bbox': {'x': x,'y': y,'w': fw,'h': fh}, 'skip': 'no embedding'})
+                continue
+
+            emb = reps[0]['embedding']
+            query = np.array(emb, dtype=np.float32)
+            dists = np.linalg.norm(embedding_index._matrix - query, axis=1).tolist()
+            top3 = sorted(
+                zip(dists, embedding_index._meta),
+                key=lambda t: t[0]
+            )[:3]
+
+            faces_info.append({
+                'bbox': {'x': x, 'y': y, 'w': fw, 'h': fh},
+                'top_matches': [
+                    {
+                        'name': m['name'],
+                        'role': m['role'],
+                        'distance': round(d, 4),
+                        'confidence': round(max(0.0, 1.0 - d / DISTANCE_THRESHOLD), 3),
+                        'would_match': d <= DISTANCE_THRESHOLD,
+                    }
+                    for d, m in top3
+                ],
+            })
+        except Exception as e:
+            faces_info.append({'bbox': {'x': x,'y': y,'w': fw,'h': fh}, 'error': str(e)})
+
+    return jsonify({
+        'camera_id': camera_id,
+        'faces_detected': len(faces_info),
+        'threshold': DISTANCE_THRESHOLD,
+        'confidence_threshold': RECOGNITION_CONFIDENCE_THRESHOLD,
+        'faces': faces_info,
     })
 
 
@@ -1149,6 +1441,89 @@ def ws_events_endpoint(ws):
         bus.unsubscribe(sub)
 
 
+def _rebuild_embeddings_from_db():
+    """Pull all rows from FaceEmbeddings, rewrite the JSON cache, swap the
+    in-memory index. Called after enrol / un-enrol so live recognition
+    immediately knows about the new (or removed) person without restart.
+    """
+    global embeddings_data, embedding_index
+    from config import EMBEDDINGS_FILE
+    from utils import save_embeddings_to_json
+
+    persons = db_handler.fetch_all_persons()
+    new_data = []
+    for p in persons.values():
+        for emb in p['embeddings']:
+            new_data.append({
+                'person_id':  p['id'],
+                'name':       p['name'],
+                'role':       p['role'],
+                'person_key': p['key'],
+                'embedding':  emb,
+            })
+
+    new_index = EmbeddingIndex(new_data)
+    save_embeddings_to_json(new_data, EMBEDDINGS_FILE)
+
+    with _reload_lock:
+        embeddings_data = new_data
+        embedding_index = new_index
+
+    return len(new_data)
+
+
+@app.route('/enroll/<person_type>/<int:person_id>', methods=['POST'])
+def enroll_person(person_type, person_id):
+    """Generate FaceNet embeddings for one student/teacher and hot-reload the
+    index. Called by the Node.js backend after a student/teacher is created
+    or updated, so newly-enrolled people are recognised on the next frame
+    without needing a service restart or a manual /embeddings/reload."""
+    pt = (person_type or '').lower()
+    if pt not in ('student', 'teacher'):
+        return jsonify({'success': False, 'error': 'person_type must be student or teacher'}), 400
+    role_label = 'Student' if pt == 'student' else 'Teacher'
+
+    try:
+        from enrollment import enroll_person_from_database
+        ok = enroll_person_from_database(person_id, role_label, db_handler)
+        if not ok:
+            return jsonify({'success': False, 'error': 'enrollment failed — check service logs'}), 500
+
+        total = _rebuild_embeddings_from_db()
+        return jsonify({
+            'success': True,
+            'person_type': role_label,
+            'person_id':   person_id,
+            'total_embeddings': total,
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/enroll/<person_type>/<int:person_id>', methods=['DELETE'])
+def unenroll_person(person_type, person_id):
+    """Remove a person's embeddings (called by Node.js after delete)."""
+    pt = (person_type or '').lower()
+    if pt not in ('student', 'teacher'):
+        return jsonify({'success': False, 'error': 'person_type must be student or teacher'}), 400
+    id_field = '"Student_ID"' if pt == 'student' else '"Teacher_ID"'
+
+    try:
+        db_handler._ensure_connection()
+        with db_handler.conn.cursor() as cur:
+            cur.execute(f'DELETE FROM "FaceEmbeddings" WHERE {id_field} = %s', (person_id,))
+            db_handler.conn.commit()
+
+        total = _rebuild_embeddings_from_db()
+        return jsonify({
+            'success': True,
+            'removed_person_id': person_id,
+            'total_embeddings':  total,
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/embeddings/reload', methods=['POST'])
 def reload_embeddings():
     """Reload embeddings from file without restarting.
@@ -1173,7 +1548,7 @@ def reload_embeddings():
         embeddings_data = new_data
         embedding_index = new_index
 
-    persons = {d.get('person', 'Unknown') for d in embeddings_data}
+    persons = {d.get('name') or d.get('person', 'Unknown') for d in embeddings_data}
     return jsonify({
         'success': True,
         'loaded': len(embeddings_data),
@@ -1259,8 +1634,7 @@ def initialize():
     if len(embeddings_data) == 0:
         print("⚠ WARNING: No embeddings loaded! Run 'python train.py --train' first.")
     else:
-        # Print loaded persons
-        persons = set([d.get('person', 'Unknown') for d in embeddings_data])
+        persons = set([d.get('name') or d.get('person', 'Unknown') for d in embeddings_data])
         print(f"  Persons: {', '.join(persons)}")
     
     # Initialize database handler
@@ -1309,16 +1683,16 @@ def auto_start_all_cameras():
     
     try:
         # Get all cameras from database
-        conn = db_handler.conn
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        
+        db_handler._ensure_connection()
+        cursor = db_handler.conn.cursor(cursor_factory=RealDictCursor)
+
         cursor.execute("""
             SELECT c.*, z."Zone_Name"
             FROM "Camara" c
             LEFT JOIN "Zone" z ON c."Zone_id" = z."Zone_id"
             ORDER BY c."Zone_id", c."Camera_Type"
         """)
-        
+
         cameras = cursor.fetchall()
         cursor.close()
         

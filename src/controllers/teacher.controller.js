@@ -4,6 +4,7 @@ import { successResponse } from '../utils/response.js';
 import { NotFoundError, BadRequestError } from '../utils/errors.js';
 import { HTTP_STATUS, SUCCESS_MESSAGES } from '../config/constants.js';
 import { savePersonImages, deletePersonImages } from '../services/imageSaving.service.js';
+import { notifyAIEnrollment } from '../services/pythonService.js';
 
 /**
  * @route   GET /api/teachers
@@ -114,6 +115,10 @@ export const createTeacher = asyncHandler(async (req, res) => {
     console.warn('[TEACHER] Failed to save images to train folder:', err.message);
   }
 
+  // Tell the AI service to embed this teacher and hot-reload the index so
+  // they're recognised on the next camera frame — no service restart needed.
+  notifyAIEnrollment('teacher', teacher.Teacher_ID, 'enroll');
+
   successResponse(
     res,
     teacher,
@@ -175,7 +180,9 @@ export const updateTeacher = asyncHandler(async (req, res) => {
   });
 
   // Save updated face images to training folder for new algorithm
+  let pictures_changed = false;
   if (Face_Picture_1 || Face_Picture_2 || Face_Picture_3 || Face_Picture_4 || Face_Picture_5) {
+    pictures_changed = true;
     try {
       await savePersonImages('teacher', teacher.Teacher_ID, teacher.Name, {
         Face_Picture_1: Face_Picture_1 || teacher.Face_Picture_1,
@@ -187,6 +194,11 @@ export const updateTeacher = asyncHandler(async (req, res) => {
     } catch (err) {
       console.warn('[TEACHER] Failed to save images to train folder:', err.message);
     }
+  }
+
+  // Re-enroll only when face pictures actually changed.
+  if (pictures_changed) {
+    notifyAIEnrollment('teacher', teacher.Teacher_ID, 'enroll');
   }
 
   successResponse(res, teacher, SUCCESS_MESSAGES.UPDATED);
@@ -220,6 +232,10 @@ export const deleteTeacher = asyncHandler(async (req, res) => {
   await prisma.teacher.delete({
     where: { Teacher_ID: parseInt(id) },
   });
+
+  // Strip this teacher's embeddings from the AI service so a future face
+  // doesn't keep matching against a deleted person.
+  notifyAIEnrollment('teacher', parseInt(id), 'unenroll');
 
   successResponse(
     res,

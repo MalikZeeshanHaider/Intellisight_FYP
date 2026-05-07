@@ -120,24 +120,34 @@ def generate_embeddings():
             image_path = os.path.join(person_path, image_file)
             
             try:
-                # Read image and apply the same preprocessing used during recognition
-                # (CLAHE contrast enhancement + cubic upscale for small faces).
-                # This is critical: training and recognition must produce embeddings
-                # in the same feature space for accurate distance matching.
+                # Read image and apply the same preprocessing used during recognition.
+                # Pipeline must match _recognize_face in camera_streaming_service.py:
+                #   preprocess_face_crop (CLAHE) → resize 160×160 → represent(skip)
+                #
+                # detector_backend='skip' embeds the image as-is without re-running a
+                # face detector. This is critical: the recognition path already has the
+                # face crop extracted by yunet; asking yunet to re-detect inside the crop
+                # often fails (tight crop, low confidence) and produces an unaligned
+                # embedding in a different feature space. Using 'skip' in both training
+                # and recognition ensures they occupy the same embedding space.
                 image = cv2.imread(image_path)
                 if image is None:
                     print(f"  [FAIL] {image_file} - Cannot read image file")
                     error_count += 1
                     continue
 
+                # Detect + crop the face (same as enrollment.py and recognition pipeline)
+                from enrollment import _detect_and_crop_face
+                image = _detect_and_crop_face(image)
                 image = preprocess_face_crop(image)
+                image = cv2.resize(image, (160, 160), interpolation=cv2.INTER_LINEAR)
 
                 embedding_objs = DeepFace.represent(
                     img_path=image,
                     model_name=MODEL_NAME,
-                    detector_backend=DETECTOR_BACKEND,
-                    enforce_detection=True,   # Skip images where no face is detected
-                    align=True
+                    detector_backend='skip',
+                    enforce_detection=False,
+                    align=False,
                 )
                 
                 # TODO: DeepFace.represent returns a list, get the first face

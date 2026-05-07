@@ -10,6 +10,9 @@ export default function ActivePresence() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [, setTick] = useState(0);
+  // Offset between server clock and client clock (ms). Corrects timezone/clock skew.
+  const serverClockOffset = useRef(0);
   const dropdownRef = useRef(null);
 
   // Close dropdown when clicking outside
@@ -26,10 +29,15 @@ export default function ActivePresence() {
   useEffect(() => {
     fetchZones();
     fetchActivePresence();
-    
-    // Auto-refresh every 10 seconds
-    const interval = setInterval(fetchActivePresence, 10000);
-    return () => clearInterval(interval);
+
+    // Auto-refresh data every 10 seconds
+    const dataInterval = setInterval(fetchActivePresence, 10000);
+    // Tick every second so getDuration() updates live without waiting for a data refresh
+    const tickInterval = setInterval(() => setTick(t => t + 1), 1000);
+    return () => {
+      clearInterval(dataInterval);
+      clearInterval(tickInterval);
+    };
   }, []);
 
   const fetchZones = async () => {
@@ -54,18 +62,25 @@ export default function ActivePresence() {
   const fetchActivePresence = async () => {
     try {
       setLoading(true);
+      const clientBefore = Date.now();
       const response = await getAllActivePresence();
-      console.log('Active Presence API Response:', response);
-      // Handle both array format and { success, data } format
-      if (response?.success && Array.isArray(response.data)) {
-        setActivePersons(response.data);
-      } else if (Array.isArray(response.data)) {
-        setActivePersons(response.data);
-      } else if (Array.isArray(response)) {
-        setActivePersons(response);
-      } else {
-        setActivePersons([]);
+      const clientAfter = Date.now();
+
+      // Compute server clock offset: server_now vs midpoint of request round-trip
+      if (response?.serverTimestamp) {
+        const roundTripMid = Math.round((clientBefore + clientAfter) / 2);
+        serverClockOffset.current = response.serverTimestamp - roundTripMid;
       }
+
+      const persons = response?.success && Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data)
+          ? response.data
+          : Array.isArray(response)
+            ? response
+            : [];
+
+      setActivePersons(persons);
       setError(null);
     } catch (err) {
       console.error('Error fetching active presence:', err);
@@ -91,22 +106,28 @@ export default function ActivePresence() {
     return byZone;
   };
 
-  const formatTime = (date) => {
-    return new Date(date).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  // Use entryTimestamp (Unix ms from server) so there is no string-parsing ambiguity.
+  const formatTime = (entryTimestamp) => {
+    const ms = typeof entryTimestamp === 'number' ? entryTimestamp : new Date(entryTimestamp).getTime();
+    return new Date(ms).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
-  const getDuration = (entryTime) => {
-    const now = new Date();
-    const entry = new Date(entryTime);
-    const minutes = Math.floor((now - entry) / 60000);
-    
+  // serverNow = client clock corrected by the measured server clock offset.
+  // entryTimestamp is a raw Unix ms number — no string parsing, no timezone ambiguity.
+  const getDuration = (entryTimestamp) => {
+    const entryMs = typeof entryTimestamp === 'number'
+      ? entryTimestamp
+      : new Date(entryTimestamp).getTime();
+    if (isNaN(entryMs)) return 'Unknown';
+    const serverNow = Date.now() + serverClockOffset.current;
+    const totalSecs = Math.max(0, Math.floor((serverNow - entryMs) / 1000));
+    if (totalSecs < 10) return 'Just arrived';
+    if (totalSecs < 60) return `${totalSecs} sec`;
+    const minutes = Math.floor(totalSecs / 60);
     if (minutes < 60) return `${minutes} min`;
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   };
 
   const personsByZone = getPersonsByZone();
@@ -301,7 +322,7 @@ export default function ActivePresence() {
             <div className="space-y-3">
               {persons.map((presence) => {
                 const person = presence.person;
-                const isStudent = presence.personType === 'Student';
+                const isStudent = (presence.personType || '').toUpperCase() === 'STUDENT';
                 
                 return (
                   <div
@@ -370,7 +391,7 @@ export default function ActivePresence() {
                       </p>
                       <p className="text-xs mt-1 flex items-center gap-1 font-medium" style={{ color: isDarkMode ? '#a855f7' : '#8849a1ff' }}>
                         <FiClock size={12} />
-                        Entered {formatTime(presence.entryTime)} • {getDuration(presence.entryTime)}
+                        Entered {formatTime(presence.entryTimestamp || presence.entryTime)} • {getDuration(presence.entryTimestamp || presence.entryTime)}
                       </p>
                     </div>
                   </div>

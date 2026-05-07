@@ -75,6 +75,12 @@ export const zoneAPI = {
     return response.data;
   },
 
+  // Get unknown face count for a specific zone (Zone 2+)
+  getZoneUnknownCount: async (zoneId) => {
+    const response = await api.get(`/zones/${zoneId}/unknown-count`);
+    return response.data;
+  },
+
   // Create new zone
   createZone: async (zoneData) => {
     const response = await api.post('/zones', zoneData);

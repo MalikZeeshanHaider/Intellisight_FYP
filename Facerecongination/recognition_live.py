@@ -21,7 +21,7 @@ from deepface import DeepFace
 
 from database_handler import DatabaseHandler
 from config import (
-    MODEL_NAME, DISTANCE_THRESHOLD, MIN_FACE_SIZE,
+    MODEL_NAME, DISTANCE_THRESHOLD, DISTANCE_METRIC, MIN_FACE_SIZE,
     CONSECUTIVE_MATCHES, EMBEDDINGS_FILE, DETECTOR_BACKEND,
     UNIDENTIFIED_SAVE_PATH, FRAME_SKIP
 )
@@ -78,14 +78,19 @@ class DualCameraRecognizer:
         # Face trackers — one per camera, cache identity for 2 s without re-recognition
         self.entry_tracker = FaceTracker(max_age_seconds=2.0)
         self.exit_tracker  = FaceTracker(max_age_seconds=2.0)
+
+        # Per-person DB write cooldown — prevents repeated idempotent writes for
+        # the same person within WRITE_COOLDOWN seconds after a confirmed write.
+        self.last_write_time = {}
+        self.WRITE_COOLDOWN  = 5.0
         
         print(f"\n{'='*60}")
-        print(f"DUAL CAMERA RECOGNITION SYSTEM - DeepFace FaceNet")
+        print(f"DUAL CAMERA RECOGNITION SYSTEM - DeepFace ArcFace")
         print(f"Zone: {self.zone_name} (ID: {zone_id})")
         print(f"Known Persons: {len(self.embeddings_data)}")
         print(f"Entry Camera: {'✓' if self.entry_cap else '✗'}")
         print(f"Exit Camera: {'✓' if self.exit_cap else '✗'}")
-        print(f"Distance Threshold: {DISTANCE_THRESHOLD}")
+        print(f"Distance ({DISTANCE_METRIC}): threshold={DISTANCE_THRESHOLD}")
         print(f"{'='*60}\n")
 
     def _open_camera(self, source, label, max_attempts=5):
@@ -234,6 +239,7 @@ class DualCameraRecognizer:
         tracker  = self.entry_tracker if camera_type == 'entry' else self.exit_tracker
         display  = frame.copy()
         recognized_persons = []
+        unknown_crops      = []   # (face_crop, distance) for unrecognised faces
         detections         = []   # fed into tracker.update() at end of frame
 
         # ── Phase 1: detect all faces ─────────────────────────────────────────
@@ -242,7 +248,7 @@ class DualCameraRecognizer:
                 img_path=preprocess_face_crop(frame),
                 detector_backend=DETECTOR_BACKEND,
                 enforce_detection=False,
-                align=True
+                align=False   # must match enrollment.py which uses align=False
             )
         except Exception as e:
             logger.debug(f"Detection error: {e}")
@@ -279,6 +285,13 @@ class DualCameraRecognizer:
                     m = 20
                     face_crop = frame[max(0, y - m):min(fh, y + h + m),
                                       max(0, x - m):min(fw, x + w + m)]
+                else:
+                    # DeepFace ≥0.0.79 returns float32 [0–1] RGB from extract_faces.
+                    # Convert to uint8 BGR so CLAHE preprocessing works correctly,
+                    # matching the uint8 BGR pipeline used during enrollment.
+                    if face_crop.dtype != np.uint8:
+                        face_crop = (face_crop * 255).clip(0, 255).astype(np.uint8)
+                        face_crop = cv2.cvtColor(face_crop, cv2.COLOR_RGB2BGR)
 
                 face_crop    = preprocess_face_crop(face_crop)
                 face_resized = cv2.resize(face_crop, (160, 160))
@@ -288,9 +301,9 @@ class DualCameraRecognizer:
                     results = DeepFace.represent(
                         img_path=face_resized,
                         model_name=MODEL_NAME,
-                        detector_backend="skip",   # already cropped + aligned
+                        detector_backend="skip",
                         enforce_detection=False,
-                        align=True
+                        align=False,
                     )
                     if results:
                         person_dict, distance = self.embedding_index.search(
@@ -324,6 +337,10 @@ class DualCameraRecognizer:
             elif distance is not None:
                 color = (0, 0, 255)
                 label = f"Unknown ({distance:.1f})"
+                # face_crop is always available here — unknown faces never hit the
+                # cached-identity branch (cached_person would be None, forcing full
+                # recognition).  Collect for entry-camera unknown-face saving.
+                unknown_crops.append((face_crop.copy(), distance))
             else:
                 color = (0, 255, 255)
                 label = "Detecting..."
@@ -333,7 +350,7 @@ class DualCameraRecognizer:
         # ── Update tracker with this frame's detections ───────────────────────
         tracker.update(detections, self.frame_count)
 
-        return display, recognized_persons
+        return display, recognized_persons, unknown_crops
 
     def handle_entry_detection(self, person: dict):
         """
@@ -349,6 +366,14 @@ class DualCameraRecognizer:
         match_counts[person_key] = match_counts.get(person_key, 0) + 1
 
         if match_counts[person_key] >= CONSECUTIVE_MATCHES:
+            match_counts[person_key] = 0
+
+            # Skip if a write for this person was committed within the cooldown window.
+            now = time.time()
+            write_key = f"entry_{person_key}"
+            if now - self.last_write_time.get(write_key, 0) < self.WRITE_COOLDOWN:
+                return
+
             person_id = person['person_id']
             role      = person['role']
             name      = person['name']
@@ -357,11 +382,12 @@ class DualCameraRecognizer:
                 person_type = 'Student' if role == 'STUDENT' else 'Teacher'
                 success = self.db_handler.add_to_active_presence(person_id, person_type, self.zone_id)
                 if success:
+                    self.last_write_time[write_key] = now
                     print(f"[ENTRY] ✓ {name} ({role}) entered {self.zone_name}")
+                else:
+                    print(f"[ENTRY] = {name} already present in {self.zone_name}")
             else:
                 logger.warning(f"[ENTRY] Invalid identity in person dict: {person!r}")
-
-            match_counts[person_key] = 0
 
     def handle_exit_detection(self, person: dict):
         """
@@ -377,6 +403,25 @@ class DualCameraRecognizer:
         match_counts[person_key] = match_counts.get(person_key, 0) + 1
 
         if match_counts[person_key] >= CONSECUTIVE_MATCHES:
+            match_counts[person_key] = 0
+
+            now = time.time()
+            write_key = f"exit_{person_key}"
+
+            # Guard 1: exit cooldown — don't fire twice for the same exit event.
+            if now - self.last_write_time.get(write_key, 0) < self.WRITE_COOLDOWN:
+                return
+
+            # Guard 2: entry-exit overlap prevention.
+            # If this person was written to ActivePresence within the last
+            # ENTRY_EXIT_GUARD seconds by the entry camera, skip the exit —
+            # it's almost certainly a false detection caused by the two cameras
+            # seeing the same doorway simultaneously.
+            ENTRY_EXIT_GUARD = 10.0
+            entry_write_key  = f"entry_{person_key}"
+            if now - self.last_write_time.get(entry_write_key, 0) < ENTRY_EXIT_GUARD:
+                return
+
             person_id = person['person_id']
             role      = person['role']
             name      = person['name']
@@ -385,11 +430,38 @@ class DualCameraRecognizer:
                 person_type = 'Student' if role == 'STUDENT' else 'Teacher'
                 success = self.db_handler.remove_from_active_presence(person_id, person_type, self.zone_id)
                 if success:
+                    self.last_write_time[write_key] = now
                     print(f"[EXIT] ✓ {name} ({role}) exited {self.zone_name}")
+                else:
+                    print(f"[EXIT] ? {name} not in ActivePresence (no entry recorded or already exited)")
             else:
                 logger.warning(f"[EXIT] Invalid identity in person dict: {person!r}")
 
-            match_counts[person_key] = 0
+    # UNKNOWN_FACE_COOLDOWN: minimum seconds between consecutive saves of an
+    # unrecognised face from the same camera to avoid spamming the DB.
+    UNKNOWN_FACE_COOLDOWN = 30.0
+
+    def handle_unknown_face(self, face_crop, distance):
+        """
+        Save an unrecognised face image to the UnknownFaces table.
+        Called only by the ENTRY camera path — exit camera does not log unknowns.
+        A 30-second per-camera cooldown prevents repeated saves of the same person.
+        """
+        write_key = "unknown_entry"
+        now = time.time()
+        if now - self.last_write_time.get(write_key, 0) < self.UNKNOWN_FACE_COOLDOWN:
+            return
+
+        try:
+            _, jpeg = cv2.imencode('.jpg', face_crop, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            image_bytes = jpeg.tobytes()
+            confidence  = max(0.0, 1.0 - (distance / DISTANCE_THRESHOLD))
+            saved_id    = self.db_handler.save_unknown_face(image_bytes, self.zone_id, confidence)
+            if saved_id is not None:
+                self.last_write_time[write_key] = now
+                print(f"[ENTRY] ⚠ Unknown face saved (id={saved_id}, dist={distance:.2f}, zone={self.zone_id})")
+        except Exception as e:
+            logger.warning(f"[ENTRY] Unknown face save failed: {e}")
 
     def run(self, entry_only=False, exit_only=False):
         """
@@ -424,9 +496,13 @@ class DualCameraRecognizer:
                     if ret:
                         entry_fail_count = 0
                         if self.frame_count % FRAME_SKIP == 0:
-                            display, recognized = self.process_frame(frame, 'entry')
+                            display, recognized, unknowns = self.process_frame(frame, 'entry')
+                            # Entry camera: write presence + open attendance log
                             for person in recognized:
                                 self.handle_entry_detection(person)
+                            # Entry camera only: save unknown faces to DB
+                            for face_crop, distance in unknowns:
+                                self.handle_unknown_face(face_crop, distance)
                             fps = self.fps_counter.get_fps()
                             draw_info_panel(display, [
                                 f"Zone: {self.zone_name} (Entry)",
@@ -467,7 +543,9 @@ class DualCameraRecognizer:
                     if ret:
                         exit_fail_count = 0
                         if self.frame_count % FRAME_SKIP == 0:
-                            display, recognized = self.process_frame(frame, 'exit')
+                            display, recognized, _ = self.process_frame(frame, 'exit')
+                            # Exit camera only: close attendance log + remove presence.
+                            # Unknown faces from exit camera are intentionally ignored.
                             for person in recognized:
                                 self.handle_exit_detection(person)
                             fps = self.fps_counter.get_fps()

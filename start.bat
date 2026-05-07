@@ -1,213 +1,134 @@
 @echo off
-REM ============================================================
-REM  IntelliSight - Complete System Startup Script
-REM  Starts Backend (Node.js) + Frontend (React) + Python Services
-REM ============================================================
+setlocal enabledelayedexpansion
 
-title IntelliSight - System Launcher
+title IntelliSight Launcher
 color 0A
 
 echo.
 echo  ================================================================
-echo  ^|                                                              ^|
-echo  ^|              INTELLISIGHT - FACE RECOGNITION                 ^|
-echo  ^|                  ATTENDANCE SYSTEM                           ^|
-echo  ^|                  ------------------                          ^|
-echo  ^|                    Abdullah Uzair - 221083                   ^|
-echo  ^|                    Zeeshan Haider - 221093                   ^|
-echo  ^|                    Zainab Moazzam - 221095                   ^|
+echo  ^|          INTELLISIGHT - FACE RECOGNITION SYSTEM             ^|
+echo  ^|              Abdullah Uzair   Zeeshan Haider                ^|
+echo  ^|                    Zainab Moazzam                           ^|
 echo  ================================================================
 echo.
 
-REM Set project directory (always ends with \)
+REM ── Paths ─────────────────────────────────────────────────────────────
 set "PROJECT_DIR=%~dp0"
-
-REM Python conda env - intellisight_gpu (Python 3.10, deepface/flask/cv2)
-set "PYTHON_EXE=C:\Users\abdul\miniconda3\envs\intellisight_gpu\python.exe"
-
-REM MediaMTX binary location (Go single-binary media server: RTSP -> WebRTC/HLS)
+set "PYTHON_EXE=C:\Users\abdul\miniconda3\envs\deepface_env\python.exe"
 set "MEDIAMTX_DIR=%~dp0Facerecongination\mediamtx"
 set "MEDIAMTX_EXE=%MEDIAMTX_DIR%\mediamtx.exe"
 set "MEDIAMTX_CFG=%MEDIAMTX_DIR%\mediamtx.yml"
 
-echo [*] Project Directory: %PROJECT_DIR%
+REM Suppress TF oneDNN spam — inherited by all child processes
+set "TF_ENABLE_ONEDNN_OPTS=0"
+set "TF_CPP_MIN_LOG_LEVEL=2"
+
+echo [*] Project: %PROJECT_DIR%
 echo.
 
-REM ============================================================
-REM  Check .env file
-REM ============================================================
-if not exist "%PROJECT_DIR%.env" (
-    echo [ERROR] .env file not found!
-    echo         Copy .env.example to .env and fill in your values.
-    echo.
-    pause
-    exit /b 1
-)
-echo [OK] .env file found
+REM ── STEP 1: Kill previous processes on our ports ───────────────────────
+echo [*] Killing any processes on ports 3000 3001 5001 8889 9997 ...
 
-REM ============================================================
-REM  Check Node.js
-REM ============================================================
-echo [*] Checking Node.js...
-where node >nul 2>nul
-if errorlevel 1 (
-    echo [ERROR] Node.js not found. Install from https://nodejs.org
-    pause
-    exit /b 1
+powershell -NoProfile -Command ^
+  "$ports = 3000,3001,5001,8889,9997; foreach ($p in $ports) { $c = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue; if ($c) { Stop-Process -Id $c.OwningProcess -Force -ErrorAction SilentlyContinue; Write-Host \"  Killed PID $($c.OwningProcess) on port $p\" } }"
+
+timeout /t 2 /nobreak >nul
+echo [OK] Port cleanup done
+echo.
+
+REM ── STEP 2: Pre-flight checks ──────────────────────────────────────────
+if not exist "%PROJECT_DIR%.env" (
+    echo [ERROR] .env file not found - copy .env.example to .env
+    pause & exit /b 1
+)
+echo [OK] .env found
+
+where node >nul 2>nul || (
+    echo [ERROR] Node.js not found - install from https://nodejs.org
+    pause & exit /b 1
 )
 for /f "tokens=*" %%v in ('node -v 2^>nul') do echo [OK] Node.js %%v
-echo.
 
-REM ============================================================
-REM  Check Python (intellisight_gpu conda environment)
-REM ============================================================
-echo [*] Checking Python environment (intellisight_gpu)...
-if not exist "%PYTHON_EXE%" goto :python_missing
-for /f "tokens=*" %%v in ('"%PYTHON_EXE%" --version 2^>^&1') do echo [OK] %%v ^(intellisight_gpu env^)
-goto :python_ok
-
-:python_missing
-echo [WARNING] intellisight_gpu conda env not found at:
-echo           %PYTHON_EXE%
-echo           Camera streaming service will NOT start.
-echo           Setup: conda create -n intellisight_gpu python=3.10
-echo                  conda activate intellisight_gpu
-echo                  pip install -r Facerecongination\requirements.txt
-set "PYTHON_EXE="
-
-:python_ok
-echo.
-
-REM ============================================================
-REM  Install Backend Dependencies (if needed)
-REM ============================================================
-if not exist "%PROJECT_DIR%node_modules\" (
-    echo [*] Installing backend dependencies...
-    cd /d "%PROJECT_DIR%"
-    call npm install
-    if errorlevel 1 (
-        echo [ERROR] Backend npm install failed!
-        pause
-        exit /b 1
-    )
-    echo [OK] Backend dependencies installed
-    echo.
+if not exist "%PYTHON_EXE%" (
+    echo [WARN] Python env not found: %PYTHON_EXE%
+    echo        Camera AI will not start.
+    set "PYTHON_EXE="
+) else (
+    for /f "tokens=*" %%v in ('"%PYTHON_EXE%" --version 2^>^&1') do echo [OK] %%v
 )
+echo.
 
-REM ============================================================
-REM  Generate Prisma Client (if needed)
-REM ============================================================
+REM ── STEP 3: First-run dependency install ──────────────────────────────
+if not exist "%PROJECT_DIR%node_modules\" (
+    echo [*] Installing backend npm packages...
+    cd /d "%PROJECT_DIR%"
+    call npm install || ( echo [ERROR] npm install failed & pause & exit /b 1 )
+)
 if not exist "%PROJECT_DIR%node_modules\.prisma\" (
     echo [*] Generating Prisma client...
     cd /d "%PROJECT_DIR%"
-    call npx prisma generate
-    if errorlevel 1 (
-        echo [ERROR] Prisma generate failed!
-        pause
-        exit /b 1
-    )
-    echo [OK] Prisma client generated
-    echo.
+    call npx prisma generate || ( echo [ERROR] Prisma generate failed & pause & exit /b 1 )
 )
-
-REM ============================================================
-REM  Install Frontend Dependencies (if needed)
-REM ============================================================
 if not exist "%PROJECT_DIR%admin-dashboard\node_modules\" (
-    echo [*] Installing frontend dependencies...
+    echo [*] Installing frontend npm packages...
     cd /d "%PROJECT_DIR%admin-dashboard"
-    call npm install
-    if errorlevel 1 (
-        echo [ERROR] Frontend npm install failed!
-        cd /d "%PROJECT_DIR%"
-        pause
-        exit /b 1
-    )
+    call npm install || ( echo [ERROR] frontend npm install failed & cd /d "%PROJECT_DIR%" & pause & exit /b 1 )
     cd /d "%PROJECT_DIR%"
-    echo [OK] Frontend dependencies installed
-    echo.
 )
-
-REM ============================================================
-REM  Auto-create frontend .env if missing
-REM ============================================================
 if not exist "%PROJECT_DIR%admin-dashboard\.env" (
-    echo [*] Creating admin-dashboard\.env from .env.example...
     copy "%PROJECT_DIR%admin-dashboard\.env.example" "%PROJECT_DIR%admin-dashboard\.env" >nul
-    echo [OK] admin-dashboard\.env created
-    echo.
+    echo [OK] Created admin-dashboard\.env
 )
-
-REM ============================================================
-REM  Start Services
-REM ============================================================
-echo.
-echo  ================================================================
-echo  ^|                  STARTING SERVICES                           ^|
-echo  ================================================================
-echo.
-echo  Backend API:     http://localhost:3000
-echo  Frontend App:    http://localhost:3001
-echo  Camera Service:  http://localhost:5001  (AI metadata only)
-echo  MediaMTX WebRTC: http://localhost:8889  (browser video source)
-echo  MediaMTX API:    http://localhost:9997  (path management)
-echo.
-echo  [!] Each service opens in its own window.
 echo.
 
-REM --- MediaMTX (RTSP -> WebRTC/HLS) ---
-REM Must start BEFORE the Python camera service because the camera service
-REM registers RTSP paths against MediaMTX's HTTP API on port 9997.
+REM ── STEP 4: Start servers ─────────────────────────────────────────────
+echo  ================================================================
+echo  ^|                  STARTING SERVERS                           ^|
+echo  ================================================================
+echo.
+
+REM 1. MediaMTX (start first — Python registers paths against it)
 if exist "%MEDIAMTX_EXE%" (
-    start "IntelliSight - MediaMTX (8889/9997)" /d "%MEDIAMTX_DIR%" cmd /k ""%MEDIAMTX_EXE%" "%MEDIAMTX_CFG%""
+    start "MediaMTX [8889]" /d "%MEDIAMTX_DIR%" cmd /k "%MEDIAMTX_EXE%" "%MEDIAMTX_CFG%"
     timeout /t 2 /nobreak >nul
-    echo [OK] MediaMTX launched
+    echo [OK] MediaMTX started   -  WebRTC: http://localhost:8889
 ) else (
-    echo [WARNING] MediaMTX binary not found at:
-    echo           %MEDIAMTX_EXE%
-    echo           Browser video preview will NOT work until you install it.
-    echo           Download: https://github.com/bluenviron/mediamtx/releases
-    echo           Place mediamtx.exe in: %MEDIAMTX_DIR%
+    echo [WARN] mediamtx.exe not found - browser video preview disabled
+    echo        Expected: %MEDIAMTX_EXE%
 )
-echo.
 
-REM --- Backend (Node.js / nodemon) ---
-start "IntelliSight - Backend (Port 3000)" /d "%PROJECT_DIR%" cmd /k "npm run dev"
+REM 2. Node.js Backend  (port 3000)
+start "Backend [3000]" /d "%PROJECT_DIR%" cmd /k npm run dev
 timeout /t 4 /nobreak >nul
+echo [OK] Backend started   -  API:    http://localhost:3000
 
-REM --- Frontend (Vite / React) ---
-start "IntelliSight - Frontend (Port 3001)" /d "%PROJECT_DIR%admin-dashboard" cmd /k "npm run dev"
+REM 3. React Frontend   (port 3001)
+start "Frontend [3001]" /d "%PROJECT_DIR%admin-dashboard" cmd /k npm run dev
 timeout /t 2 /nobreak >nul
+echo [OK] Frontend started  -  App:    http://localhost:3001
 
-REM --- Camera Streaming Service (Flask / Python) ---
-if not defined PYTHON_EXE goto :skip_camera
-start "IntelliSight - Camera Service (Port 5001)" /d "%PROJECT_DIR%Facerecongination" cmd /k ""%PYTHON_EXE%" camera_streaming_service.py"
-goto :camera_done
+REM 4. Python Camera AI (port 5001)
+if not defined PYTHON_EXE (
+    echo [WARN] Camera AI skipped - Python env missing
+    goto :done
+)
+start "Camera AI [5001]" /d "%PROJECT_DIR%Facerecongination" cmd /k "%PYTHON_EXE%" camera_streaming_service.py
+echo [OK] Camera AI started -  AI:     http://localhost:5001
 
-:skip_camera
-echo [WARNING] Camera service skipped - intellisight_gpu env not found.
-
-:camera_done
-
-echo.
-echo [OK] All services started!
+:done
 echo.
 echo  ================================================================
-echo  ^|                  SYSTEM IS RUNNING                           ^|
+echo  ^|              ALL SERVERS RUNNING                            ^|
 echo  ================================================================
 echo.
-echo  Backend API:     http://localhost:3000
-echo  Frontend App:    http://localhost:3001
-echo  Camera Service:  http://localhost:5001
+echo    Backend   API  -  http://localhost:3000
+echo    Frontend  App  -  http://localhost:3001
+echo    Camera    AI   -  http://localhost:5001
+echo    MediaMTX       -  http://localhost:8889
 echo.
-echo  Python env:  intellisight_gpu  (FaceNet + RetinaFace)
+echo  Close any server window to stop it.
+echo  Run start.bat again to restart clean.
 echo.
-echo  Press any key to open the frontend in your browser...
+echo  Press any key to open the dashboard ...
 pause >nul
-
 start http://localhost:3001
-
-echo.
-echo  Close the individual service windows to stop each service.
-echo.
-pause

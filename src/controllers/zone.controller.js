@@ -130,6 +130,85 @@ export const deleteZone = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @route   GET /api/zones/:id/unknown-count
+ * @desc    Count unknown faces detected in a specific zone
+ * @access  Private
+ */
+export const getZoneUnknownCount = asyncHandler(async (req, res) => {
+  const zoneId = parseInt(req.params.id);
+
+  const count = await prisma.unknownFaces.count({
+    where: { Zone_id: zoneId },
+  });
+
+  successResponse(res, { count, zone_id: zoneId }, 'Unknown face count retrieved');
+});
+
+/**
+ * @route   GET /api/zones/unknown-faces
+ * @desc    List unknown faces from ALL zones (replaces zone-1-only endpoint).
+ *          Returns face image as base64 data URL so the frontend can render
+ *          directly without a separate fetch per row.
+ * @access  Private
+ */
+export const getAllUnknownFaces = asyncHandler(async (req, res) => {
+  const { limit = 100, status, zone_id } = req.query;
+
+  const where = {};
+  if (status) where.Status = status;
+  if (zone_id) where.Zone_id = parseInt(zone_id);
+
+  const rows = await prisma.unknownFaces.findMany({
+    where,
+    orderBy: { DetectedTime: 'desc' },
+    take: parseInt(limit),
+  });
+
+  // UnknownFaces has no Prisma relation to Zone — fetch zone names in one
+  // batch query and join in JS so the page can display "C Block" etc.
+  const zoneIds = [...new Set(rows.map((r) => r.Zone_id).filter((id) => id != null))];
+  const zones = zoneIds.length
+    ? await prisma.zone.findMany({
+        where: { Zone_id: { in: zoneIds } },
+        select: { Zone_id: true, Zone_Name: true },
+      })
+    : [];
+  const zoneNameById = Object.fromEntries(zones.map((z) => [z.Zone_id, z.Zone_Name]));
+
+  const data = rows.map((row) => ({
+    Unknown_ID:    row.Unknown_ID,
+    Zone_id:       row.Zone_id,
+    Zone_Name:     zoneNameById[row.Zone_id] || `Zone ${row.Zone_id ?? '?'}`,
+    Confidence:    row.Confidence,
+    Status:        row.Status,
+    Notes:         row.Notes,
+    DetectedTime:  row.DetectedTime,
+    // Key name matches the existing UI (UnknownFaces.jsx renders face.CapturedImage)
+    CapturedImage: row.Captured_Image
+      ? `data:image/jpeg;base64,${Buffer.from(row.Captured_Image).toString('base64')}`
+      : null,
+  }));
+
+  successResponse(res, data, 'Unknown faces retrieved');
+});
+
+/**
+ * @route   GET /api/zones/unknown-stats
+ * @desc    Aggregate counts across ALL zones for the Unknown Faces page header.
+ * @access  Private
+ */
+export const getAllUnknownStats = asyncHandler(async (req, res) => {
+  const [total, pending, identified, ignored] = await Promise.all([
+    prisma.unknownFaces.count(),
+    prisma.unknownFaces.count({ where: { Status: 'PENDING'    } }),
+    prisma.unknownFaces.count({ where: { Status: 'IDENTIFIED' } }),
+    prisma.unknownFaces.count({ where: { Status: 'IGNORED'    } }),
+  ]);
+
+  successResponse(res, { total, pending, identified, ignored }, 'Unknown face stats retrieved');
+});
+
+/**
  * @route   GET /api/zones/:id/current
  * @desc    Get all persons currently in a specific zone
  * @access  Private

@@ -359,7 +359,7 @@ const Zones = () => {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => navigate(zone.Zone_id === 1 ? '/zones/zone1-live' : `/zones/${zone.Zone_id}/live`)}
+                onClick={() => navigate(`/zones/${zone.Zone_id}/live`)}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-white transition-all"
                 style={{ 
                   backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#3ca1afff', 

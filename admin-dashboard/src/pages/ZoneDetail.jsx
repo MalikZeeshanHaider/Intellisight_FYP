@@ -65,10 +65,10 @@ const ZoneDetail = () => {
     });
   }, [persons]);
 
-  // Redirect Zone 1 to live page
+  // Redirect to unified live page for any zone id
   useEffect(() => {
-    if (id === '1' || id === 'zone1-live') {
-      navigate('/zones/zone1-live', { replace: true });
+    if (id === '1') {
+      navigate('/zones/1/live', { replace: true });
     }
   }, [id, navigate]);
 

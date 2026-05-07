@@ -620,7 +620,7 @@ const Dashboard = () => {
                     whileHover={{ scale: 1.02 }}
                   >
                     <Link
-                      to={zone.Zone_id === 1 ? '/zones/zone1-live' : `/zones/${zone.Zone_id}/live`}
+                      to={`/zones/${zone.Zone_id}/live`}
                       className="block p-3 rounded-xl transition-all duration-200"
                       style={{
                         background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(79, 70, 229, 0.1))',

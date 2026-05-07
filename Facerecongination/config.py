@@ -30,8 +30,13 @@ DB_CONFIG = {
     'password': os.getenv('DB_PASSWORD')
 }
 
-# Face recognition settings - DeepFace with FaceNet + YuNet detector
-MODEL_NAME = "Facenet"  # FaceNet model for embeddings (128-dimensional)
+# Face recognition settings - DeepFace with ArcFace + YuNet detector
+MODEL_NAME = "ArcFace"  # ArcFace model — 512-D embeddings, angular margin loss
+                         # More accurate than FaceNet, especially under lighting/angle variation.
+
+# Distance metric — ArcFace embeddings are L2-normalised to the unit sphere,
+# so cosine distance is the correct metric.
+DISTANCE_METRIC = 'cosine'
 
 # Detector backend — controls which model locates faces in the frame.
 #
@@ -48,36 +53,39 @@ MODEL_NAME = "Facenet"  # FaceNet model for embeddings (128-dimensional)
 #
 DETECTOR_BACKEND = "yunet"
 
-# FaceNet euclidean distance threshold: lower = stricter matching
-# NOTE: FaceNet512 uses larger distances (5-15 typical range)
-# For Facenet (128D): typical range is 5-12 for unnormalized embeddings
-DISTANCE_THRESHOLD = 8.0  # Stricter threshold for better accuracy
+# ArcFace cosine distance threshold.
+# Same person: typically 0.20–0.45 | Different person: typically 0.55–1.00
+# DeepFace's own verified threshold for ArcFace cosine = 0.6717.
+# Using 0.68 to match that boundary and reject borderline matches.
+DISTANCE_THRESHOLD = 0.68  # ArcFace cosine distance (0 = identical, 1 = orthogonal)
 MIN_FACE_SIZE = 40  # Minimum face crop size (pixels) for recognition — NOT for detection frame
 CONSECUTIVE_MATCHES = 2  # Matches needed before confirming identity
 FRAME_SKIP = 3  # Legacy — kept for import compatibility; AI sampling now queue-driven
 
 # ── Confidence threshold ───────────────────────────────────────────────────────
-# Minimum recognition confidence [0.0 – 1.0] for a single-frame identification
-# to be accepted and written to the database.
+# Minimum single-frame confidence to call _handle_recognition (and write to DB).
 #
-# Derivation:  confidence = max(0.0,  1 - distance / DISTANCE_THRESHOLD)
-#   distance = 0.0       →  confidence = 1.00  (perfect match)
-#   distance = 2.0 (25%) →  confidence = 0.75
-#   distance = 4.0 (50%) →  confidence = 0.50
-#   distance = 8.0 (100%)→  confidence = 0.00  (at threshold boundary)
+#   confidence = max(0.0, 1 - distance / DISTANCE_THRESHOLD)
 #
-# 0.75 means we only accept matches where distance ≤ 2.0  (top 25 % of the
-# allowed range). This replaces the old consecutive-frame requirement:
-# a single high-confidence hit is sufficient for immediate confirmation.
-# Raise toward 0.90 for stricter environments; lower toward 0.65 if false
-# negatives become a problem (e.g. poor lighting / side-on faces).
-RECOGNITION_CONFIDENCE_THRESHOLD = 0.60   # distance ≤ 3.2 passes (was 0.75 → ≤ 2.0)
+# With DISTANCE_THRESHOLD = 0.68 (ArcFace cosine):
+#   distance 0.34 →  confidence 0.50  (strong match)
+#   distance 0.48 →  confidence 0.30  (passes gate)
+#   distance 0.55 →  confidence 0.19  (below gate — rejected)
+#   distance 0.68 →  confidence 0.00  (at search cutoff)
+#
+# 0.30 requires cosine distance ≤ 0.476 — solidly within same-person range.
+RECOGNITION_CONFIDENCE_THRESHOLD = 0.30   # cosine distance ≤ 0.476 passes
+
+# ── EMA smoothing factor ────────────────────────────────────────────────────────
+# Used in camera_streaming_service.py _handle_recognition.
+# Lower α = smoother (more frames needed to confirm), less reactive to jitter.
+EMA_ALPHA = 0.35   # was hardcoded 0.6 — reduced for stabler per-person EMA
 
 # Folder paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IMAGES_FOLDER = os.path.join(BASE_DIR, "images")
 EMBEDDINGS_FOLDER = os.path.join(BASE_DIR, "embeddings")
-EMBEDDINGS_FILE = os.path.join(EMBEDDINGS_FOLDER, "representations_facenet.json")
+EMBEDDINGS_FILE = os.path.join(EMBEDDINGS_FOLDER, "representations_arcface.json")
 
 # Unidentified face settings
 UNIDENTIFIED_CONSECUTIVE = 5
@@ -101,4 +109,4 @@ for directory in [IMAGES_FOLDER, EMBEDDINGS_FOLDER, UNIDENTIFIED_SAVE_PATH]:
         os.makedirs(directory)
         print(f"[CONFIG] Created directory: {directory}")
 
-print(f"[CONFIG] Loaded: DB={DB_CONFIG['database']}, Model={MODEL_NAME}, Threshold={DISTANCE_THRESHOLD}")
+print(f"[CONFIG] Loaded: DB={DB_CONFIG['database']}, Model={MODEL_NAME}, Metric={DISTANCE_METRIC}, Threshold={DISTANCE_THRESHOLD}")

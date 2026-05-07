@@ -4,6 +4,7 @@ import { successResponse } from '../utils/response.js';
 import { NotFoundError, BadRequestError } from '../utils/errors.js';
 import { HTTP_STATUS, SUCCESS_MESSAGES } from '../config/constants.js';
 import { savePersonImages, deletePersonImages } from '../services/imageSaving.service.js';
+import { notifyAIEnrollment } from '../services/pythonService.js';
 
 /**
  * @route   GET /api/students
@@ -144,6 +145,10 @@ export const createStudent = asyncHandler(async (req, res) => {
     console.warn('[STUDENT] Failed to save images to train folder:', err.message);
   }
 
+  // Tell the AI service to embed this student and hot-reload the index so
+  // they're recognised on the next camera frame — no service restart needed.
+  notifyAIEnrollment('student', student.Student_ID, 'enroll');
+
   successResponse(
     res,
     student,
@@ -233,7 +238,9 @@ export const updateStudent = asyncHandler(async (req, res) => {
   });
 
   // Save updated face images to training folder for new algorithm
+  let pictures_changed = false;
   if (Face_Picture_1 || Face_Picture_2 || Face_Picture_3 || Face_Picture_4 || Face_Picture_5) {
+    pictures_changed = true;
     try {
       await savePersonImages('student', student.Student_ID, student.Name, {
         Face_Picture_1: Face_Picture_1 || student.Face_Picture_1,
@@ -245,6 +252,12 @@ export const updateStudent = asyncHandler(async (req, res) => {
     } catch (err) {
       console.warn('[STUDENT] Failed to save images to train folder:', err.message);
     }
+  }
+
+  // Re-enroll only when the face pictures actually changed — no point burning
+  // ~5s of DeepFace inference on a name-only or section-only edit.
+  if (pictures_changed) {
+    notifyAIEnrollment('student', student.Student_ID, 'enroll');
   }
 
   // Upsert enrollment if Section_ID provided
@@ -310,6 +323,10 @@ export const deleteStudent = asyncHandler(async (req, res) => {
   await prisma.students.delete({
     where: { Student_ID: parseInt(id) },
   });
+
+  // Strip this student's embeddings from the AI service so a future face
+  // doesn't keep matching against a deleted person.
+  notifyAIEnrollment('student', parseInt(id), 'unenroll');
 
   successResponse(
     res,

@@ -34,39 +34,76 @@ from utils import (
 logger = setup_logging()
 
 
-def generate_embedding_from_base64(base64_string):
+def _detect_and_crop_face(image):
     """
-    Generate FaceNet embedding from base64 image using DeepFace
-    
-    Args:
-        base64_string: Base64 encoded image
-        
-    Returns:
-        list: 128-dimensional FaceNet embedding or None
+    Detect the largest face in *image* and return a tight BGR uint8 crop.
+    Falls back to the original image if no face is found so that enrollment
+    never fails silently on a good-quality face photo.
+
+    Matches the pipeline used in recognition_live.py:
+      • align=False  (same as _recognize_face in camera_streaming_service.py)
+      • BGR uint8 output (DeepFace ≥0.0.79 returns float RGB — converted here)
     """
     try:
-        # Decode base64 to image array
+        faces = DeepFace.extract_faces(
+            img_path=image,
+            detector_backend=DETECTOR_BACKEND,
+            enforce_detection=False,
+            align=False,          # must match recognition
+        )
+        if faces:
+            # Pick the highest-confidence face
+            best = max(faces, key=lambda f: f.get('confidence', 0))
+            face_arr = best.get('face')
+            if face_arr is not None and face_arr.size > 0:
+                # DeepFace ≥0.0.79 returns float32 [0-1] RGB
+                if face_arr.dtype != np.uint8:
+                    face_arr = (face_arr * 255).clip(0, 255).astype(np.uint8)
+                    face_arr = cv2.cvtColor(face_arr, cv2.COLOR_RGB2BGR)
+                h, w = face_arr.shape[:2]
+                if h >= 20 and w >= 20:   # discard tiny artefacts
+                    return face_arr
+    except Exception:
+        pass
+    return image   # fallback: use the original image
+
+
+def generate_embedding_from_base64(base64_string):
+    """
+    Generate FaceNet embedding from base64 image using DeepFace.
+
+    Pipeline (matches recognition_live.py exactly):
+      1. Decode base64 → BGR uint8
+      2. Detect + crop the face  ← KEY: same crop domain as live recognition
+      3. CLAHE contrast enhancement
+      4. Resize to 160×160
+      5. DeepFace.represent(skip, align=False) → 128-D embedding
+    """
+    try:
         image = decode_base64_image(base64_string)
         if image is None:
             return None
 
-        # Apply the same preprocessing used during recognition so training
-        # and recognition embeddings occupy the same feature space.
-        image = preprocess_face_crop(image)
+        # Step 2: detect + crop — produces the same tight face region
+        # that recognition will embed from the live camera frame.
+        image = _detect_and_crop_face(image)
 
-        # Generate embedding using DeepFace
+        # Steps 3-4: CLAHE + resize (same as recognition pipeline)
+        image = preprocess_face_crop(image)
+        image = cv2.resize(image, (160, 160), interpolation=cv2.INTER_LINEAR)
+
         result = DeepFace.represent(
             img_path=image,
             model_name=MODEL_NAME,
-            detector_backend=DETECTOR_BACKEND,
-            enforce_detection=True,
-            align=True
+            detector_backend='skip',
+            enforce_detection=False,
+            align=False,
         )
-        
+
         if result and len(result) > 0:
             return result[0]["embedding"]
         return None
-        
+
     except Exception as e:
         logger.error(f"Error generating embedding: {e}")
         return None
@@ -95,14 +132,16 @@ def generate_embeddings_from_images(image_paths):
             if image is None:
                 print("✗ Cannot read image file")
                 continue
+            image = _detect_and_crop_face(image)
             image = preprocess_face_crop(image)
+            image = cv2.resize(image, (160, 160), interpolation=cv2.INTER_LINEAR)
 
             result = DeepFace.represent(
                 img_path=image,
                 model_name=MODEL_NAME,
-                detector_backend=DETECTOR_BACKEND,
-                enforce_detection=True,
-                align=True
+                detector_backend='skip',
+                enforce_detection=False,
+                align=False,
             )
             
             if result and len(result) > 0:
@@ -296,14 +335,16 @@ def train_from_images_folder():
                     print(f"  ✗ {image_file} - Cannot read image file")
                     error_count += 1
                     continue
+                image = _detect_and_crop_face(image)
                 image = preprocess_face_crop(image)
+                image = cv2.resize(image, (160, 160), interpolation=cv2.INTER_LINEAR)
 
                 result = DeepFace.represent(
                     img_path=image,
                     model_name=MODEL_NAME,
-                    detector_backend=DETECTOR_BACKEND,
-                    enforce_detection=True,
-                    align=True
+                    detector_backend='skip',
+                    enforce_detection=False,
+                    align=False,
                 )
 
                 if result and len(result) > 0:

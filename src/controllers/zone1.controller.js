@@ -288,7 +288,7 @@ export const getCurrentPersons = async (req, res) => {
       return {
         Presence_ID: entry.Presence_ID,
         PersonType: entry.PersonType,
-        PersonID: entry.PersonType === 'Student' ? entry.Student_ID : entry.Teacher_ID,
+        PersonID: (entry.PersonType || '').toUpperCase() === 'STUDENT' ? entry.Student_ID : entry.Teacher_ID,
         Name: person?.Name,
         Email: person?.Email,
         Department: person?.Department,
@@ -377,7 +377,7 @@ export const getZoneLogs = async (req, res) => {
       return {
         Log_ID: entry.Log_ID,
         PersonType: entry.PersonType,
-        PersonID: entry.PersonType === 'Student' ? entry.Student_ID : entry.Teacher_ID,
+        PersonID: (entry.PersonType || '').toUpperCase() === 'STUDENT' ? entry.Student_ID : entry.Teacher_ID,
         Name: person?.Name,
         Email: person?.Email,
         Department: person?.Department,
@@ -846,7 +846,7 @@ export const getTimeTableLogs = async (req, res) => {
       return {
         Log_ID: entry.Log_ID,
         PersonType: entry.PersonType,
-        PersonID: entry.PersonType === 'Student' ? entry.Student_ID : entry.Teacher_ID,
+        PersonID: (entry.PersonType || '').toUpperCase() === 'STUDENT' ? entry.Student_ID : entry.Teacher_ID,
         Name: person?.Name,
         Email: person?.Email,
         Department: person?.Department,

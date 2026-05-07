@@ -83,13 +83,16 @@ export const resetPasswordLimiter = rateLimit({
 });
 
 /**
- * GENERAL API — 500 requests per 15 minutes per IP.
+ * GENERAL API — 5000 requests per 15 minutes per IP.
  * Broad protection against abuse while allowing normal dashboard
- * polling (multiple widgets refreshing every 5 seconds).
+ * polling — Cameras, ZoneLive and the unknown-faces page each refresh
+ * every few seconds, so the old 500-req cap was tripping legitimate use.
+ * Disabled entirely in development so local testing is never blocked.
  */
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,   // 15 minutes
-  max: 500,
+  max: 5000,
+  skip: skipInDev,
   message: 'Too many requests. Please slow down and try again after 15 minutes.',
   standardHeaders: true,
   legacyHeaders: false,
