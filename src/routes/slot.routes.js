@@ -1,4 +1,5 @@
 import express from 'express';
+import multer from 'multer';
 import {
   getAllSlots,
   getSlotById,
@@ -9,6 +10,10 @@ import {
   deleteSlot,
   checkSlotOverlaps,
 } from '../controllers/slot.controller.js';
+import {
+  extractFromImage,
+  importExtracted,
+} from '../controllers/timetableImport.controller.js';
 import { validateRequest } from '../middlewares/validateRequest.js';
 import {
   createSlotSchema,
@@ -23,7 +28,18 @@ import { authenticateToken } from '../middlewares/auth.js';
 
 const router = express.Router();
 
+// In-memory upload — buffers go straight to Gemini, never hit disk.
+// 8 MB ceiling matches typical phone screenshots; tweak if needed.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 },
+});
+
 router.use(authenticateToken);
+
+// AI extraction routes — registered BEFORE generic /:id route to avoid collisions
+router.post('/extract-from-image', upload.single('file'), extractFromImage);
+router.post('/import-extracted', importExtracted);
 
 router.get('/', getAllSlots);
 router.get('/section/:sectionId', validateRequest(getSlotsBySectionSchema), getSlotsBySection);

@@ -13,6 +13,26 @@ Architecture:
 """
 
 import os
+
+# ── CPU thread-pool tuning ────────────────────────────────────────────────────
+# Must be set BEFORE cv2 (OpenMP runtime) and DeepFace (TensorFlow) are imported.
+# Without limits TF and OpenCV each claim all logical CPUs, causing context-switch
+# thrash when 2+ camera AI threads compete for cores simultaneously.
+#
+# i7-8750H (6C/12T) recommended split:
+#   OMP / OpenCV YuNet : 4 threads  (detection runs in parallel with ArcFace wait)
+#   TF intra-op        : 4 threads  (one ArcFace call at a time — give it real cores)
+#   TF inter-op        : 2 threads  (graph scheduler — ArcFace is a flat sequential graph)
+#
+# Tune via environment variables to override without touching this file:
+#   set OMP_NUM_THREADS=2 && python camera_streaming_service.py
+os.environ.setdefault('OMP_NUM_THREADS',        '4')   # OpenCV DNN / Intel OpenMP
+os.environ.setdefault('MKL_NUM_THREADS',        '4')   # Intel MKL (used by numpy on MKL builds)
+os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL',   '2')   # suppress TF INFO/WARNING console spam
+os.environ.setdefault('TF_NUM_INTRAOP_THREADS', '4')   # TF intra-op: single-op parallelism
+os.environ.setdefault('TF_NUM_INTEROP_THREADS', '2')   # TF inter-op: cross-op scheduling
+# ─────────────────────────────────────────────────────────────────────────────
+
 import sys
 import cv2
 import numpy as np
@@ -65,13 +85,20 @@ from psycopg2.extras import RealDictCursor
 
 from config import (
     DB_CONFIG, MODEL_NAME, DISTANCE_THRESHOLD, DISTANCE_METRIC, MIN_FACE_SIZE,
-    RECOGNITION_CONFIDENCE_THRESHOLD, EMA_ALPHA, DETECTOR_BACKEND, FRAME_SKIP,
-    MEDIAMTX_WEBRTC_URL,
+    RECOGNITION_CONFIDENCE_THRESHOLD, EMA_ALPHA, EMBEDDING_EMA_ALPHA,
+    SHARPNESS_THRESHOLD, DETECTOR_BACKEND, FRAME_SKIP, MEDIAMTX_WEBRTC_URL,
+    KNN_K, KNN_VOTE_MIN, KNN_MARGIN,
 )
-from utils import load_embeddings_from_json, FPSCounter, preprocess_face_crop, EmbeddingIndex
+from utils import load_embeddings_from_json, FPSCounter, preprocess_face_crop, EmbeddingIndex, FaceTracker
 from database_handler import DatabaseHandler
 from event_bus import bus
 import mediamtx_client
+
+# ── OpenCV runtime settings ───────────────────────────────────────────────────
+# Applied once at import time — safe after cv2 is loaded.
+cv2.setNumThreads(int(os.environ.get('OMP_NUM_THREADS', '4')))
+cv2.setUseOptimized(True)   # enable SSE2/AVX code paths in OpenCV (should already be on)
+# ─────────────────────────────────────────────────────────────────────────────
 
 app = Flask(__name__)
 CORS(app)
@@ -83,21 +110,40 @@ embeddings_data = []    # raw list — kept for len() / reload responses
 embedding_index = None  # EmbeddingIndex — built once at startup
 db_handler      = None
 
-# Lock strategy
-# ─────────────────────────────────────────────────────────────────────────────
-# _tf_inference_lock — serialises ALL calls to DeepFace.represent() across
-#   every camera thread.  TensorFlow's Keras model is NOT thread-safe for
-#   concurrent inference in eager mode: two threads calling model(x) at the
-#   same time can corrupt internal allocator state and trigger a C-level abort
-#   that kills the process instantly (no Python traceback, no atexit).  One
-#   lock call costs ~0-1ms overhead — far cheaper than a process crash.
+# _reload_lock — protects the embedding reload path only.  Recognition threads
+#   snapshot embedding_index before the DeepFace call so a concurrent
+#   /embeddings/reload cannot swap the index mid-search.
+# ── Inference locks ───────────────────────────────────────────────────────────
+# Two separate locks — splitting them is the key multi-camera throughput win.
 #
-# _reload_lock — protects the reload code path only.  Recognition threads
-#   take a local snapshot of embedding_index before the DeepFace call so a
-#   concurrent /embeddings/reload cannot swap the index mid-search.
+# _arcface_lock  — serialises ALL DeepFace.represent() (ArcFace/TF) calls.
+#   TF Keras model is NOT thread-safe: concurrent calls corrupt the allocator
+#   and trigger a C-level abort with no Python traceback.  (~80–150 ms held)
+#
+# _yunet_lock    — serialises DeepFace.extract_faces() (YuNet/OpenCV DNN) calls.
+#   OpenCV's DNN BlobManager is shared across threads; concurrent calls trigger
+#   a C-level assertion abort (mapIt != reuseMap.end()).  (~5–15 ms held)
+#
+# Why two locks?
+#   With ONE lock both steps had to be sequential.  With two separate locks:
+#     Camera 1  ──[yunet 10ms]──[arcface 120ms]──
+#     Camera 2  ──────────────[yunet 10ms]──[arcface waits]──[arcface 120ms]──
+#   Camera 2 can run YuNet detection WHILE Camera 1 holds the ArcFace lock —
+#   the 10ms detection phase is no longer bottlenecked by the 120ms embedding.
 # ─────────────────────────────────────────────────────────────────────────────
-_tf_inference_lock = threading.Lock()   # ONE TF call at a time across all cameras
-_reload_lock       = threading.Lock()
+_arcface_lock = threading.Lock()   # Keras/TF ArcFace embedding — NOT thread-safe
+_yunet_lock   = threading.Lock()   # OpenCV DNN YuNet detector — shared model instance
+_reload_lock  = threading.Lock()
+
+# ── Module-level CLAHE singletons ─────────────────────────────────────────────
+# cv2.createCLAHE() allocates a tile histogram buffer on each call.  In the hot
+# path (preprocess_face_crop called ~60×/s with 2 cameras × 3 faces × 10 FPS)
+# this creates ~60 transient allocations/second — measurable GC pressure.
+# Module-level singletons pay the allocation cost exactly once at startup.
+#
+# _CLAHE_DISPLAY is used only for the /snapshot MJPEG enhancement path (cold).
+_CLAHE_DISPLAY = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+# ─────────────────────────────────────────────────────────────────────────────
 
 # Video frames are no longer pushed over WebSocket — MediaMTX owns video.
 # Metadata events fan out via event_bus.bus (see /ws/events below).
@@ -132,7 +178,7 @@ PROCESS_HEIGHT = 180   # was 270 — maintains 16:9 aspect ratio
 # small (~11 % of frame height), so anything smaller is likely noise.
 DETECT_MIN_PX = 20
 
-FACE_SIZE = 160   # FaceNet input size — do not change
+FACE_SIZE = 112   # ArcFace canonical input size (112×112)
 
 # ── Motion-detection pre-filter constants ─────────────────────────────────────
 # Mean pixel change (0-255) in the 320×180 grayscale frame between consecutive
@@ -153,6 +199,16 @@ FACE_DETECT_CONFIDENCE = 0.85
 # they ever reach the embedding model or the unknown-faces table.
 CROP_MIN_MEAN_BRIGHTNESS = 25   # 0–255 — full-black IR frames sit below ~15
 CROP_MIN_STD_DEV         = 18   # uniform regions (walls/ceilings) sit below ~10
+
+# ── FaceTracker settings ──────────────────────────────────────────────────────
+# A per-camera FaceTracker caches each person's identity across frames using IoU
+# bounding-box matching.  When a bbox matches a live track, ArcFace (~120 ms) is
+# skipped entirely — reducing CPU by 60–80 % on a steady scene.
+#
+# TRACKER_RERECOG_INTERVAL — seconds before a tracked identity is considered
+#   stale and a fresh ArcFace call is forced.  8 s = one re-recognition call
+#   per person roughly every 8 seconds of continuous presence.
+TRACKER_RERECOG_INTERVAL = 8.0   # seconds between forced re-recognitions per track
 
 # ── Low-latency RTSP / FFMPEG options ────────────────────────────────────────
 # Applied via OPENCV_FFMPEG_CAPTURE_OPTIONS (key;value|key;value format).
@@ -227,8 +283,35 @@ class CameraStream:
         self._no_face_streak = 0      # consecutive AI frames with zero faces
 
         # ── Recognition summary timer ──────────────────────────────────────────
-        self._last_summary_t = time.time()
+        self._last_summary_t  = time.time()
         self._summary_matches = 0     # confirmed DB writes since last summary
+
+        # ── FaceTracker — identity cache across frames ─────────────────────────
+        # Caches the last-known identity for each tracked bbox so ArcFace
+        # (~120 ms/call) is skipped on frames where the person hasn't moved.
+        # Evicts tracks after max_age_seconds of no matching detection.
+        # confirm_frames=3: require 3 consecutive same-person recognitions before
+        # locking in an identity.  Suppresses single-frame misidentification
+        # (Ali → Ahmed → Ali) without adding latency on steady presences.
+        self._face_tracker   = FaceTracker(max_age_seconds=3.0, confirm_frames=3)
+        self._tracker_hits   = 0   # ArcFace calls saved since last 60 s summary
+        self._tracker_misses = 0   # full ArcFace calls made since last 60 s summary
+
+        # ── Quality-gate reject counters ───────────────────────────────────────
+        # Incremented by _assess_face_quality rejects; printed in the 60s summary
+        # so operators can tune thresholds based on what is actually being dropped.
+        # Keys: 'too_small', 'bad_aspect', 'too_dark', 'overexposed',
+        #        'low_contrast', 'blurry'
+        self._quality_rejects: dict = {}
+
+        # ── Per-stage timing accumulators ──────────────────────────────────────
+        # Accumulated in _run_ai, printed in the 60s summary, then reset.
+        # Lets operators pinpoint whether the bottleneck is detection (YuNet),
+        # embedding (ArcFace), or something else.
+        self._ai_timing = {
+            'detect_ms': 0.0,   'detect_n': 0,    # YuNet detection call
+            'embed_ms':  0.0,   'embed_n':  0,    # ArcFace embedding call
+        }
 
         # ── AI worker queue (RTSP reader → AI thread) ─────────────────────────
         # Producer : _rtsp_reader_loop calls _enqueue_for_ai() after each decoded frame.
@@ -524,8 +607,10 @@ class CameraStream:
           2. YuNet detection    — find face bounding boxes in a 320×180 thumbnail.
           3. Quality gates      — drop crops that are too small, dark, uniform,
                                   or have a non-face aspect ratio.
-          4. FaceNet embedding  — represent() with detector_backend='skip'.
-          5. EmbeddingIndex     — nearest-neighbour search against stored embeddings.
+          4. FaceTracker cache  — return cached identity (skip ArcFace) when IoU
+                                  matches a recent track and cache is not stale.
+          5. ArcFace embedding  — DeepFace.represent() + EmbeddingIndex search
+                                  (only on tracker cache miss or stale track).
           6. Entry / Exit write — update ActivePresence and AttendanceLog in DB.
           7. WebSocket event    — publish detection metadata to browser overlay.
         """
@@ -556,11 +641,16 @@ class CameraStream:
             return
 
         # ── Step 2: Face detection ─────────────────────────────────────────────
+        _t_det = time.perf_counter()
         small_faces = self._detect_faces(small_frame)
+        self._ai_timing['detect_ms'] += (time.perf_counter() - _t_det) * 1000
+        self._ai_timing['detect_n']  += 1
 
         new_cached_faces = []
         new_recognized   = []
         detections       = []
+
+        tracker_updates = []
 
         for face in small_faces:
             # Scale bbox from detection frame (320×180) back to full resolution.
@@ -568,6 +658,7 @@ class CameraStream:
             y  = int(face['y'] * scale)
             fw = int(face['w'] * scale)
             fh = int(face['h'] * scale)
+            bbox = (x, y, fw, fh)
 
             new_cached_faces.append({
                 'x': x, 'y': y, 'w': fw, 'h': fh,
@@ -581,15 +672,26 @@ class CameraStream:
             }
 
             # ── Step 3: Quality gates ──────────────────────────────────────────
-            # Gate A: minimum size — crop must be large enough for FaceNet.
-            margin = int(max(fw, fh) * 0.25)
-            y1 = max(0, y - margin);  y2 = min(h, y + fh + margin)
-            x1 = max(0, x - margin);  x2 = min(w, x + fw + margin)
+            # Gate A: minimum size — crop must be large enough for ArcFace.
+            #
+            # CRITICAL: enrollment uses the TIGHT bbox crop returned by
+            # DeepFace.extract_faces (essentially frame[y:y+h, x:x+w] with no
+            # padding).  If we add a margin here, the face occupies a different
+            # fraction of the 112×112 ArcFace input than during enrollment, and
+            # cosine distances systematically exceed the threshold for the
+            # SAME person.  Match enrollment exactly: use the YuNet bbox
+            # directly with no margin.
+            y1 = max(0, y);   y2 = min(h, y + fh)
+            x1 = max(0, x);   x2 = min(w, x + fw)
             face_crop = frame[y1:y2, x1:x2]
 
             if (face_crop.size == 0
                     or face_crop.shape[0] < MIN_FACE_SIZE
                     or face_crop.shape[1] < MIN_FACE_SIZE):
+                self._quality_rejects['too_small'] = (
+                    self._quality_rejects.get('too_small', 0) + 1)
+                tracker_updates.append({'bbox': bbox, 'person': None,
+                                        'distance': float('inf'), 'confidence': 0.0})
                 detections.append(detection)
                 continue
 
@@ -597,20 +699,81 @@ class CameraStream:
             # Horizontal "faces" detected on ceiling rails or shelves are rejected.
             aspect = fw / fh if fh > 0 else 0
             if not (0.4 <= aspect <= 2.5):
+                self._quality_rejects['bad_aspect'] = (
+                    self._quality_rejects.get('bad_aspect', 0) + 1)
+                tracker_updates.append({'bbox': bbox, 'person': None,
+                                        'distance': float('inf'), 'confidence': 0.0})
                 detections.append(detection)
                 continue
 
-            # Gate C: brightness / uniformity — reject dark IR frames and blank
-            # walls that somehow passed the yunet confidence threshold.
-            if not _crop_looks_like_face(face_crop):
+            # Gates C–E: brightness, contrast, sharpness (Laplacian variance).
+            # _assess_face_quality runs all three in ~0.3 ms on a 64×64 thumbnail.
+            _q_ok, _q_reason, _q_metrics = _assess_face_quality(face_crop)
+            if not _q_ok:
+                _q_cat = _q_reason.split('(')[0]   # e.g. 'blurry', 'too_dark'
+                self._quality_rejects[_q_cat] = (
+                    self._quality_rejects.get(_q_cat, 0) + 1)
+                tracker_updates.append({'bbox': bbox, 'person': None,
+                                        'distance': float('inf'), 'confidence': 0.0})
                 detections.append(detection)
                 continue
 
-            # ── Step 4 & 5: Embed + search ────────────────────────────────────
-            person_dict, distance = self._recognize_face(face_crop)
+            # ── Step 4: FaceTracker cache — skip ArcFace on known tracks ──────
+            # get_person_for_bbox returns the cached identity when IoU >= 0.5 and
+            # the cache has been refreshed within TRACKER_RERECOG_INTERVAL seconds.
+            # Returns (None, None, None) on miss, forcing a fresh ArcFace call.
+            person_dict, distance, confidence = self._face_tracker.get_person_for_bbox(
+                bbox, rerecog_interval=TRACKER_RERECOG_INTERVAL
+            )
+            smooth_emb = None   # populated only when ArcFace runs (cache miss)
 
             if person_dict is not None:
-                confidence = max(0.0, 1.0 - (distance / DISTANCE_THRESHOLD))
+                self._tracker_hits += 1   # ArcFace skipped — identity reused
+            else:
+                # ── Step 5: ArcFace embedding + EMA smoothing + search ────────
+                self._tracker_misses += 1
+                _t_emb  = time.perf_counter()
+                raw_emb = self._get_raw_embedding(face_crop)
+                self._ai_timing['embed_ms'] += (time.perf_counter() - _t_emb) * 1000
+                self._ai_timing['embed_n']  += 1
+
+                if raw_emb is not None:
+                    # Blend with the track's previous smooth embedding (if any)
+                    prev_smooth = self._face_tracker.get_smooth_embedding(bbox)
+                    smooth_emb  = _ema_smooth_embedding(raw_emb, prev_smooth,
+                                                        EMBEDDING_EMA_ALPHA)
+
+                    # Search the index with Top-K voting
+                    _idx = embedding_index   # local snapshot (reload-safe)
+                    if _idx is not None and len(_idx) > 0:
+                        confidence = 0.0
+                        person_dict, distance, confidence = _idx.search_with_vote(
+                            smooth_emb,
+                            k=KNN_K,
+                            threshold=DISTANCE_THRESHOLD,
+                            vote_min=KNN_VOTE_MIN,
+                            margin=KNN_MARGIN,
+                        )
+                        dist_str = f"{distance:.4f}" if distance is not None else "inf"
+                        if person_dict is not None:
+                            print(f"[Camera {self.camera_id}] ✓ MATCH: "
+                                  f"{person_dict['name']} "
+                                  f"(dist: {dist_str}, conf: {confidence:.0%})")
+                        else:
+                            print(f"[Camera {self.camera_id}] ✗ NO MATCH: "
+                                  f"best dist {dist_str} > {DISTANCE_THRESHOLD}")
+
+            # Register this detection in the tracker (smooth_emb stored when set)
+            tracker_updates.append({
+                'bbox':             bbox,
+                'person':           person_dict,
+                'distance':         distance if distance is not None else float('inf'),
+                'confidence':       confidence or 0.0,
+                'smooth_embedding': smooth_emb,  # None on cache hit or embed failure
+            })
+
+            # ── Step 6: Build detection result + DB write ─────────────────────
+            if person_dict is not None:
                 detection['person'] = {
                     'recognized': True,
                     'id':   person_dict['person_id'],
@@ -630,14 +793,15 @@ class CameraStream:
                     'camera_type': self.camera_type,
                 })
 
-                # ── Step 6: Entry / Exit DB write ─────────────────────────────
                 if confidence >= RECOGNITION_CONFIDENCE_THRESHOLD:
                     self._handle_recognition(person_dict, confidence)
             else:
-                # Unrecognised face — log as unknown (with cooldown).
                 self._handle_unknown_face(face_crop, distance)
 
             detections.append(detection)
+
+        # ── Update FaceTracker with all detections from this frame ────────────
+        self._face_tracker.update(tracker_updates)
 
         # Update no-face streak for motion gate.
         if small_faces:
@@ -653,16 +817,45 @@ class CameraStream:
         # ── Step 7: Periodic recognition summary (every 60 s) ─────────────────
         now = time.time()
         if now - self._last_summary_t >= 60:
-            cam_label = f"Camera {self.camera_id} ({self.camera_type})"
+            cam_label   = f"Camera {self.camera_id} ({self.camera_type})"
+            total_recog = self._tracker_hits + self._tracker_misses
+            hit_pct     = (self._tracker_hits / total_recog * 100) if total_recog > 0 else 0
+            tracker_info = (f"tracker {self._tracker_hits}hit/"
+                            f"{self._tracker_misses}miss ({hit_pct:.0f}% cached)")
+            # Format quality reject breakdown — only show non-zero buckets
+            if self._quality_rejects:
+                reject_parts = ', '.join(f"{k}:{v}"
+                                         for k, v in sorted(self._quality_rejects.items())
+                                         if v > 0)
+                reject_info = f" | rejects [{reject_parts}]"
+            else:
+                reject_info = ''
+            # ── Timing breakdown ──────────────────────────────────────────────
+            dn = self._ai_timing['detect_n']
+            en = self._ai_timing['embed_n']
+            avg_det = self._ai_timing['detect_ms'] / dn if dn else 0.0
+            avg_emb = self._ai_timing['embed_ms']  / en if en else 0.0
+            fps_approx = dn / 60.0  # rough AI FPS over the 60s window
+            timing_info = (f"detect {avg_det:.0f}ms×{dn} | "
+                           f"embed {avg_emb:.0f}ms×{en} | "
+                           f"~{fps_approx:.1f} AI fps")
+
             if self._summary_matches:
                 names = list({r['name'] for r in self.recognized_persons[-10:]})
-                print(f"[{cam_label}] 60s summary: {self._summary_matches} DB write(s), "
-                      f"seen: {', '.join(names) or 'none'}")
+                print(f"[{cam_label}] 60s: {self._summary_matches} DB write(s), "
+                      f"seen: {', '.join(names) or 'none'} | "
+                      f"{tracker_info}{reject_info} | {timing_info}")
             else:
-                print(f"[{cam_label}] 60s summary: no confirmed detections "
-                      f"(streak={self._no_face_streak}, motion≈{motion_score:.1f})")
-            self._last_summary_t = now
+                print(f"[{cam_label}] 60s: no confirmed detections "
+                      f"(streak={self._no_face_streak}, motion≈{motion_score:.1f}) | "
+                      f"{tracker_info}{reject_info} | {timing_info}")
+            self._last_summary_t  = now
             self._summary_matches = 0
+            self._tracker_hits    = 0
+            self._tracker_misses  = 0
+            self._quality_rejects.clear()
+            self._ai_timing = {'detect_ms': 0.0, 'detect_n': 0,
+                               'embed_ms':  0.0, 'embed_n':  0}
 
         # ── Step 7: WebSocket event ────────────────────────────────────────────
         bus.publish({
@@ -710,15 +903,12 @@ class CameraStream:
             return out
 
         # ── Primary detector (yunet by default) ──────────────────────────────
-        # CRITICAL: _tf_inference_lock must wrap this call even though it is
-        # only detection (not FaceNet embedding). OpenCV's DNN BlobManager is
-        # shared across threads and is NOT thread-safe: two cameras calling
-        # DeepFace.extract_faces() with yunet simultaneously trigger a C-level
-        # assertion abort (mapIt != reuseMap.end()) that kills the process with
-        # no Python traceback. The lock is cheap (~0 ms when uncontested) and
-        # is the only safe way to serialise DNN calls across camera threads.
+        # _yunet_lock (NOT _arcface_lock) — OpenCV DNN BlobManager is shared
+        # across threads; concurrent calls trigger a C-level assertion abort.
+        # Using a separate lock from _arcface_lock means Camera 2 can run YuNet
+        # detection WHILE Camera 1 is inside the longer ArcFace embedding call.
         try:
-            with _tf_inference_lock:
+            with _yunet_lock:
                 results = DeepFace.extract_faces(
                     img_path=frame,
                     detector_backend=DETECTOR_BACKEND,
@@ -735,12 +925,13 @@ class CameraStream:
         # ── Fallback: opencv Haar cascade (always available, zero download) ──
         if DETECTOR_BACKEND != 'opencv':
             try:
-                results = DeepFace.extract_faces(
-                    img_path=frame,
-                    detector_backend='opencv',
-                    enforce_detection=False,
-                    align=False,
-                )
+                with _yunet_lock:
+                    results = DeepFace.extract_faces(
+                        img_path=frame,
+                        detector_backend='opencv',
+                        enforce_detection=False,
+                        align=False,
+                    )
                 faces = _parse(results)
             except Exception as fb_err:
                 if "face" not in str(fb_err).lower():
@@ -758,13 +949,12 @@ class CameraStream:
                 gray = face_crop
             
             # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-            equalized = clahe.apply(gray)
+            equalized = _CLAHE_DISPLAY.apply(gray)  # reuse module-level singleton
             
             # Convert back to BGR for DeepFace
             equalized_bgr = cv2.cvtColor(equalized, cv2.COLOR_GRAY2BGR)
             
-            # Resize to standard face size (160x160 for FaceNet)
+            # Resize to ArcFace canonical input size (112×112)
             face_resized = cv2.resize(equalized_bgr, (FACE_SIZE, FACE_SIZE), 
                                       interpolation=cv2.INTER_LINEAR)
             
@@ -773,10 +963,46 @@ class CameraStream:
             # Fallback: just resize
             return cv2.resize(face_crop, (FACE_SIZE, FACE_SIZE))
     
+    def _get_raw_embedding(self, face_crop) -> 'np.ndarray | None':
+        """Extract the raw ArcFace embedding for a face crop without searching.
+
+        Identical preprocessing pipeline to _recognize_face:
+          1. preprocess_face_crop  — CLAHE contrast + upscale small crops
+          2. resize to FACE_SIZE×FACE_SIZE
+          3. DeepFace.represent with detector_backend='skip'
+
+        Returns a (512,) float32 numpy array, or None on failure.
+        The caller is responsible for EMA smoothing and index search.
+        """
+        if (face_crop is None or face_crop.size == 0
+                or face_crop.shape[0] < MIN_FACE_SIZE
+                or face_crop.shape[1] < MIN_FACE_SIZE):
+            return None
+
+        try:
+            face_preprocessed = preprocess_face_crop(face_crop)
+            face_resized = cv2.resize(face_preprocessed, (FACE_SIZE, FACE_SIZE),
+                                      interpolation=cv2.INTER_LINEAR)
+            with _arcface_lock:
+                results = DeepFace.represent(
+                    img_path=face_resized,
+                    model_name=MODEL_NAME,
+                    detector_backend='skip',
+                    enforce_detection=False,
+                    align=False,
+                )
+            if results and len(results) > 0:
+                emb = results[0]['embedding']
+                return np.array(emb, dtype=np.float32)
+        except Exception as e:
+            if 'face' not in str(e).lower():
+                print(f"[Camera {self.camera_id}] Embedding error: {e}")
+        return None
+
     def _recognize_face(self, face_crop):
         """Recognize a face using DeepFace — runs in parallel across all camera AI threads.
 
-        Uses _tf_inference_lock to serialise the DeepFace.represent() call —
+        Uses _arcface_lock to serialise the DeepFace.represent() call —
         TF/Keras is NOT safe for concurrent inference across threads.
 
           1. A local reference to embedding_index is captured before the call.
@@ -796,7 +1022,7 @@ class CameraStream:
         try:
             # Preprocessing pipeline — must match train.py / enrollment.py exactly:
             #   1. preprocess_face_crop : CLAHE contrast enhancement + upscale small crops
-            #   2. resize to FACE_SIZE×FACE_SIZE : FaceNet's canonical input dimensions
+            #   2. resize to FACE_SIZE×FACE_SIZE : ArcFace canonical input (112×112)
             #   3. detector_backend='skip' : do NOT re-run a face detector on the crop.
             #      The crop was already located by yunet in _detect_faces; asking yunet
             #      to re-detect inside the tight crop often fails (low confidence, face
@@ -808,7 +1034,7 @@ class CameraStream:
             face_resized = cv2.resize(face_preprocessed, (FACE_SIZE, FACE_SIZE),
                                       interpolation=cv2.INTER_LINEAR)
 
-            with _tf_inference_lock:
+            with _arcface_lock:
                 results = DeepFace.represent(
                     img_path=face_resized,
                     model_name=MODEL_NAME,
@@ -904,12 +1130,15 @@ class CameraStream:
         self._conf_ema[person_key] = ema
 
         if ema < RECOGNITION_CONFIDENCE_THRESHOLD:
-            return   # accumulating — not yet confident enough
+            print(f"[Camera {self.camera_id}] EMA gate: {person_key} ema={ema:.0%} "
+                  f"< threshold={RECOGNITION_CONFIDENCE_THRESHOLD:.0%} — accumulating")
+            return
 
         # ── Stage 2: cooldown ─────────────────────────────────────────────────
         now = time.time()
-        if now - self.last_recognition_time.get(person_key, 0) < RECOGNITION_COOLDOWN:
-            return   # duplicate suppressed
+        elapsed = now - self.last_recognition_time.get(person_key, 0)
+        if elapsed < RECOGNITION_COOLDOWN:
+            return   # duplicate suppressed (silent — happens every frame)
 
         self.last_recognition_time[person_key] = now
         if len(self.last_recognition_time) > MAX_CACHE_SIZE:
@@ -928,17 +1157,23 @@ class CameraStream:
         person_type = 'Student' if role == 'STUDENT' else 'Teacher'
         cam_type    = (self.camera_type or '').strip().capitalize()   # 'Entry' or 'Exit'
 
+        print(f"[Camera {self.camera_id}] → DB write: {name} ({role}) "
+              f"cam_type={cam_type!r} zone_id={self.zone_id} conf={ema:.0%}")
+
+        # ── Guard: zone_id must be set ─────────────────────────────────────────
+        if not self.zone_id:
+            print(f"[Camera {self.camera_id}] ERROR: zone_id is not set — "
+                  f"assign a Zone to this camera in the dashboard, then restart the service.")
+            return
+
         # ── DB write — Entry camera ────────────────────────────────────────────
-        # add_to_active_presence() inserts one row into ActivePresence
-        # (Zone_id, PersonType, Student_ID or Teacher_ID, EntryTime=NOW).
-        # It is a no-op if the person is already present (prevents duplicates).
         if cam_type == 'Entry':
             try:
                 added = db_handler.add_to_active_presence(person_id, person_type, self.zone_id)
                 if added:
                     self._summary_matches += 1
-                    print(f"[ENTRY  Cam {self.camera_id}] + {name} ({role}) "
-                          f"→ Zone {self.zone_id}  conf={ema:.0%}")
+                    print(f"[ENTRY  Cam {self.camera_id}] ✓ {name} ({role}) "
+                          f"→ Zone {self.zone_id}  conf={ema:.0%}  — ActivePresence + AttendanceLog written")
                 else:
                     print(f"[ENTRY  Cam {self.camera_id}] = {name} already present "
                           f"in Zone {self.zone_id}")
@@ -946,47 +1181,39 @@ class CameraStream:
                 print(f"[ENTRY  Cam {self.camera_id}] DB ERROR: {e}")
 
         # ── DB write — Exit camera ─────────────────────────────────────────────
-        # remove_from_active_presence() does two things atomically:
-        #   1. Reads EntryTime from ActivePresence for this person+zone.
-        #   2. Inserts a completed row into AttendanceLog
-        #      (EntryTime, ExitTime=NOW, Duration=seconds).
-        #   3. Deletes the row from ActivePresence.
-        # Returns False if the person was not in ActivePresence (they didn't use
-        # the entry camera, or already exited).
         elif cam_type == 'Exit':
             try:
                 removed = db_handler.remove_from_active_presence(person_id, person_type, self.zone_id)
                 if removed:
                     self._summary_matches += 1
-                    print(f"[EXIT   Cam {self.camera_id}] - {name} ({role}) "
-                          f"← Zone {self.zone_id}  conf={ema:.0%}  → AttendanceLog written")
+                    print(f"[EXIT   Cam {self.camera_id}] ✓ {name} ({role}) "
+                          f"← Zone {self.zone_id}  conf={ema:.0%}  — AttendanceLog completed")
                 else:
-                    print(f"[EXIT   Cam {self.camera_id}] ? {name} not in Zone {self.zone_id} "
+                    print(f"[EXIT   Cam {self.camera_id}] ? {name} not found in ActivePresence "
                           f"(no entry recorded or already exited)")
             except Exception as e:
                 print(f"[EXIT   Cam {self.camera_id}] DB ERROR: {e}")
 
         elif cam_type == 'Both':
-            # Smart bidirectional: act as entry if person not yet present, exit if they are.
             try:
                 added = db_handler.add_to_active_presence(person_id, person_type, self.zone_id)
                 if added:
                     self._summary_matches += 1
-                    print(f"[BOTH   Cam {self.camera_id}] + {name} ({role}) "
+                    print(f"[BOTH   Cam {self.camera_id}] ✓ {name} ({role}) "
                           f"→ Zone {self.zone_id}  conf={ema:.0%}  [entry]")
                 else:
-                    # Already present — treat as exit
                     removed = db_handler.remove_from_active_presence(person_id, person_type, self.zone_id)
                     if removed:
                         self._summary_matches += 1
-                        print(f"[BOTH   Cam {self.camera_id}] - {name} ({role}) "
-                              f"← Zone {self.zone_id}  conf={ema:.0%}  [exit → log]")
+                        print(f"[BOTH   Cam {self.camera_id}] ✓ {name} ({role}) "
+                              f"← Zone {self.zone_id}  conf={ema:.0%}  [exit → AttendanceLog completed]")
             except Exception as e:
                 print(f"[BOTH   Cam {self.camera_id}] DB ERROR: {e}")
 
         else:
-            print(f"[Camera {self.camera_id}] WARN: unknown camera_type={self.camera_type!r} "
-                  f"— must be 'Entry', 'Exit', or 'Both'")
+            print(f"[Camera {self.camera_id}] WARN: camera_type={self.camera_type!r} is not "
+                  f"'Entry', 'Exit', or 'Both' — set correct Camera_Type in the dashboard "
+                  f"and restart the service.")
 
     def stop(self):
         """Stop camera stream with proper cleanup"""
@@ -1002,6 +1229,12 @@ class CameraStream:
 
         self.last_recognition_time.clear()
         self._conf_ema.clear()
+        self._face_tracker.clear()
+        self._tracker_hits    = 0
+        self._tracker_misses  = 0
+        self._quality_rejects.clear()
+        self._ai_timing = {'detect_ms': 0.0, 'detect_n': 0,
+                           'embed_ms':  0.0, 'embed_n':  0}
         self._prev_gray      = None
         self._no_face_streak = 0
         if self.cap:
@@ -1051,6 +1284,133 @@ def _crop_looks_like_face(face_crop):
     return True
 
 
+def _assess_face_quality(crop: np.ndarray) -> tuple:
+    """
+    Unified quality pipeline for face crops — replaces Gate C and adds Gate D/E.
+
+    Runs four checks in order of increasing cost.  Returns on the first failure
+    so the most expensive check (Laplacian) is skipped when cheaper ones fail.
+
+    Gates
+    ─────
+    C  Brightness   mean(gray) < CROP_MIN_MEAN_BRIGHTNESS  → too dark (IR night mode)
+                    mean(gray) > 245                        → overexposed (direct flash)
+    D  Contrast     std(gray)  < CROP_MIN_STD_DEV           → uniform surface (wall/ceiling)
+    E  Sharpness    Laplacian variance on 64×64 thumb
+                    < SHARPNESS_THRESHOLD                   → motion-blurred / out-of-focus
+
+    All photometric work is done on a grayscale image.  Gate E always uses a
+    fixed 64×64 thumbnail so cost is O(4 096) regardless of original crop size
+    (~0.2 ms on CPU).
+
+    Args:
+        crop : BGR (or grayscale) numpy array, already validated for minimum size
+               and aspect ratio by the caller (Gates A and B).
+
+    Returns:
+        (passed: bool, reason: str, metrics: dict)
+        • passed  — True if every gate passes.
+        • reason  — empty string on pass; otherwise the first failing gate's label
+                    with the measured value, e.g. 'blurry(11.3)' or 'too_dark(8)'.
+                    The part before '(' is the category key for reject counters.
+        • metrics — {'brightness': float, 'contrast': float, 'sharpness': float}
+                    Always fully populated so callers can log all values even when
+                    reason is non-empty (values after the first failure are 0.0).
+
+    Debug visualization hint
+    ────────────────────────
+    To overlay quality info on a frame copy during development:
+
+        passed, reason, m = _assess_face_quality(crop)
+        color = (0, 200, 0) if passed else (0, 0, 220)
+        cv2.rectangle(frame, (x, y), (x+fw, y+fh), color, 2)
+        label = f"shp:{m['sharpness']:.0f} brt:{m['brightness']:.0f}"
+        cv2.putText(frame, label, (x, y - 6),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
+    """
+    metrics = {'brightness': 0.0, 'contrast': 0.0, 'sharpness': 0.0}
+
+    if crop is None or crop.size == 0:
+        return False, 'empty_crop', metrics
+
+    try:
+        gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) if crop.ndim == 3 else crop
+
+        # ── Gate C: brightness ────────────────────────────────────────────────
+        brightness = float(gray.mean())
+        metrics['brightness'] = round(brightness, 1)
+        if brightness < CROP_MIN_MEAN_BRIGHTNESS:
+            return False, f'too_dark({brightness:.0f})', metrics
+        if brightness > 245:
+            return False, f'overexposed({brightness:.0f})', metrics
+
+        # ── Gate D: contrast ──────────────────────────────────────────────────
+        contrast = float(gray.std())
+        metrics['contrast'] = round(contrast, 1)
+        if contrast < CROP_MIN_STD_DEV:
+            return False, f'low_contrast({contrast:.0f})', metrics
+
+        # ── Gate E: sharpness — Laplacian variance on fixed 64×64 thumbnail ───
+        # Resizing BEFORE computing the Laplacian keeps cost constant at O(4096)
+        # regardless of crop resolution, and avoids amplifying JPEG compression
+        # artefacts that appear in large high-res crops.
+        thumb     = cv2.resize(gray, (64, 64), interpolation=cv2.INTER_AREA)
+        sharpness = float(cv2.Laplacian(thumb, cv2.CV_64F).var())
+        metrics['sharpness'] = round(sharpness, 1)
+        if sharpness < SHARPNESS_THRESHOLD:
+            return False, f'blurry({sharpness:.1f})', metrics
+
+    except Exception:
+        # Preprocessing error — let the frame through rather than block it.
+        return True, '', metrics
+
+    return True, '', metrics
+
+
+def _ema_smooth_embedding(raw_emb: np.ndarray,
+                          prev_smooth: np.ndarray | None,
+                          alpha: float) -> np.ndarray:
+    """
+    Blend a new ArcFace embedding with the track's previous smooth embedding
+    using EMA, then L2-normalize the result.
+
+    Why normalize after blending?
+    ─────────────────────────────
+    ArcFace embeddings are L2-normalized (unit sphere).  The arithmetic mean of
+    two unit vectors is NOT a unit vector — its magnitude is < 1 if the vectors
+    differ.  Cosine similarity is defined as the dot product of two *unit* vectors,
+    so we must renormalize after blending to stay in the same feature space as the
+    stored enrollment embeddings.
+
+    Typical α values
+    ────────────────
+      0.70  robust to motion blur and lighting transients (recommended default)
+      0.50  equal old/new weight — faster identity adaptation
+      0.85  maximum smoothing — use only for near-static cameras
+
+    Args:
+        raw_emb    : (512,) float32 — fresh ArcFace embedding from this frame
+        prev_smooth: (512,) float32 — stored smooth embedding from tracker,
+                     or None for the first ArcFace call on a new track
+        alpha      : EMA weight given to prev_smooth (0 < α < 1)
+
+    Returns:
+        (512,) float32 — L2-normalized blended embedding
+    """
+    if prev_smooth is None:
+        blended = raw_emb.copy()
+    else:
+        blended = alpha * prev_smooth + (1.0 - alpha) * raw_emb
+
+    norm = float(np.linalg.norm(blended))
+    if norm < 1e-9:
+        # Degenerate case: vectors nearly orthogonal — fall back to raw embedding
+        raw_norm = float(np.linalg.norm(raw_emb))
+        return raw_emb / raw_norm if raw_norm > 1e-9 else raw_emb
+
+    return blended / norm
+
+
 def _enhance_frame_for_display(frame):
     """Boost brightness on dark/IR frames so the MJPEG preview is visible.
 
@@ -1062,7 +1422,7 @@ def _enhance_frame_for_display(frame):
     try:
         gray_mean = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).mean()
         if gray_mean < 60:
-            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+            clahe = _CLAHE_DISPLAY   # module-level singleton — no per-call alloc
             yuv = cv2.cvtColor(frame, cv2.COLOR_BGR2YUV)
             yuv[:, :, 0] = clahe.apply(yuv[:, :, 0])
             return cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR)
@@ -1152,7 +1512,7 @@ def start_camera():
     data = request.json
     camera_id = data.get('camera_id')
     camera_url = data.get('camera_url')
-    camera_type = data.get('camera_type', 'Entry')
+    camera_type = data.get('camera_type') or 'Entry'
     zone_id = data.get('zone_id')
     
     if camera_id in active_cameras:
@@ -1262,6 +1622,66 @@ def debug_embeddings():
     })
 
 
+@app.route('/debug/clear_presence', methods=['POST'])
+def debug_clear_presence():
+    """Clear all ActivePresence rows (dev/test use — removes stale records from previous sessions)."""
+    try:
+        db_handler._ensure_connection()
+        with db_handler.conn.cursor() as cur:
+            cur.execute('DELETE FROM "ActivePresence"')
+            deleted = cur.rowcount
+        db_handler.conn.commit()
+        return jsonify({'success': True, 'deleted': deleted,
+                        'message': f'Cleared {deleted} ActivePresence row(s)'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/debug/attendance', methods=['GET'])
+def debug_attendance():
+    """Show camera config + current ActivePresence rows for quick diagnosis."""
+    out = {'cameras': [], 'active_presence': [], 'issues': []}
+
+    for cam_id, cam in active_cameras.items():
+        cam_type = (cam.camera_type or '').strip().capitalize()
+        entry = {
+            'camera_id':   cam_id,
+            'camera_type': cam.camera_type,
+            'camera_type_normalized': cam_type,
+            'zone_id':     cam.zone_id,
+            'is_running':  cam.is_running,
+        }
+        if not cam.zone_id:
+            entry['issue'] = 'zone_id is NULL — attendance cannot be written'
+            out['issues'].append(f"Cam {cam_id}: zone_id is NULL")
+        if cam_type not in ('Entry', 'Exit', 'Both'):
+            entry['issue'] = f"camera_type {cam.camera_type!r} not Entry/Exit/Both"
+            out['issues'].append(f"Cam {cam_id}: unknown camera_type {cam.camera_type!r}")
+        out['cameras'].append(entry)
+
+    try:
+        db_handler._ensure_connection()
+        with db_handler.conn.cursor() as cur:
+            cur.execute("""
+                SELECT "Presence_ID", "PersonType", "Student_ID", "Teacher_ID",
+                       "Zone_id", "EntryTime"
+                FROM "ActivePresence"
+                ORDER BY "EntryTime" DESC
+                LIMIT 20
+            """)
+            rows = cur.fetchall()
+            out['active_presence'] = [
+                {'Presence_ID': r[0], 'PersonType': r[1],
+                 'Student_ID': r[2], 'Teacher_ID': r[3],
+                 'Zone_id': r[4], 'EntryTime': str(r[5])}
+                for r in rows
+            ]
+    except Exception as e:
+        out['db_error'] = str(e)
+
+    return jsonify(out)
+
+
 @app.route('/debug/recognition/<int:camera_id>', methods=['GET'])
 def debug_recognition(camera_id):
     """Force-run recognition on the latest frame and return raw distances.
@@ -1286,7 +1706,7 @@ def debug_recognition(camera_id):
 
     small = cv2.resize(frame, (PROCESS_WIDTH, PROCESS_HEIGHT))
     try:
-        with _tf_inference_lock:
+        with _yunet_lock:
             face_results = DeepFace.extract_faces(
                 img_path=small,
                 detector_backend=DETECTOR_BACKEND,
@@ -1323,14 +1743,14 @@ def debug_recognition(camera_id):
         try:
             from utils import preprocess_face_crop
             processed = preprocess_face_crop(crop)
-            resized = cv2.resize(processed, (160, 160))
-            with _tf_inference_lock:
+            resized = cv2.resize(processed, (FACE_SIZE, FACE_SIZE))
+            with _arcface_lock:
                 reps = DeepFace.represent(
                     img_path=resized,
                     model_name=MODEL_NAME,
                     detector_backend='skip',
                     enforce_detection=False,
-                    align=True,
+                    align=False,
                 )
             if not reps:
                 faces_info.append({'bbox': {'x': x,'y': y,'w': fw,'h': fh}, 'skip': 'no embedding'})
@@ -1594,7 +2014,7 @@ def start_zone_cameras(zone_id):
                 cam_stream = CameraStream(
                     camera_id,
                     camera['Camera_URL'],
-                    camera['Camera_Type'],
+                    camera.get('Camera_Type') or 'Entry',
                     zone_id
                 )
                 
@@ -1625,21 +2045,27 @@ def initialize():
     print("IntelliSight - Live Camera Streaming Service (OPTIMIZED)")
     print("="*70)
 
-    # Load embeddings and build vectorized index
-    from config import EMBEDDINGS_FILE
-    embeddings_data = load_embeddings_from_json(EMBEDDINGS_FILE)
-    embedding_index = EmbeddingIndex(embeddings_data)
-    print(f"✓ Loaded {len(embeddings_data)} face embeddings ({len(embedding_index)} vectors in index)")
-    
-    if len(embeddings_data) == 0:
-        print("⚠ WARNING: No embeddings loaded! Run 'python train.py --train' first.")
-    else:
-        persons = set([d.get('name') or d.get('person', 'Unknown') for d in embeddings_data])
-        print(f"  Persons: {', '.join(persons)}")
-    
-    # Initialize database handler
+    # Initialize database handler FIRST so embeddings can be loaded from DB
     db_handler = DatabaseHandler()
     print("✓ Database connected")
+
+    # Load embeddings from DB (authoritative — always reflects latest enrollments)
+    # and rebuild the JSON cache so restarts stay in sync.
+    from config import EMBEDDINGS_FILE
+    try:
+        total = _rebuild_embeddings_from_db()
+        print(f"✓ Loaded {total} face embeddings from DB ({len(embedding_index)} vectors in index)")
+    except Exception as _e:
+        print(f"[WARN] DB embedding load failed ({_e}) — falling back to JSON cache")
+        embeddings_data = load_embeddings_from_json(EMBEDDINGS_FILE)
+        embedding_index = EmbeddingIndex(embeddings_data)
+        print(f"✓ Loaded {len(embeddings_data)} face embeddings from JSON cache")
+
+    if len(embedding_index) == 0:
+        print("⚠ WARNING: No embeddings loaded! Enrol students/teachers first.")
+    else:
+        persons = set([d.get('name') or d.get('person', 'Unknown') for d in embeddings_data])
+        print(f"  Persons: {', '.join(sorted(persons))}")
 
     # ── Warm up the face detector ─────────────────────────────────────────────
     # On first call DeepFace downloads the yunet model (~400 KB) and loads it
@@ -1704,13 +2130,17 @@ def auto_start_all_cameras():
         for camera in cameras:
             camera_id = camera['Camara_Id']
             camera_url = camera['Camera_URL']
-            camera_type = camera.get('Camera_Type', 'Entry')
+            camera_type = camera.get('Camera_Type') or 'Entry'  # NULL → default 'Entry'
             zone_id = camera.get('Zone_id')
             zone_name = camera.get('Zone_Name', 'Unknown')
-            
+
             if not camera_url:
                 print(f"[!] Camera {camera_id}: No URL configured, skipping")
                 continue
+
+            if not zone_id:
+                print(f"[WARN] Camera {camera_id}: Zone_id is NULL — attendance will NOT be logged. "
+                      f"Assign a Zone to this camera in the dashboard.")
             
             print(f"[*] Starting Camera {camera_id} ({camera_type}) for Zone: {zone_name}...")
             
@@ -1751,10 +2181,15 @@ def _configure_tensorflow():
         gpus = tf.config.experimental.list_physical_devices('GPU')
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
-        # Bound the thread pool so two AI threads don't each spin up 16 workers
-        tf.config.threading.set_inter_op_parallelism_threads(2)
-        tf.config.threading.set_intra_op_parallelism_threads(2)
-        print(f"[TF] Configured: {len(gpus)} GPU(s), memory_growth=True, threads=2/2",
+        # intra-op=4: one ArcFace call runs at a time (serialised by _arcface_lock),
+        # so give it 4 real cores.  inter-op=2: ArcFace is a shallow flat graph —
+        # 2 scheduler threads is more than enough.
+        _intra = int(os.environ.get('TF_NUM_INTRAOP_THREADS', '4'))
+        _inter = int(os.environ.get('TF_NUM_INTEROP_THREADS', '2'))
+        tf.config.threading.set_intra_op_parallelism_threads(_intra)
+        tf.config.threading.set_inter_op_parallelism_threads(_inter)
+        print(f"[TF] Configured: {len(gpus)} GPU(s), memory_growth=True, "
+              f"intra={_intra} inter={_inter}",
               flush=True)
     except Exception as e:
         print(f"[TF] Config skipped ({e})", flush=True)

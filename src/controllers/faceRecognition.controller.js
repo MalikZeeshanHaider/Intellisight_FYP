@@ -10,6 +10,10 @@ const __dirname = path.dirname(__filename);
 // Path to the new Facerecongination folder (DeepFace FaceNet algorithm)
 const FACE_RECOGNITION_PATH = path.join(__dirname, '../../Facerecongination');
 
+// Use explicit Python path from env so Node.js finds the correct conda/venv
+// environment regardless of which PATH was active when the server started.
+const PYTHON_BIN = process.env.PYTHON_PATH || 'python';
+
 /**
  * Enroll face embeddings for a student or teacher
  * POST /api/face-recognition/enroll
@@ -49,7 +53,7 @@ export const enrollPerson = async (req, res) => {
 
     // Run Python enrollment script from new Facerecongination folder
     const scriptPath = path.join(FACE_RECOGNITION_PATH, 'enrollment.py');
-    const python = spawn('python', [
+    const python = spawn(PYTHON_BIN, [
       scriptPath,
       '--type', personType.toLowerCase(),
       '--id', personId.toString()
@@ -116,7 +120,7 @@ export const enrollPerson = async (req, res) => {
 export const enrollAll = async (req, res) => {
   try {
     const scriptPath = path.join(FACE_RECOGNITION_PATH, 'enrollment.py');
-    const python = spawn('python', [scriptPath, '--all']);
+    const python = spawn(PYTHON_BIN, [scriptPath, '--all']);
 
     let output = '';
     let errorOutput = '';
@@ -407,7 +411,7 @@ export const startRecognition = async (req, res) => {
 
     // Start recognition process (non-blocking) - using new DeepFace algorithm
     const scriptPath = path.join(FACE_RECOGNITION_PATH, 'recognition_live.py');
-    const python = spawn('python', [scriptPath, '--zone', zoneId.toString()], {
+    const python = spawn(PYTHON_BIN, [scriptPath, '--zone', zoneId.toString()], {
       detached: true,
       stdio: 'ignore'
     });

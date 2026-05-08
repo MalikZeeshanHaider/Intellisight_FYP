@@ -74,6 +74,7 @@ model Teacher {
   Email           String?               @unique
   CreatedAt       DateTime              @default(now())
   Department      String?
+  Profile_Picture String?
   Face_Picture_1  String?
   Face_Picture_2  String?
   Face_Picture_3  String?
@@ -99,6 +100,7 @@ model Students {
   Name            String?
   RollNumber      String?               @unique
   Email           String?               @unique
+  Profile_Picture String?
   Face_Picture_1  String?
   Face_Picture_2  String?
   Face_Picture_3  String?
@@ -184,18 +186,26 @@ model ProcessedFaceImages {
 }
 
 model FaceEmbeddings {
-  Embedding_ID  Int       @id @default(autoincrement())
-  PersonType    String
-  Student_ID    Int?
-  Teacher_ID    Int?
-  PersonName    String?
-  ImagePath     String?
-  Embedding     Bytes
-  EmbeddingJson String?
-  CreatedAt     DateTime  @default(now())
-  UpdatedAt     DateTime  @updatedAt
-  student       Students? @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
-  teacher       Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
+  Embedding_ID     Int       @id @default(autoincrement())
+  PersonType       String
+  Student_ID       Int?
+  Teacher_ID       Int?
+  PersonName       String?
+  ImagePath        String?
+  Embedding        Bytes
+  EmbeddingJson    String?
+  // Enrollment quality metadata — populated by enrollment.py v2 pipeline.
+  // Run migration: ALTER TABLE "FaceEmbeddings"
+  //   ADD COLUMN "QualityScore" FLOAT,
+  //   ADD COLUMN "IsCentroid" BOOLEAN NOT NULL DEFAULT FALSE,
+  //   ADD COLUMN "SourceImageIndex" INT;
+  QualityScore     Float?    // 0.0–1.0 composite score (sharpness + brightness + contrast + detection)
+  IsCentroid       Boolean   @default(false) // true = averaged centroid of all accepted embeddings
+  SourceImageIndex Int?      // which Face_Picture_N this came from (1–5); NULL for centroid rows
+  CreatedAt        DateTime  @default(now())
+  UpdatedAt        DateTime  @updatedAt
+  student          Students? @relation(fields: [Student_ID], references: [Student_ID], onDelete: Cascade)
+  teacher          Teacher?  @relation(fields: [Teacher_ID], references: [Teacher_ID], onDelete: Cascade)
 
   @@map("FaceEmbeddings")
 }

@@ -8,6 +8,7 @@ import { slotAPI } from '../../api/attendance';
 import { teacherAPI, zoneAPI } from '../../api/api';
 import SectionManager from './SectionManager';
 import SlotFormModal from './SlotFormModal';
+import UploadTimetableModal from './UploadTimetableModal';
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI'];
 const DAY_LABELS = { MON: 'Monday', TUE: 'Tuesday', WED: 'Wednesday', THU: 'Thursday', FRI: 'Friday' };
@@ -225,46 +226,23 @@ export default function TimetableManager({ sections, setSections, selectedSectio
         </div>
       )}
 
-      {/* AI Upload placeholder */}
-      <AnimatePresence>
-        {showAiUpload && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="bg-gradient-to-br from-violet-50 to-indigo-50 dark:from-violet-900/20 dark:to-indigo-900/20 border-2 border-dashed border-violet-300 dark:border-violet-700 rounded-2xl p-8 text-center">
-              <div className="inline-flex p-4 bg-violet-100 dark:bg-violet-900/40 rounded-2xl mb-4">
-                <Upload size={32} className="text-violet-500" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-700 dark:text-white mb-2">
-                AI Timetable Extraction
-              </h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-4">
-                Upload a photo or screenshot of your timetable. Our AI will automatically detect class slots,
-                identify free periods, and let you confirm before saving.
-              </p>
-              <div className="flex items-center justify-center gap-3">
-                <label className="cursor-pointer flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
-                  <ImagePlus size={16} />
-                  Choose Image
-                  <input type="file" accept="image/*" className="hidden" onChange={() => {
-                    // AI extraction logic will be implemented here
-                    alert('AI timetable extraction will be available in the next update. Please use manual entry for now.');
-                  }} />
-                </label>
-                <button
-                  onClick={() => setShowAiUpload(false)}
-                  className="px-4 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* AI Upload modal — full extraction + review flow */}
+      <UploadTimetableModal
+        isOpen={showAiUpload}
+        onClose={() => setShowAiUpload(false)}
+        onSuccess={async (newSectionId) => {
+          // Switch to imported section, then refresh the grid
+          if (newSectionId && newSectionId !== selectedSectionId) {
+            setSelectedSectionId(Number(newSectionId));
+          } else if (selectedSectionId) {
+            await loadGrid(selectedSectionId);
+          }
+          setSuccess('Timetable imported successfully');
+          setTimeout(() => setSuccess(''), 4000);
+        }}
+        defaultSectionId={selectedSectionId}
+        sections={sections}
+      />
 
       {/* Success message */}
       <AnimatePresence>

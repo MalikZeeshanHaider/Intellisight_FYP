@@ -81,6 +81,57 @@ RECOGNITION_CONFIDENCE_THRESHOLD = 0.30   # cosine distance ≤ 0.476 passes
 # Lower α = smoother (more frames needed to confirm), less reactive to jitter.
 EMA_ALPHA = 0.35   # was hardcoded 0.6 — reduced for stabler per-person EMA
 
+# ── Per-track embedding EMA alpha ─────────────────────────────────────────────
+# Applied to the raw ArcFace embedding *before* nearest-neighbour search.
+# Smoothing happens in unnormalized space; the blended vector is L2-normalized
+# before searching so cosine similarity is unaffected.
+#
+#  α = 0.70 : 70 % old smooth + 30 % new frame (robust to motion blur)
+#  α = 0.50 : equal weight   (faster to adapt, less jitter filtering)
+#  α = 0.85 : very smooth    (slow walkers; still trails on sharp turns)
+#
+# Recommended range for a classroom corridor at ~3–5 FPS AI rate: 0.65–0.75.
+EMBEDDING_EMA_ALPHA = 0.70
+
+# ── Face crop sharpness gate ───────────────────────────────────────────────────
+# Laplacian variance is computed on a 64×64 grayscale thumbnail of the face crop
+# (cost ~0.2 ms, fixed regardless of original crop size).
+# Crops below this value are motion-blurred or out-of-focus and produce
+# inconsistent ArcFace embeddings that hurt recognition accuracy.
+#
+# Calibration guide (64×64 thumbnail Laplacian variance):
+#   Stationary person   : 150 – 800+
+#   Slow walk (~1 m/s)  :  60 – 200
+#   Fast walk (~2 m/s)  :  20 –  80   ← threshold sits just below this range
+#   Running / heavy blur :   5 –  25
+#   Out of focus         :   2 –  15
+#   Blank wall FP        :   0.5–  8
+#
+# 15.0 rejects only extremely blurry crops (running, severe camera shake).
+# Raise to 25–40 if you want to reject walking-speed motion blur too.
+SHARPNESS_THRESHOLD = 15.0
+
+# ── Top-K voting recognition ───────────────────────────────────────────────────
+# search_with_vote() finds the K nearest stored embeddings, tallies per-person
+# votes, and applies a margin gate before accepting a match.
+#
+# KNN_K        — pool size.  With 5 enrolled images/person, K=5 lets a single
+#                person fill the entire pool and get 5 votes.  K=3 is faster
+#                and sufficient if persons have ≥ 2 enrolled images.
+#
+# KNN_VOTE_MIN — minimum votes required.  1 = same as search() but with margin
+#                gate.  2 = requires at least 2 enrolled images to agree.
+#                Use 2 only if every person has ≥ 3 enrolled images.
+#
+# KNN_MARGIN   — minimum cosine-distance gap between the best and second-best
+#                person (person-level best, not raw embedding level).
+#                0.08 catches cases where the query is between two identities.
+#                Raise to 0.12 for stricter anti-confusion, lower to 0.05 to
+#                allow matches where enrolled images cluster tightly together.
+KNN_K        = 5     # top-K nearest embeddings for voting pool
+KNN_VOTE_MIN = 1     # minimum votes to accept (raise to 2 with ≥3 images each)
+KNN_MARGIN   = 0.08  # min cosine-distance gap between 1st and 2nd best person
+
 # Folder paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IMAGES_FOLDER = os.path.join(BASE_DIR, "images")

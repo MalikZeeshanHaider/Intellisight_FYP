@@ -60,6 +60,21 @@ export const slotAPI = {
   checkOverlaps: (data) => api.post('/slots/check-overlaps', data).then((r) => r.data),
   update: (id, data) => api.put(`/slots/${id}`, data).then((r) => r.data),
   delete: (id) => api.delete(`/slots/${id}`).then((r) => r.data),
+
+  /** Upload an image of a timetable; backend runs Gemini and returns extracted slots. */
+  extractFromImage: (file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api
+      .post('/slots/extract-from-image', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 90000, // Gemini calls can take 30-60s on large images
+      })
+      .then((r) => r.data);
+  },
+
+  /** Persist admin-confirmed slots from extraction. */
+  importExtracted: (payload) => api.post('/slots/import-extracted', payload).then((r) => r.data),
 };
 
 // ── Class Attendance ──────────────────────────────────────────

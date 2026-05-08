@@ -6,6 +6,7 @@ import {
   updateTeacher,
   deleteTeacher,
   uploadFacePicture,
+  getTeacherAttendanceSummary,
 } from '../controllers/teacher.controller.js';
 import { validateRequest } from '../middlewares/validateRequest.js';
 import {
@@ -23,6 +24,7 @@ const router = express.Router();
 router.use(authenticateToken);
 
 router.get('/', getAllTeachers);
+router.get('/:id/attendance-summary', validateRequest(getTeacherSchema), getTeacherAttendanceSummary);
 router.get('/:id', validateRequest(getTeacherSchema), getTeacherById);
 router.post('/', validateRequest(createTeacherSchema), createTeacher);
 router.put('/:id', validateRequest(updateTeacherSchema), updateTeacher);

@@ -84,11 +84,15 @@ const sendEmail = async (to, subject, html) => {
   // ── 1. Try Gmail SMTP ──────────────────────────────────────────────────────
   try {
     const transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        // Google App Passwords are displayed with spaces but SMTP requires them removed
+        pass: (process.env.EMAIL_PASS || '').replace(/\s/g, ''),
       },
+      tls: { rejectUnauthorized: false },
     });
     await transporter.sendMail({
       from: `"IntelliSight" <${process.env.EMAIL_USER}>`,
@@ -728,56 +732,68 @@ const generateRandomPassword = () => {
 };
 
 /**
- * Add user directly by super admin
+ * Send email via Gmail/Google Workspace SMTP only — no Ethereal fallback.
+ * Throws a user-facing error if delivery fails so the caller can abort
+ * account creation rather than silently creating an unreachable account.
+ */
+const sendEmailStrict = async (to, subject, html) => {
+  const emailUser = process.env.EMAIL_USER;
+  const emailPass = (process.env.EMAIL_PASS || '').replace(/\s/g, '');
+
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    auth: { user: emailUser, pass: emailPass },
+    tls: { rejectUnauthorized: false },
+  });
+
+  try {
+    await transporter.sendMail({
+      from: `"IntelliSight" <${emailUser}>`,
+      to,
+      subject,
+      html,
+    });
+    console.info(`[EMAIL] Sent via Gmail SMTP to ${to}`);
+  } catch (err) {
+    console.error(`[EMAIL] Gmail SMTP error: ${err.message}`);
+
+    // Distinguish auth failures (our credentials) from delivery failures (recipient)
+    const isAuthError = /invalid login|username and password|authentication|535|534|530/i.test(err.message);
+    if (isAuthError) {
+      throw new Error(
+        `Email server authentication failed. ` +
+        `Check that EMAIL_USER and EMAIL_PASS in .env are correct and that ` +
+        `an App Password (not your regular password) is being used.`
+      );
+    }
+    throw new Error(
+      `Could not deliver email to "${to}". ` +
+      `Please verify the address is correct, then try again.`
+    );
+  }
+};
+
+/**
+ * Add user directly by super admin.
+ * Email is verified by actually sending first — if delivery fails the account
+ * is NOT created and the admin sees a clear error.
  */
 export const addUserByAdmin = async ({ name, email }) => {
-  // Check if email already exists
-  const existingAdmin = await prisma.admin.findUnique({
-    where: { Email: email },
+  // 1. Check for duplicates
+  const existingAdmin = await prisma.admin.findUnique({ where: { Email: email } });
+  if (existingAdmin) throw new ConflictError('Email already registered');
+
+  const existingPending = await prisma.pendingUsers.findFirst({
+    where: { Email: email, Status: 'PENDING' },
   });
+  if (existingPending) throw new ConflictError('Registration request already pending for this email');
 
-  if (existingAdmin) {
-    throw new ConflictError('Email already registered');
-  }
-
-  const existingPending = await prisma.pendingUsers.findUnique({
-    where: { Email: email },
-  });
-
-  if (existingPending && existingPending.Status === 'PENDING') {
-    throw new ConflictError('Registration request already pending for this email');
-  }
-
-  // Generate random password
-  const randomPassword = generateRandomPassword();
-  const hashedPassword = await hashPassword(randomPassword);
-
-  // Create admin account
-  const newAdmin = await prisma.admin.create({
-    data: {
-      Name: name,
-      Email: email,
-      Password: hashedPassword,
-      Role: 'User',
-    },
-  });
-
-  // Generate password reset token
+  // 2. Build the password-setup link (token not yet persisted — we do that only after email succeeds)
   const resetToken = generateVerificationToken();
-  const expiresAt = new Date();
-  expiresAt.setHours(expiresAt.getHours() + 24); // Token expires in 24 hours
+  const resetUrl   = `${FRONTEND_URL}/reset-password/${resetToken}`;
 
-  await prisma.passwordResets.create({
-    data: {
-      Email: email,
-      Token: resetToken,
-      ExpiresAt: expiresAt,
-    },
-  });
-
-  // Send email with reset password link
-  const resetUrl = `${FRONTEND_URL}/reset-password/${resetToken}`;
-  
   const emailHtml = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9f9f9; padding: 20px; border-radius: 10px;">
       <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
@@ -786,21 +802,14 @@ export const addUserByAdmin = async ({ name, email }) => {
       <div style="background: white; padding: 30px; border-radius: 0 0 10px 10px;">
         <h2 style="color: #667eea; margin-top: 0;">Account Created Successfully!</h2>
         <p style="color: #666; line-height: 1.6;">Hi <strong>${name}</strong>,</p>
-        <p style="color: #666; line-height: 1.6;">Your account has been created by the system administrator. To get started, please set up your password.</p>
-        
+        <p style="color: #666; line-height: 1.6;">Your account has been created by the system administrator. Please set your password to get started.</p>
         <div style="background: #f0f8ff; padding: 15px; border-left: 4px solid #667eea; margin: 20px 0;">
-          <p style="margin: 5px 0;"><strong>Your Account Details:</strong></p>
-          <p style="margin: 5px 0;">Email: ${email}</p>
-          <p style="margin: 5px 0; color: #999; font-size: 12px;">You'll set your own password in the next step</p>
+          <p style="margin: 5px 0;"><strong>Your Account Email:</strong> ${email}</p>
         </div>
-
         <div style="text-align: center; margin: 30px 0;">
           <a href="${resetUrl}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 40px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Set Your Password</a>
         </div>
-
-        <p style="color: #999; font-size: 14px; margin-top: 30px;">This link will expire in 24 hours.</p>
-        <p style="color: #999; font-size: 14px;">If you didn't expect this email, please contact your administrator.</p>
-        
+        <p style="color: #999; font-size: 14px;">This link expires in 24 hours. If you did not expect this email, contact your administrator.</p>
         <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px;">
           <p style="color: #999; font-size: 12px; text-align: center; margin: 0;">IntelliSight - Facial Recognition System</p>
         </div>
@@ -808,16 +817,31 @@ export const addUserByAdmin = async ({ name, email }) => {
     </div>
   `;
 
-  await sendEmail(email, 'Welcome to IntelliSight - Set Your Password', emailHtml);
+  // 3. Try sending BEFORE creating anything — throws if the address is unreachable
+  await sendEmailStrict(email, 'Welcome to IntelliSight - Set Your Password', emailHtml);
 
-  return { 
-    message: 'User created successfully. Password reset email sent.',
+  // 4. Email delivered → now create the account
+  const randomPassword = generateRandomPassword();
+  const hashedPassword = await hashPassword(randomPassword);
+
+  const newAdmin = await prisma.admin.create({
+    data: { Name: name, Email: email, Password: hashedPassword, Role: 'User' },
+  });
+
+  // 5. Persist the reset token (24-hour expiry)
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  await prisma.passwordResets.create({
+    data: { Email: email, Token: resetToken, ExpiresAt: expiresAt },
+  });
+
+  return {
+    message: 'User created successfully. A password setup email has been sent.',
     user: {
       Admin_ID: newAdmin.Admin_ID,
       Name: newAdmin.Name,
       Email: newAdmin.Email,
-      Role: newAdmin.Role
-    }
+      Role: newAdmin.Role,
+    },
   };
 };
 

@@ -56,6 +56,7 @@ export const createTeacher = asyncHandler(async (req, res) => {
     Gender,
     Faculty_Type,
     Department,
+    Profile_Picture,
     Face_Picture_1,
     Face_Picture_2,
     Face_Picture_3,
@@ -94,6 +95,7 @@ export const createTeacher = asyncHandler(async (req, res) => {
       Gender,
       Faculty_Type,
       Department: Faculty_Type === 'Permanent' ? Department : null,
+      Profile_Picture: Profile_Picture || null,
       Face_Picture_1,
       Face_Picture_2,
       Face_Picture_3,
@@ -134,12 +136,13 @@ export const createTeacher = asyncHandler(async (req, res) => {
  */
 export const updateTeacher = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { 
-    Name, 
+  const {
+    Name,
     Email,
     Gender,
     Faculty_Type,
     Department,
+    Profile_Picture,
     Face_Picture_1,
     Face_Picture_2,
     Face_Picture_3,
@@ -162,6 +165,7 @@ export const updateTeacher = asyncHandler(async (req, res) => {
   if (Gender !== undefined) updateData.Gender = Gender;
   if (Faculty_Type !== undefined) updateData.Faculty_Type = Faculty_Type;
   if (Department !== undefined) updateData.Department = Department;
+  if (Profile_Picture !== undefined) updateData.Profile_Picture = Profile_Picture;
   if (Face_Picture_1 !== undefined) updateData.Face_Picture_1 = Face_Picture_1;
   if (Face_Picture_2 !== undefined) updateData.Face_Picture_2 = Face_Picture_2;
   if (Face_Picture_3 !== undefined) updateData.Face_Picture_3 = Face_Picture_3;
@@ -284,4 +288,72 @@ export const uploadFacePicture = asyncHandler(async (req, res) => {
   };
 
   successResponse(res, teacherWithBase64, 'Face picture uploaded successfully');
+});
+
+/**
+ * @route   GET /api/teachers/:id/attendance-summary
+ * @desc    Full attendance history + monthly breakdown for one teacher
+ * @access  Private
+ */
+export const getTeacherAttendanceSummary = asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { month } = req.query; // optional "YYYY-MM"
+
+  const teacher = await prisma.teacher.findUnique({
+    where: { Teacher_ID: id },
+    select: { Teacher_ID: true, Name: true, Department: true, Faculty_Type: true, Profile_Picture: true },
+  });
+  if (!teacher) throw new NotFoundError(`Teacher with ID ${id} not found`);
+
+  let entryFilter = {};
+  if (month) {
+    const [y, m] = month.split('-').map(Number);
+    entryFilter = { gte: new Date(y, m - 1, 1), lt: new Date(y, m, 1) };
+  }
+
+  const logs = await prisma.attendanceLog.findMany({
+    where: { Teacher_ID: id, ...(month ? { EntryTime: entryFilter } : {}) },
+    include: { zone: { select: { Zone_Name: true } } },
+    orderBy: { EntryTime: 'desc' },
+  });
+
+  let totalMinutes = 0;
+  const monthlyMap = {};
+  const zoneMap = {};
+
+  for (const log of logs) {
+    const dur = log.Duration || 0;
+    totalMinutes += dur;
+
+    const key = log.EntryTime.toISOString().slice(0, 7);
+    if (!monthlyMap[key]) monthlyMap[key] = { month: key, visits: 0, totalMinutes: 0 };
+    monthlyMap[key].visits++;
+    monthlyMap[key].totalMinutes += dur;
+
+    const zn = log.zone?.Zone_Name || 'Unknown';
+    if (!zoneMap[zn]) zoneMap[zn] = { zoneName: zn, visits: 0, totalMinutes: 0 };
+    zoneMap[zn].visits++;
+    zoneMap[zn].totalMinutes += dur;
+  }
+
+  successResponse(res, {
+    person: { ...teacher, type: 'TEACHER' },
+    summary: {
+      totalVisits: logs.length,
+      totalMinutes,
+      uniqueZones: Object.keys(zoneMap).length,
+      firstSeen: logs.length ? logs[logs.length - 1].EntryTime : null,
+      lastSeen: logs.length ? logs[0].EntryTime : null,
+    },
+    monthlySummary: Object.values(monthlyMap).sort((a, b) => b.month.localeCompare(a.month)),
+    zoneBreakdown: Object.values(zoneMap).sort((a, b) => b.visits - a.visits),
+    logs: logs.map((l) => ({
+      log_id: l.Log_ID,
+      date: l.EntryTime.toISOString().split('T')[0],
+      zoneName: l.zone?.Zone_Name || 'Unknown',
+      entryTime: l.EntryTime,
+      exitTime: l.ExitTime,
+      duration: l.Duration,
+    })),
+  }, 'Attendance summary retrieved');
 });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FaUsers, FaUserClock, FaUserCheck, FaUserShield, FaTrash, FaCheck, FaTimes, FaUserPlus, FaTimes as FaClose, FaSignOutAlt, FaMoon, FaSun, FaUserCircle, FaChevronDown } from 'react-icons/fa';
+import { FaUsers, FaUserClock, FaUserCheck, FaUserShield, FaTrash, FaCheck, FaTimes, FaUserPlus, FaTimes as FaClose, FaSignOutAlt, FaMoon, FaSun, FaUserCircle, FaChevronDown, FaTachometerAlt } from 'react-icons/fa';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -125,14 +125,14 @@ const SuperAdminDashboard = () => {
     try {
       setIsAddingUser(true);
       await api.post('/auth/admin/add-user', newUser);
-      setSuccessMessage('User added successfully! Password reset email sent.');
       setShowAddUserModal(false);
       setNewUser({ name: '', email: '' });
       fetchData();
-      setTimeout(() => setSuccessMessage(''), 3000);
+      setSuccessMessage(`User added successfully. A password setup email has been sent to ${newUser.email}.`);
+      setTimeout(() => setSuccessMessage(''), 5000);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to add user');
-      setTimeout(() => setError(''), 3000);
+      setTimeout(() => setError(''), 5000);
     } finally {
       setIsAddingUser(false);
     }
@@ -273,13 +273,32 @@ const SuperAdminDashboard = () => {
         >
           <div>
             <h1 className="text-5xl font-black mb-2 tracking-tight" style={{ color: isLightMode ? '#0F172A' : '#E5E7EB' }}>
-              <FaUserShield className="inline-block mr-3" style={{ color: isLightMode ? '#0F172A' : '#E5E7EB' }} />
-              Super Admin Dashboard
+  
+              Admin Dashboard
             </h1>
           </div>
           
+          {/* Header Actions */}
+          <div className="flex items-center gap-3 mt-2">
+          {/* Go to Dashboard */}
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-2 px-5 py-3 rounded-xl font-medium transition-all duration-300"
+            style={{
+              background: isLightMode ? 'rgba(22, 163, 74, 0.12)' : 'rgba(34, 197, 94, 0.1)',
+              border: isLightMode ? '1px solid rgba(22, 163, 74, 0.4)' : '1px solid rgba(34, 197, 94, 0.4)',
+              color: isLightMode ? '#15803d' : '#4ade80',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+            }}
+          >
+            <FaTachometerAlt />
+            <span>Dashboard</span>
+          </motion.button>
+
           {/* Profile Dropdown */}
-          <div className="relative mt-2 profile-dropdown-container">
+          <div className="relative profile-dropdown-container">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -341,6 +360,7 @@ const SuperAdminDashboard = () => {
                 </button>
               </motion.div>
             )}
+          </div>
           </div>
         </motion.div>
 

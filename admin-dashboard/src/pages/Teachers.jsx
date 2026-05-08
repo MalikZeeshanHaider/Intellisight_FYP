@@ -371,17 +371,18 @@ const Teachers = () => {
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <motion.div 
+                        <motion.div
                           whileHover={{ scale: 1.1 }}
-                          className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center border-2 shadow-sm"
-                          style={{ 
+                          className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center border-2 shadow-sm overflow-hidden"
+                          style={{
                             borderColor: isDarkMode ? '#34d399' : '#247e5bff',
                             backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : 'rgba(36, 126, 91, 0.1)'
                           }}
                         >
-                          <span className="font-semibold" style={{ color: isDarkMode ? '#34d399' : '#247e5bff' }}>
-                            {teacher.Name?.[0] || '?'}
-                          </span>
+                          {teacher.Profile_Picture
+                            ? <img src={teacher.Profile_Picture} alt={teacher.Name} className="w-full h-full object-cover" />
+                            : <span className="font-semibold" style={{ color: isDarkMode ? '#34d399' : '#247e5bff' }}>{teacher.Name?.[0] || '?'}</span>
+                          }
                         </motion.div>
                         <div className="ml-4">
                           <div className="text-sm font-medium" style={{ color: isDarkMode ? '#c0f0f0' : '#1f2937' }}>

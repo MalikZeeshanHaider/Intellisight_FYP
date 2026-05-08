@@ -478,7 +478,7 @@ const Zones = () => {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={handleOpenAdd}
+            onClick={() => setShowAddModal(true)}
             className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white"
             style={{ 
               backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#3ca1afff', 

@@ -10,6 +10,8 @@ const __dirname = path.dirname(__filename);
 // Path to the new Facerecongination folder (DeepFace FaceNet algorithm)
 const FACE_RECOGNITION_PATH = path.join(__dirname, '../../Facerecongination');
 
+const PYTHON_BIN = process.env.PYTHON_PATH || 'python';
+
 // Store active recognition processes
 const activeProcesses = new Map();
 
@@ -63,7 +65,7 @@ export const startLiveRecognition = async (req, res) => {
 
     // Start recognition process - using new DeepFace FaceNet algorithm
     const scriptPath = path.join(FACE_RECOGNITION_PATH, 'recognition_live.py');
-    const python = spawn('python', [scriptPath, '--zone', zoneId.toString()], {
+    const python = spawn(PYTHON_BIN, [scriptPath, '--zone', zoneId.toString()], {
       detached: false,
       stdio: ['ignore', 'pipe', 'pipe']
     });

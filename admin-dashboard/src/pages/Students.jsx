@@ -353,16 +353,17 @@ const Students = () => {
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div 
-                          className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center"
+                        <div
+                          className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center overflow-hidden"
                           style={{
                             backgroundColor: isDarkMode ? 'rgba(99, 102, 241, 0.2)' : '#f3f4f6',
                             border: isDarkMode ? '2px solid #818cf8' : '2px solid #e5e7eb'
                           }}
                         >
-                          <span className="font-bold" style={{ color: isDarkMode ? '#818cf8' : '#6365baff' }}>
-                            {student.Name?.[0] || '?'}
-                          </span>
+                          {student.Profile_Picture
+                            ? <img src={student.Profile_Picture} alt={student.Name} className="w-full h-full object-cover" />
+                            : <span className="font-bold" style={{ color: isDarkMode ? '#818cf8' : '#6365baff' }}>{student.Name?.[0] || '?'}</span>
+                          }
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-semibold" style={{ color: isDarkMode ? '#c0f0f0' : '#1f2937' }}>

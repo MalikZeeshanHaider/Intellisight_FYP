@@ -63,11 +63,20 @@ def load_existing_embeddings():
 
 
 def get_trained_images(embeddings):
-    """Get set of already trained image paths"""
+    """Get set of already trained image paths.
+
+    Handles two formats:
+      - train_incremental format: {'person': 'Ali', 'image': 'img1.jpg', ...}
+      - enrollment format:        {'person_key': '1|TEACHER|Ali', 'name': 'Ali', 'image': '', ...}
+    """
     trained = set()
     for item in embeddings:
-        # Store just the person/image combination
-        trained.add(f"{item['person']}/{item['image']}")
+        person = item.get('person') or item.get('name') or ''
+        image  = item.get('image', '')
+        if person and image:
+            trained.add(f"{person}/{image}")
+        # enrollment items have image='' — they don't correspond to on-disk images
+        # so we intentionally skip them (they won't collide with folder scan keys)
     return trained
 
 
@@ -123,8 +132,8 @@ def extract_face_embedding(image_path):
             img_path=image,
             model_name=MODEL_NAME,
             detector_backend=DETECTOR_BACKEND,
-            enforce_detection=True,   # Skip images where no face is detected
-            align=True
+            enforce_detection=True,
+            align=False   # must match enrollment.py (align=False) to keep embedding space consistent
         )
         
         if results and len(results) > 0:

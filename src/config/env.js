@@ -107,6 +107,9 @@ export const env = {
 
   // Logging
   LOG_LEVEL:            process.env.LOG_LEVEL                 || ENV_DEFAULTS.LOG_LEVEL,
+
+  // Gemini AI (timetable extraction) — optional
+  GEMINI_API_KEY:       process.env.GEMINI_API_KEY            || '',
 };
 
 console.log(`[ENV] Configuration validated. NODE_ENV=${env.NODE_ENV}, PORT=${env.PORT}`);

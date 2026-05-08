@@ -209,6 +209,42 @@ export const getAllUnknownStats = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @route   GET /api/zones/recent-alerts
+ * @desc    Returns unknown face detections from the last 30 minutes (no image payload)
+ *          Used by the alert bell in the dashboard header.
+ * @access  Private
+ */
+export const getRecentAlerts = asyncHandler(async (req, res) => {
+  const minutes = parseInt(req.query.minutes) || 30;
+  const since = new Date(Date.now() - minutes * 60 * 1000);
+
+  const rows = await prisma.unknownFaces.findMany({
+    where: { DetectedTime: { gte: since } },
+    orderBy: { DetectedTime: 'desc' },
+    take: 50,
+    select: { Unknown_ID: true, Zone_id: true, Confidence: true, Status: true, DetectedTime: true },
+  });
+
+  const zoneIds = [...new Set(rows.map((r) => r.Zone_id).filter(Boolean))];
+  const zones = zoneIds.length
+    ? await prisma.zone.findMany({ where: { Zone_id: { in: zoneIds } }, select: { Zone_id: true, Zone_Name: true } })
+    : [];
+  const zoneNameById = Object.fromEntries(zones.map((z) => [z.Zone_id, z.Zone_Name]));
+
+  const alerts = rows.map((r) => ({
+    id: `unknown_${r.Unknown_ID}`,
+    type: 'UNKNOWN_FACE',
+    severity: 'warning',
+    message: `Unknown face detected in ${zoneNameById[r.Zone_id] || `Zone ${r.Zone_id ?? '?'}`}`,
+    zoneName: zoneNameById[r.Zone_id] || `Zone ${r.Zone_id ?? '?'}`,
+    timestamp: r.DetectedTime,
+    status: r.Status,
+  }));
+
+  successResponse(res, { alerts, total: alerts.length }, 'Recent alerts retrieved');
+});
+
+/**
  * @route   GET /api/zones/:id/current
  * @desc    Get all persons currently in a specific zone
  * @access  Private

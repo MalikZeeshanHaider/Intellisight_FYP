@@ -9,6 +9,7 @@ import {
   getZoneUnknownCount,
   getAllUnknownFaces,
   getAllUnknownStats,
+  getRecentAlerts,
 } from '../controllers/zone.controller.js';
 import { validateRequest } from '../middlewares/validateRequest.js';
 import {
@@ -28,6 +29,7 @@ router.use(authenticateToken);
 // treat "unknown-faces" or "unknown-stats" as a Zone_id.
 router.get('/unknown-faces', getAllUnknownFaces);
 router.get('/unknown-stats', getAllUnknownStats);
+router.get('/recent-alerts', getRecentAlerts);
 
 router.get('/', getAllZones);
 router.get('/:id', validateRequest(getZoneSchema), getZoneById);

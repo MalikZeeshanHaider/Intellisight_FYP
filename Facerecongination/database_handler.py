@@ -675,6 +675,100 @@ class DatabaseHandler:
             print(f"[DB ERROR] save_face_embeddings: {e}")
             return False
 
+    def save_face_embeddings_v2(self, person_id, person_type, enriched_embeddings,
+                                person_name=None):
+        """
+        Save face embeddings with per-embedding quality metadata.
+
+        Differs from save_face_embeddings() by accepting richer per-row metadata:
+
+            enriched_embeddings : list of dicts, each containing:
+                'embedding'          : list[float]  — 512-D ArcFace vector
+                'quality_score'      : float        — 0.0–1.0 composite quality score
+                'is_centroid'        : bool         — True for the averaged centroid row
+                'source_image_index' : int | None   — Face_Picture_N slot (1–5)
+
+        Writes to:
+          1. FaceEmbeddings table with QualityScore, IsCentroid, SourceImageIndex columns
+             (gracefully falls back to the v1 INSERT if those columns don't exist yet)
+          2. Legacy pickle blob in Students / Teacher table (backward compat)
+
+        The centroid row is always included — it is the most stable single-point
+        representation used by search_with_vote() as a reliable anchor.
+        """
+        try:
+            table    = '"Teacher"' if person_type == 'Teacher' else '"Students"'
+            id_field = '"Teacher_ID"' if person_type == 'Teacher' else '"Student_ID"'
+
+            if not person_name:
+                with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute(f'SELECT "Name" FROM {table} WHERE {id_field} = %s',
+                                (person_id,))
+                    row = cur.fetchone()
+                    person_name = row['Name'] if row else f"{person_type}_{person_id}"
+
+            role       = 'STUDENT' if person_type == 'Student' else 'TEACHER'
+            person_key = build_person_key(person_id, role, person_name)
+
+            # Raw list of embeddings for legacy pickle blob
+            raw_embeddings = [e['embedding'] for e in enriched_embeddings
+                              if not e.get('is_centroid', False)]
+
+            with self.conn.cursor() as cur:
+                # 1. Legacy pickle blob (only individual embeddings, not centroid)
+                cur.execute(f"""
+                    UPDATE {table} SET "Face_Embeddings" = %s WHERE {id_field} = %s
+                """, (pickle.dumps(raw_embeddings), person_id))
+
+                # 2. FaceEmbeddings — clear old rows, insert new ones
+                if person_type == 'Student':
+                    cur.execute('DELETE FROM "FaceEmbeddings" WHERE "Student_ID" = %s',
+                                (person_id,))
+                else:
+                    cur.execute('DELETE FROM "FaceEmbeddings" WHERE "Teacher_ID" = %s',
+                                (person_id,))
+
+                for item in enriched_embeddings:
+                    emb        = item['embedding']
+                    quality    = item.get('quality_score')
+                    is_cent    = bool(item.get('is_centroid', False))
+                    src_idx    = item.get('source_image_index')
+                    emb_json   = json.dumps(emb if isinstance(emb, list) else list(emb))
+                    emb_bytes  = emb_json.encode('utf-8')
+
+                    id_col  = '"Student_ID"' if person_type == 'Student' else '"Teacher_ID"'
+                    try:
+                        # v2 INSERT — requires QualityScore, IsCentroid, SourceImageIndex columns
+                        cur.execute(f"""
+                            INSERT INTO "FaceEmbeddings"
+                                ("PersonType", {id_col}, "PersonName",
+                                 "Embedding", "EmbeddingJson",
+                                 "QualityScore", "IsCentroid", "SourceImageIndex",
+                                 "CreatedAt", "UpdatedAt")
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                        """, (person_type, person_id, person_name,
+                              emb_bytes, emb_json, quality, is_cent, src_idx))
+                    except Exception:
+                        # New columns not yet migrated — fall back to v1 INSERT
+                        self.conn.rollback()
+                        cur.execute(f"""
+                            INSERT INTO "FaceEmbeddings"
+                                ("PersonType", {id_col}, "PersonName",
+                                 "Embedding", "EmbeddingJson", "CreatedAt", "UpdatedAt")
+                            VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+                        """, (person_type, person_id, person_name, emb_bytes, emb_json))
+
+            self.conn.commit()
+            n_ind  = sum(1 for e in enriched_embeddings if not e.get('is_centroid'))
+            n_cent = sum(1 for e in enriched_embeddings if e.get('is_centroid'))
+            print(f"[DB] ✓ {person_key}: saved {n_ind} embedding(s) + {n_cent} centroid")
+            return True
+
+        except Exception as e:
+            self.conn.rollback()
+            print(f"[DB ERROR] save_face_embeddings_v2: {e}")
+            return False
+
     def get_person_images(self, person_id, person_type):
         """Get all face pictures for a person"""
         try:

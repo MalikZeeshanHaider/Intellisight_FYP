@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FiX, FiUpload, FiTrash2, FiChevronDown } from 'react-icons/fi';
+import { FiX, FiUpload, FiTrash2, FiChevronDown, FiRefreshCw, FiCamera } from 'react-icons/fi';
 import { studentAPI } from '../api/api';
 import { sectionAPI, enrollmentAPI } from '../api/attendance';
+import { enrollPerson } from '../api/faceRecognition';
 
 const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
     const isDarkMode = document.documentElement.classList.contains('dark');
@@ -20,8 +21,21 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
         Face_Picture_4: null,
         Face_Picture_5: null
     });
+    const [profilePicture, setProfilePicture] = useState(null);
+    const profilePicInputRef = useRef(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [enrollStatus, setEnrollStatus] = useState(null);
+    const picturesChangedRef = useRef(false);
+
+    const handleProfilePicUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onloadend = () => setProfilePicture(reader.result);
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    };
     const [genderDropdownOpen, setGenderDropdownOpen] = useState(false);
     const genderDropdownRef = useRef(null);
     const [sections, setSections] = useState([]);
@@ -82,6 +96,7 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
                 Department: student.Department || '',
                 Section_ID: student.Section_ID ? String(student.Section_ID) : ''
             });
+            setProfilePicture(student.Profile_Picture || null);
             setFacePictures({
                 Face_Picture_1: student.Face_Picture_1 || null,
                 Face_Picture_2: student.Face_Picture_2 || null,
@@ -99,25 +114,34 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
         });
     };
 
-    const handleImageUpload = (pictureNumber) => (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            setFacePictures(prev => ({
-                ...prev,
-                [`Face_Picture_${pictureNumber}`]: reader.result
-            }));
-        };
-        reader.readAsDataURL(file);
+    const handleMultiImageUpload = (e) => {
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
+        picturesChangedRef.current = true;
+        const freeSlots = [1, 2, 3, 4, 5].filter(n => !facePictures[`Face_Picture_${n}`]);
+        files.slice(0, freeSlots.length).forEach((file, i) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFacePictures(prev => ({ ...prev, [`Face_Picture_${freeSlots[i]}`]: reader.result }));
+            };
+            reader.readAsDataURL(file);
+        });
+        e.target.value = '';
     };
 
     const removeImage = (pictureNumber) => {
-        setFacePictures(prev => ({
-            ...prev,
-            [`Face_Picture_${pictureNumber}`]: null
-        }));
+        picturesChangedRef.current = true;
+        setFacePictures(prev => {
+            const all = [1, 2, 3, 4, 5].map(n => prev[`Face_Picture_${n}`]).filter(Boolean);
+            all.splice(pictureNumber - 1, 1);
+            return {
+                Face_Picture_1: all[0] || null,
+                Face_Picture_2: all[1] || null,
+                Face_Picture_3: all[2] || null,
+                Face_Picture_4: all[3] || null,
+                Face_Picture_5: all[4] || null,
+            };
+        });
     };
 
     const handleSubmit = async (e) => {
@@ -153,6 +177,9 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
                 payload.Section_ID = parseInt(formData.Section_ID, 10);
             }
 
+            // Profile picture (optional)
+            payload.Profile_Picture = profilePicture ?? null;
+
             // Add pictures (only include changed ones)
             if (facePictures.Face_Picture_1) payload.Face_Picture_1 = facePictures.Face_Picture_1;
             if (facePictures.Face_Picture_2) payload.Face_Picture_2 = facePictures.Face_Picture_2;
@@ -161,6 +188,20 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
             if (facePictures.Face_Picture_5) payload.Face_Picture_5 = facePictures.Face_Picture_5;
 
             await studentAPI.updateStudent(student.Student_ID, payload);
+
+            // Auto-enroll when face pictures were changed
+            if (picturesChangedRef.current && facePictures.Face_Picture_1) {
+                setEnrollStatus('enrolling');
+                try {
+                    await enrollPerson('Student', student.Student_ID);
+                    setEnrollStatus('done');
+                } catch {
+                    setEnrollStatus('failed');
+                }
+                picturesChangedRef.current = false;
+                // Brief pause so user sees the status before modal closes
+                await new Promise(r => setTimeout(r, 1200));
+            }
 
             onSuccess();
             onClose();
@@ -234,6 +275,37 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
 
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    {/* Profile Picture (optional) */}
+                    <div className="flex flex-col items-center gap-2 pb-2">
+                        <div
+                            className="relative group cursor-pointer w-24 h-24 rounded-full overflow-hidden flex items-center justify-center text-3xl font-bold"
+                            style={{
+                                background: isDarkMode ? 'rgba(129,140,248,0.15)' : '#f3f4f6',
+                                border: isDarkMode ? '3px solid rgba(129,140,248,0.6)' : '3px solid #6365baff',
+                                color: isDarkMode ? '#818cf8' : '#6365baff',
+                            }}
+                            onClick={() => profilePicInputRef.current?.click()}
+                        >
+                            {profilePicture
+                                ? <img src={profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                                : <span>{student?.Name?.[0] || <FiCamera size={28} />}</span>}
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full"
+                                style={{ background: 'rgba(0,0,0,0.4)' }}>
+                                <FiCamera size={22} color="white" />
+                            </div>
+                        </div>
+                        <span className="text-xs" style={{ color: isDarkMode ? 'rgba(192,240,240,0.5)' : '#9ca3af' }}>
+                            Profile picture (optional) — click to {profilePicture ? 'change' : 'upload'}
+                        </span>
+                        {profilePicture && (
+                            <button type="button" onClick={() => setProfilePicture(null)}
+                                className="text-xs" style={{ color: '#ef4444' }}>
+                                Remove
+                            </button>
+                        )}
+                        <input ref={profilePicInputRef} type="file" accept="image/*" className="hidden" onChange={handleProfilePicUpload} />
+                    </div>
+
                     {/* Name */}
                     <div>
                         <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#1e293b' }}>
@@ -464,70 +536,87 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
                     {/* Face Pictures Upload */}
                     <div>
                         <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#1e293b' }}>
-                            Face Pictures (1-5 images)
+                            Face Pictures (1–5 images)
                         </label>
                         <p className="text-xs mb-3" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#6b7280' }}>
-                            {uploadedCount}/5 images uploaded. Leave unchanged to keep existing pictures.
+                            {uploadedCount}/5 images selected. Leave unchanged to keep existing pictures.
+                            {uploadedCount > 0 && uploadedCount < 5 && ` You can add ${5 - uploadedCount} more.`}
+                            {uploadedCount === 5 && ' Maximum reached.'}
                         </p>
 
-                        {/* Image Upload Grid */}
-                        <div className="grid grid-cols-3 gap-4">
-                            {[1, 2, 3, 4, 5].map(num => {
-                                const pictureKey = `Face_Picture_${num}`;
-                                const picture = facePictures[pictureKey];
+                        {/* Single multi-select upload button */}
+                        {uploadedCount < 5 && (
+                            <>
+                                <input
+                                    type="file"
+                                    id="editStudentMultiImageUpload"
+                                    accept="image/*"
+                                    multiple
+                                    onChange={handleMultiImageUpload}
+                                    className="hidden"
+                                />
+                                <label
+                                    htmlFor="editStudentMultiImageUpload"
+                                    className="cursor-pointer flex flex-col items-center justify-center w-full py-6 border-2 border-dashed rounded-xl transition mb-3"
+                                    style={{
+                                        borderColor: isDarkMode ? 'rgba(129, 140, 248, 0.35)' : '#c7d2fe',
+                                        backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.5)' : 'rgba(238, 242, 255, 0.5)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.borderColor = isDarkMode ? '#818cf8' : '#6365baff';
+                                        e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(129, 140, 248, 0.1)' : 'rgba(238, 242, 255, 0.9)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.borderColor = isDarkMode ? 'rgba(129, 140, 248, 0.35)' : '#c7d2fe';
+                                        e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.5)' : 'rgba(238, 242, 255, 0.5)';
+                                    }}
+                                >
+                                    <FiUpload size={28} style={{ color: isDarkMode ? '#818cf8' : '#6365baff', marginBottom: '8px' }} />
+                                    <span className="text-sm font-semibold" style={{ color: isDarkMode ? '#818cf8' : '#6365baff' }}>
+                                        Click to select images
+                                    </span>
+                                    <span className="text-xs mt-1" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#9ca3af' }}>
+                                        Select up to {5 - uploadedCount} image{5 - uploadedCount !== 1 ? 's' : ''} at once
+                                    </span>
+                                </label>
+                            </>
+                        )}
 
-                                return (
-                                    <div key={num} className="relative">
-                                        <input
-                                            type="file"
-                                            id={`editImageUpload${num}`}
-                                            accept="image/*"
-                                            onChange={handleImageUpload(num)}
-                                            className="hidden"
-                                        />
-                                        
-                                        {picture ? (
-                                            <div className="relative group">
-                                                <img
-                                                    src={picture}
-                                                    alt={`Picture ${num}`}
-                                                    className="w-full h-32 object-cover rounded-lg"
-                                                    style={{ 
-                                                        border: isDarkMode ? '2px solid rgba(129, 140, 248, 0.3)' : '2px solid #d1d5db'
-                                                    }}
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeImage(num)}
-                                                    className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"
-                                                >
-                                                    <FiTrash2 size={16} />
-                                                </button>
-                                                <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
-                                                    Picture {num}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <label
-                                                htmlFor={`editImageUpload${num}`}
-                                                className="cursor-pointer flex flex-col items-center justify-center h-32 border-2 border-dashed rounded-lg transition"
-                                                style={{
-                                                    borderColor: isDarkMode ? 'rgba(129, 140, 248, 0.3)' : '#d1d5db',
-                                                    backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.5)' : 'transparent'
-                                                }}
-                                                onMouseEnter={(e) => e.currentTarget.style.borderColor = isDarkMode ? '#818cf8' : '#3b82f6'}
-                                                onMouseLeave={(e) => e.currentTarget.style.borderColor = isDarkMode ? 'rgba(129, 140, 248, 0.3)' : '#d1d5db'}
+                        {/* Preview grid */}
+                        {uploadedCount > 0 && (
+                            <div className="grid grid-cols-3 gap-3">
+                                {[1, 2, 3, 4, 5].map(num => {
+                                    const picture = facePictures[`Face_Picture_${num}`];
+                                    if (!picture) return null;
+                                    return (
+                                        <div key={num} className="relative group">
+                                            <img
+                                                src={picture}
+                                                alt={`Picture ${num}`}
+                                                className="w-full h-28 object-cover rounded-lg"
+                                                style={{ border: isDarkMode ? '2px solid rgba(129, 140, 248, 0.3)' : '2px solid #d1d5db' }}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeImage(num)}
+                                                className="absolute top-1.5 right-1.5 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"
                                             >
-                                                <FiUpload size={24} style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#9ca3af', marginBottom: '4px' }} />
-                                                <span className="text-xs" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.6)' : '#6b7280' }}>
-                                                    Picture {num}
-                                                </span>
-                                            </label>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                                <FiTrash2 size={13} />
+                                            </button>
+                                            <div
+                                                className="absolute bottom-1.5 left-1.5 text-xs px-1.5 py-0.5 rounded"
+                                                style={{
+                                                    backgroundColor: 'rgba(0,0,0,0.65)',
+                                                    color: isDarkMode ? '#a5b4fc' : 'white'
+                                                }}
+                                            >
+                                                #{num}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     {/* Error Message */}
@@ -541,6 +630,28 @@ const EditStudentModal = ({ isOpen, onClose, onSuccess, student }) => {
                         >
                             <p className="font-semibold mb-1" style={{ color: isDarkMode ? '#f87171' : '#991b1b' }}>Validation failed</p>
                             <p className="text-sm" style={{ color: isDarkMode ? '#fca5a5' : '#dc2626' }}>{error}</p>
+                        </div>
+                    )}
+
+                    {/* Enrollment status during save */}
+                    {enrollStatus && (
+                        <div className="rounded-lg px-4 py-2 text-sm font-medium flex items-center gap-2"
+                            style={{
+                                backgroundColor: enrollStatus === 'done'
+                                    ? (isDarkMode ? 'rgba(52, 211, 153, 0.15)' : '#dcfce7')
+                                    : enrollStatus === 'failed'
+                                    ? (isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fee2e2')
+                                    : (isDarkMode ? 'rgba(129, 140, 248, 0.15)' : '#eef2ff'),
+                                color: enrollStatus === 'done'
+                                    ? (isDarkMode ? '#34d399' : '#15803d')
+                                    : enrollStatus === 'failed'
+                                    ? '#ef4444'
+                                    : (isDarkMode ? '#818cf8' : '#6365baff')
+                            }}>
+                            <FiRefreshCw size={14} className={enrollStatus === 'enrolling' ? 'animate-spin' : ''} />
+                            {enrollStatus === 'enrolling' && 'Updating face embeddings…'}
+                            {enrollStatus === 'done' && 'Face embeddings updated successfully'}
+                            {enrollStatus === 'failed' && 'Saved, but enrollment failed — re-enroll manually'}
                         </div>
                     )}
 

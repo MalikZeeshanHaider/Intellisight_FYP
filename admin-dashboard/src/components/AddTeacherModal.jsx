@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FiX, FiUpload, FiTrash2, FiChevronDown } from 'react-icons/fi';
+import { FiX, FiUpload, FiTrash2, FiChevronDown, FiCamera } from 'react-icons/fi';
 import { teacherAPI } from '../api/api';
 
 const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
@@ -10,6 +10,8 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
         Faculty_Type: '',
         Department: ''
     });
+    const [profilePicture, setProfilePicture] = useState(null);
+    const profilePicInputRef = useRef(null);
     const [facePictures, setFacePictures] = useState({
         Face_Picture_1: null,
         Face_Picture_2: null,
@@ -23,6 +25,15 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
     const [facultyDropdownOpen, setFacultyDropdownOpen] = useState(false);
     const genderDropdownRef = useRef(null);
     const facultyDropdownRef = useRef(null);
+
+    const handleProfilePicUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onloadend = () => setProfilePicture(reader.result);
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    };
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -45,25 +56,32 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
         });
     };
 
-    const handleImageUpload = (pictureNumber) => (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            setFacePictures(prev => ({
-                ...prev,
-                [`Face_Picture_${pictureNumber}`]: reader.result
-            }));
-        };
-        reader.readAsDataURL(file);
+    const handleMultiImageUpload = (e) => {
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
+        const freeSlots = [1, 2, 3, 4, 5].filter(n => !facePictures[`Face_Picture_${n}`]);
+        files.slice(0, freeSlots.length).forEach((file, i) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFacePictures(prev => ({ ...prev, [`Face_Picture_${freeSlots[i]}`]: reader.result }));
+            };
+            reader.readAsDataURL(file);
+        });
+        e.target.value = '';
     };
 
     const removeImage = (pictureNumber) => {
-        setFacePictures(prev => ({
-            ...prev,
-            [`Face_Picture_${pictureNumber}`]: null
-        }));
+        setFacePictures(prev => {
+            const all = [1, 2, 3, 4, 5].map(n => prev[`Face_Picture_${n}`]).filter(Boolean);
+            all.splice(pictureNumber - 1, 1);
+            return {
+                Face_Picture_1: all[0] || null,
+                Face_Picture_2: all[1] || null,
+                Face_Picture_3: all[2] || null,
+                Face_Picture_4: all[3] || null,
+                Face_Picture_5: all[4] || null,
+            };
+        });
     };
 
     const handleSubmit = async (e) => {
@@ -100,7 +118,7 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                 Face_Picture_1: facePictures.Face_Picture_1
             };
 
-            // Add optional pictures
+            if (profilePicture) payload.Profile_Picture = profilePicture;
             if (facePictures.Face_Picture_2) payload.Face_Picture_2 = facePictures.Face_Picture_2;
             if (facePictures.Face_Picture_3) payload.Face_Picture_3 = facePictures.Face_Picture_3;
             if (facePictures.Face_Picture_4) payload.Face_Picture_4 = facePictures.Face_Picture_4;
@@ -109,6 +127,7 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
             await teacherAPI.createTeacher(payload);
 
             setFormData({ Name: '', Email: '', Gender: '', Faculty_Type: '', Department: '' });
+            setProfilePicture(null);
             setFacePictures({
                 Face_Picture_1: null,
                 Face_Picture_2: null,
@@ -189,6 +208,37 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
 
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    {/* Profile Picture (optional) */}
+                    <div className="flex flex-col items-center gap-2 pb-2">
+                        <div
+                            className="relative group cursor-pointer w-24 h-24 rounded-full overflow-hidden flex items-center justify-center text-3xl font-bold"
+                            style={{
+                                background: isDarkMode ? 'rgba(52,211,153,0.15)' : '#ecfdf5',
+                                border: isDarkMode ? '3px solid rgba(52,211,153,0.6)' : '3px solid #247e5bff',
+                                color: isDarkMode ? '#34d399' : '#247e5bff',
+                            }}
+                            onClick={() => profilePicInputRef.current?.click()}
+                        >
+                            {profilePicture
+                                ? <img src={profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                                : <FiCamera size={28} />}
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full"
+                                style={{ background: 'rgba(0,0,0,0.4)' }}>
+                                <FiCamera size={22} color="white" />
+                            </div>
+                        </div>
+                        <span className="text-xs" style={{ color: isDarkMode ? 'rgba(192,240,240,0.5)' : '#9ca3af' }}>
+                            Profile picture (optional)
+                        </span>
+                        {profilePicture && (
+                            <button type="button" onClick={() => setProfilePicture(null)}
+                                className="text-xs" style={{ color: '#ef4444' }}>
+                                Remove
+                            </button>
+                        )}
+                        <input ref={profilePicInputRef} type="file" accept="image/*" className="hidden" onChange={handleProfilePicUpload} />
+                    </div>
+
                     {/* Name */}
                     <div>
                         <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.9)' : '#1e293b' }}>
@@ -431,77 +481,87 @@ const AddTeacherModal = ({ isOpen, onClose, onSuccess }) => {
                     {/* Face Pictures Upload */}
                     <div>
                         <label className="block text-xs font-semibold mb-1.5" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.9)' : '#1e293b' }}>
-                            Face Pictures (1-5 images) <span className="text-red-500">*</span>
+                            Face Pictures (1–5 images) <span className="text-red-500">*</span>
                         </label>
                         <p className="text-xs mb-3" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#6b7280' }}>
-                            {uploadedCount}/5 images uploaded. First image is required.
+                            {uploadedCount}/5 images selected.{uploadedCount === 0 && ' At least one image is required.'}
+                            {uploadedCount > 0 && uploadedCount < 5 && ` You can add ${5 - uploadedCount} more.`}
+                            {uploadedCount === 5 && ' Maximum reached.'}
                         </p>
 
-                        {/* Image Upload Grid */}
-                        <div className="grid grid-cols-3 gap-4">
-                            {[1, 2, 3, 4, 5].map(num => {
-                                const pictureKey = `Face_Picture_${num}`;
-                                const picture = facePictures[pictureKey];
+                        {/* Single multi-select upload button */}
+                        {uploadedCount < 5 && (
+                            <>
+                                <input
+                                    type="file"
+                                    id="teacherMultiImageUpload"
+                                    accept="image/*"
+                                    multiple
+                                    onChange={handleMultiImageUpload}
+                                    className="hidden"
+                                />
+                                <label
+                                    htmlFor="teacherMultiImageUpload"
+                                    className="cursor-pointer flex flex-col items-center justify-center w-full py-6 border-2 border-dashed rounded-xl transition mb-3"
+                                    style={{
+                                        borderColor: isDarkMode ? 'rgba(52, 211, 153, 0.35)' : '#a7f3d0',
+                                        backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.5)' : 'rgba(236, 253, 245, 0.5)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.borderColor = isDarkMode ? '#34d399' : '#247e5bff';
+                                        e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(52, 211, 153, 0.1)' : 'rgba(236, 253, 245, 0.9)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.borderColor = isDarkMode ? 'rgba(52, 211, 153, 0.35)' : '#a7f3d0';
+                                        e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.5)' : 'rgba(236, 253, 245, 0.5)';
+                                    }}
+                                >
+                                    <FiUpload size={28} style={{ color: isDarkMode ? '#34d399' : '#247e5bff', marginBottom: '8px' }} />
+                                    <span className="text-sm font-semibold" style={{ color: isDarkMode ? '#34d399' : '#247e5bff' }}>
+                                        Click to select images
+                                    </span>
+                                    <span className="text-xs mt-1" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#9ca3af' }}>
+                                        Select up to {5 - uploadedCount} image{5 - uploadedCount !== 1 ? 's' : ''} at once
+                                    </span>
+                                </label>
+                            </>
+                        )}
 
-                                return (
-                                    <div key={num} className="relative">
-                                        <input
-                                            type="file"
-                                            id={`teacherImageUpload${num}`}
-                                            accept="image/*"
-                                            onChange={handleImageUpload(num)}
-                                            className="hidden"
-                                        />
-                                        
-                                        {picture ? (
-                                            <div className="relative group">
-                                                <img
-                                                    src={picture}
-                                                    alt={`Picture ${num}`}
-                                                    className="w-full h-32 object-cover rounded-lg"
-                                                    style={{
-                                                        border: isDarkMode ? '2px solid rgba(52, 211, 153, 0.3)' : '2px solid #d1d5db'
-                                                    }}
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeImage(num)}
-                                                    className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"
-                                                >
-                                                    <FiTrash2 size={16} />
-                                                </button>
-                                                <div 
-                                                    className="absolute bottom-2 left-2 text-xs px-2 py-1 rounded"
-                                                    style={{
-                                                        backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.6)',
-                                                        color: isDarkMode ? '#34d399' : 'white'
-                                                    }}
-                                                >
-                                                    Picture {num}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <label
-                                                htmlFor={`teacherImageUpload${num}`}
-                                                className="cursor-pointer flex flex-col items-center justify-center h-32 border-2 border-dashed rounded-lg transition"
-                                                style={{
-                                                    borderColor: isDarkMode ? 'rgba(52, 211, 153, 0.3)' : '#d1d5db',
-                                                    backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.5)' : 'transparent'
-                                                }}
-                                                onMouseEnter={(e) => e.currentTarget.style.borderColor = isDarkMode ? '#34d399' : '#247e5bff'}
-                                                onMouseLeave={(e) => e.currentTarget.style.borderColor = isDarkMode ? 'rgba(52, 211, 153, 0.3)' : '#d1d5db'}
+                        {/* Preview grid */}
+                        {uploadedCount > 0 && (
+                            <div className="grid grid-cols-3 gap-3">
+                                {[1, 2, 3, 4, 5].map(num => {
+                                    const picture = facePictures[`Face_Picture_${num}`];
+                                    if (!picture) return null;
+                                    return (
+                                        <div key={num} className="relative group">
+                                            <img
+                                                src={picture}
+                                                alt={`Picture ${num}`}
+                                                className="w-full h-28 object-cover rounded-lg"
+                                                style={{ border: isDarkMode ? '2px solid rgba(52, 211, 153, 0.3)' : '2px solid #d1d5db' }}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeImage(num)}
+                                                className="absolute top-1.5 right-1.5 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"
                                             >
-                                                <FiUpload size={24} style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.5)' : '#9ca3af', marginBottom: '4px' }} />
-                                                <span className="text-xs" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#4b5563' }}>
-                                                    Picture {num}
-                                                    {num === 1 && <span className="text-red-500">*</span>}
-                                                </span>
-                                            </label>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                                <FiTrash2 size={13} />
+                                            </button>
+                                            <div
+                                                className="absolute bottom-1.5 left-1.5 text-xs px-1.5 py-0.5 rounded"
+                                                style={{
+                                                    backgroundColor: 'rgba(0,0,0,0.65)',
+                                                    color: isDarkMode ? '#6ee7b7' : 'white'
+                                                }}
+                                            >
+                                                #{num}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     {/* Error Message */}

@@ -6,6 +6,7 @@ import {
   updateStudent,
   deleteStudent,
   uploadFacePicture,
+  getStudentAttendanceSummary,
 } from '../controllers/student.controller.js';
 import { validateRequest } from '../middlewares/validateRequest.js';
 import {
@@ -23,6 +24,7 @@ const router = express.Router();
 router.use(authenticateToken);
 
 router.get('/', getAllStudents);
+router.get('/:id/attendance-summary', validateRequest(getStudentSchema), getStudentAttendanceSummary);
 router.get('/:id', validateRequest(getStudentSchema), getStudentById);
 router.post('/', validateRequest(createStudentSchema), createStudent);
 router.put('/:id', validateRequest(updateStudentSchema), updateStudent);

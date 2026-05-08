@@ -156,6 +156,14 @@ export const studentAPI = {
     const response = await api.delete(`/students/${studentId}`);
     return response.data;
   },
+
+  // Attendance summary
+  getAttendanceSummary: async (studentId, month) => {
+    const response = await api.get(`/students/${studentId}/attendance-summary`, {
+      params: month ? { month } : {},
+    });
+    return response.data;
+  },
 };
 
 // ============== TEACHER APIs ==============
@@ -188,6 +196,14 @@ export const teacherAPI = {
   // Delete teacher
   deleteTeacher: async (teacherId) => {
     const response = await api.delete(`/teachers/${teacherId}`);
+    return response.data;
+  },
+
+  // Attendance summary
+  getAttendanceSummary: async (teacherId, month) => {
+    const response = await api.get(`/teachers/${teacherId}/attendance-summary`, {
+      params: month ? { month } : {},
+    });
     return response.data;
   },
 };

@@ -10,6 +10,9 @@ import { ThemeProvider } from './context/ThemeContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
+import { AlertProvider } from './context/AlertContext';
+import AlertBell from './components/AlertBell';
+import AlertToast from './components/AlertToast';
 
 // Pages
 import Login from './pages/Login';
@@ -41,7 +44,10 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <AuthProvider>
+          <AlertProvider>
           <Router>
+            <AlertBell />
+            <AlertToast />
             <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
@@ -256,6 +262,7 @@ function App() {
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Router>
+          </AlertProvider>
       </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>

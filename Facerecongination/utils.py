@@ -19,6 +19,14 @@ from PIL import Image
 
 from config import DISTANCE_THRESHOLD
 
+# ── Module-level CLAHE singleton ───────────────────────────────────────────────
+# preprocess_face_crop is called once per face per frame (hot path: ~2 cameras
+# × 3 faces × 10 AI fps = ~60 calls/s).  cv2.createCLAHE allocates a tile
+# histogram buffer on every call — ~60 malloc/GC pairs per second.
+# One module-level instance pays that cost exactly once at import time.
+_CLAHE_L = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+# ─────────────────────────────────────────────────────────────────────────────
+
 # ─── Canonical identity key ───────────────────────────────────────────────────
 # Format : "{person_id}|{ROLE}|{Full Name}"
 # Examples: "42|STUDENT|Ali Khan"   "7|TEACHER|Dr. Smith"
@@ -220,8 +228,7 @@ def preprocess_face_crop(image):
         # Step 2 — CLAHE on L channel (perceptual luminance)
         lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
         l, a, b = cv2.split(lab)
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        l = clahe.apply(l)
+        l = _CLAHE_L.apply(l)   # module-level singleton — no per-call alloc
         image = cv2.cvtColor(cv2.merge([l, a, b]), cv2.COLOR_LAB2BGR)
 
     except Exception:
@@ -246,31 +253,47 @@ def get_euclidean_distance(emb1, emb2):
 
 class FaceTracker:
     """
-    Track face identities across frames using IoU-based bounding-box matching.
+    Track face identities across frames using IoU-based bounding-box matching
+    with consecutive-frame voting (identity hysteresis).
 
     Workflow
     --------
-    1. Each processed frame calls update() with all detected faces.
-    2. Before running expensive embedding extraction, call get_person_for_bbox()
-       — if a cached identity is returned, skip DeepFace + index search entirely.
-    3. New or unmatched faces always go through full recognition.
-    4. Tracks that receive no matching detection for max_age_seconds are evicted,
-       forcing full re-recognition when that face reappears.
+    1. Each processed frame calls update() with all detected faces and their
+       raw recognition result (person_dict | None).
+    2. Identity hysteresis: a new identity only becomes the track's *confirmed*
+       person after CONFIRM_FRAMES consecutive recognitions of the same person.
+       Single-frame misidentifications (Ali → Ahmed → Ali) are suppressed.
+    3. Before running expensive embedding extraction, call get_person_for_bbox()
+       — if a confirmed cached identity is returned, skip DeepFace entirely.
+    4. New or unmatched faces always go through full recognition.
+    5. Tracks that receive no matching detection for max_age_seconds are evicted.
+
+    Per-track state
+    ---------------
+    person          : confirmed identity dict (None until CONFIRM_FRAMES hit)
+    candidate       : the identity being accumulated before confirmation
+    candidate_count : consecutive frames the same candidate has been seen
+    last_rerecog_time : wall-clock time of last ArcFace call for this track
 
     Thread-safe: all public methods acquire a threading.Lock.
     """
 
-    def __init__(self, max_age_seconds: float = 2.0, max_cache: int = 100):
+    def __init__(self, max_age_seconds: float = 2.0, max_cache: int = 100,
+                 confirm_frames: int = 3):
         """
         Args:
             max_age_seconds : seconds without a match before a track is evicted
                               and re-recognition is forced (default 2 s).
             max_cache       : hard cap on simultaneous tracks to bound memory.
+            confirm_frames  : consecutive recognitions of the same person before
+                              the identity is locked in (default 3).  A value of
+                              1 disables hysteresis (instant identity update).
         """
         self.tracks          = {}   # {track_id: track_dict}
         self.next_id         = 0
         self.max_age_seconds = max_age_seconds
         self.max_cache       = max_cache
+        self.confirm_frames  = confirm_frames
         self.lock            = threading.Lock()
 
     # ── IoU helper ────────────────────────────────────────────────────────────
@@ -292,7 +315,26 @@ class FaceTracker:
 
     def update(self, detections, frame_count=None):
         """
-        Match detections to existing tracks and evict stale ones.
+        Match detections to existing tracks, apply identity hysteresis voting,
+        and evict stale tracks.
+
+        Identity hysteresis
+        -------------------
+        Each track holds two identity slots:
+
+          person          — the *confirmed* identity, only updated once
+                            `confirm_frames` consecutive recognitions of the
+                            same candidate are observed.
+          candidate       — the challenger being accumulated.
+          candidate_count — consecutive frames the current candidate has been
+                            seen without interruption.
+
+        Transitions:
+          • Same candidate as last frame  → candidate_count += 1
+          • Different candidate           → candidate replaced, count reset to 1
+          • candidate_count == confirm_frames → person = candidate (confirmed)
+          • det['person'] is None         → candidate_count reset to 0
+            (unknown frame resets accumulation but does NOT clear confirmed person)
 
         Args:
             detections  : list of dicts, each containing:
@@ -308,9 +350,10 @@ class FaceTracker:
         with self.lock:
             # ── Match detections to existing tracks ───────────────────────────
             for det in detections:
-                bbox     = det['bbox']
-                best_id  = None
-                best_iou = 0.3  # minimum IoU to associate detection with track
+                bbox      = det['bbox']
+                det_person = det.get('person')
+                best_id   = None
+                best_iou  = 0.3  # minimum IoU to associate detection with track
 
                 for tid, track in self.tracks.items():
                     iou = self._iou(bbox, track['bbox'])
@@ -319,26 +362,66 @@ class FaceTracker:
                         best_id  = tid
 
                 if best_id is not None:
-                    # Update existing track position and timestamp
-                    self.tracks[best_id]['bbox']           = bbox
-                    self.tracks[best_id]['last_seen_time'] = now
-                    # Only overwrite identity when recognition succeeded
-                    if det.get('person') is not None:
-                        self.tracks[best_id]['person']     = det['person']
-                        self.tracks[best_id]['distance']   = det.get('distance', 0)
-                        self.tracks[best_id]['confidence'] = det.get('confidence', 0)
+                    track = self.tracks[best_id]
+                    track['bbox']           = bbox
+                    track['last_seen_time'] = now
+
+                    # Always store a fresh smooth embedding when one is provided
+                    if det.get('smooth_embedding') is not None:
+                        track['smooth_embedding'] = det['smooth_embedding']
+
+                    if det_person is not None:
+                        # ── Hysteresis voting ─────────────────────────────────
+                        # Determine whether the incoming person matches the
+                        # current candidate (same person_key) or is a challenger.
+                        det_key = (det_person.get('person_key') or
+                                   f"{det_person.get('person_id')}|{det_person.get('role')}")
+                        cand    = track.get('candidate')
+                        cand_key = (cand.get('person_key') or
+                                    f"{cand.get('person_id')}|{cand.get('role')}"
+                                    if cand else None)
+
+                        if cand_key == det_key:
+                            # Same candidate — increment streak
+                            track['candidate_count'] = track.get('candidate_count', 0) + 1
+                        else:
+                            # New challenger — reset accumulation
+                            track['candidate']       = det_person
+                            track['candidate_count'] = 1
+                            track['candidate_dist']  = det.get('distance', 0)
+                            track['candidate_conf']  = det.get('confidence', 0)
+
+                        # Promote to confirmed identity once streak is reached
+                        if track['candidate_count'] >= self.confirm_frames:
+                            track['person']           = track['candidate']
+                            track['distance']         = track.get('candidate_dist', 0)
+                            track['confidence']       = track.get('candidate_conf', 0)
+                            track['last_rerecog_time'] = now
+                    else:
+                        # Unrecognised frame — break accumulation streak but
+                        # do NOT evict the confirmed person (they just moved).
+                        track['candidate_count'] = 0
+
                 else:
-                    # Create new track for unmatched detection
+                    # New track — seed candidate; require confirm_frames before
+                    # returning any identity from get_person_for_bbox().
+                    is_confirmed = (self.confirm_frames <= 1 and det_person is not None)
                     self.tracks[self.next_id] = {
-                        'bbox':           bbox,
-                        'person':         det.get('person'),
-                        'distance':       det.get('distance', 0),
-                        'confidence':     det.get('confidence', 0),
-                        'last_seen_time': now,
+                        'bbox':             bbox,
+                        'person':           det_person if is_confirmed else None,
+                        'distance':         det.get('distance', 0) if is_confirmed else 0,
+                        'confidence':       det.get('confidence', 0) if is_confirmed else 0,
+                        'last_seen_time':   now,
+                        'last_rerecog_time': now if is_confirmed else 0.0,
+                        'candidate':        det_person,
+                        'candidate_count':  1 if det_person is not None else 0,
+                        'candidate_dist':   det.get('distance', 0),
+                        'candidate_conf':   det.get('confidence', 0),
+                        'smooth_embedding': det.get('smooth_embedding'),  # may be None
                     }
                     self.next_id += 1
 
-            # ── Evict stale tracks (time-based, 2 s default) ──────────────────
+            # ── Evict stale tracks (time-based) ───────────────────────────────
             stale = [tid for tid, t in self.tracks.items()
                      if now - t['last_seen_time'] > self.max_age_seconds]
             for tid in stale:
@@ -351,7 +434,8 @@ class FaceTracker:
                 for tid, _ in oldest[:len(self.tracks) - self.max_cache]:
                     del self.tracks[tid]
 
-    def get_person_for_bbox(self, bbox, iou_threshold: float = 0.5):
+    def get_person_for_bbox(self, bbox, iou_threshold: float = 0.5,
+                            rerecog_interval: float = 0.0):
         """
         Return the cached identity for a detection bounding box.
 
@@ -359,28 +443,72 @@ class FaceTracker:
         accidentally serving one person's identity for a nearby face.
 
         Args:
-            bbox          : (x, y, w, h) of the detected face
-            iou_threshold : minimum IoU required to accept a cached track
+            bbox               : (x, y, w, h) of the detected face
+            iou_threshold      : minimum IoU required to accept a cached track
+            rerecog_interval   : seconds after which the cached identity is
+                                 considered stale — returns (None, None, None)
+                                 to force a fresh ArcFace call.  0.0 = disabled.
 
         Returns:
-            (person_dict, distance, confidence)  when a cached match is found
-            (None, None, None)                   when no match
+            (person_dict, distance, confidence)  when a confirmed, fresh match exists
+            (None, None, None)                   when no match, unconfirmed, or stale
+
+        Note: only *confirmed* identities (those that have passed the
+        consecutive-frame vote in update()) are returned.  Tracks where the
+        candidate hasn't yet reached confirm_frames always return (None, None, None),
+        causing the caller to run a fresh ArcFace call and feed the result back
+        into the voting accumulator via update().
         """
+        now = time.time()
         with self.lock:
             best_track = None
             best_iou   = iou_threshold
 
             for track in self.tracks.values():
                 iou = self._iou(bbox, track['bbox'])
+                # Only serve confirmed identities (person is not None)
                 if iou > best_iou and track.get('person') is not None:
                     best_iou   = iou
                     best_track = track
 
-            if best_track:
-                return (best_track['person'],
-                        best_track.get('distance', 0),
-                        best_track.get('confidence', 0))
-            return None, None, None
+            if best_track is None:
+                return None, None, None
+
+            # Force re-recognition after rerecog_interval seconds to prevent drift
+            if (rerecog_interval > 0.0 and
+                    now - best_track.get('last_rerecog_time', 0) > rerecog_interval):
+                return None, None, None
+
+            return (best_track['person'],
+                    best_track.get('distance', 0),
+                    best_track.get('confidence', 0))
+
+    def get_smooth_embedding(self, bbox, iou_threshold: float = 0.3):
+        """
+        Return the stored smoothed embedding for a detection bbox.
+
+        Used by the call site in _run_ai to seed EMA smoothing on the next
+        ArcFace call for this track.  A looser IoU threshold (0.3) is intentional
+        here — we only need positional proximity to retrieve the right track's
+        embedding, not to confirm identity.
+
+        Args:
+            bbox          : (x, y, w, h) of the detected face
+            iou_threshold : minimum IoU to accept a match (default 0.3)
+
+        Returns:
+            np.ndarray (512,) if a smoothed embedding exists for this bbox,
+            None otherwise (new track or ArcFace has not yet run for it).
+        """
+        with self.lock:
+            best_iou = iou_threshold
+            best_emb = None
+            for track in self.tracks.values():
+                iou = self._iou(bbox, track['bbox'])
+                if iou > best_iou and track.get('smooth_embedding') is not None:
+                    best_iou = iou
+                    best_emb = track['smooth_embedding']
+            return best_emb
 
     def clear(self):
         """Evict all tracks (call on camera disconnect or service shutdown)."""
@@ -543,6 +671,164 @@ class EmbeddingIndex:
         bonus      = min(0.15, (best_group['within'] - 1) * 0.05)
         confidence = min(1.0, base + bonus)
         return best_meta, min_dist, confidence
+
+    def search_with_vote(self, embedding, k: int = 5,
+                         threshold: float = DISTANCE_THRESHOLD,
+                         vote_min: int = 1,
+                         margin: float = 0.08):
+        """
+        Top-K voting search with margin gate — more robust than single-NN.
+
+        Algorithm
+        ─────────
+        1. Compute cosine distances for ALL stored embeddings (vectorized).
+        2. Per-person best distance: each person's score = their closest embedding.
+           This prevents persons with many enrolled images from dominating the vote
+           via quantity alone.
+        3. Find the K nearest embeddings across ALL persons (argpartition, O(N)).
+        4. Count per-person votes: each unique person whose embedding appears in
+           the top-K pool AND whose best distance ≤ threshold gets 1 vote.
+        5. Winner = person with the most votes (tie-broken by lowest best-distance).
+        6. Reject if winner_votes < vote_min (insufficient agreement).
+        7. Reject if second-best person is also within threshold AND the distance
+           gap (margin) < margin (ambiguous query — between two identities).
+        8. Confidence = f(best_distance, vote_bonus).
+
+        Why step 4 counts embedding-level votes but step 7 uses person-level
+        best-distances for margin: the vote rewards persons who enrolled multiple
+        diverse photos (more embeddings in top-K); the margin uses the actual
+        nearest embedding per person so the gap is meaningful in distance space.
+
+        Args:
+            embedding  : query vector — (512,) float32 ArcFace, any normalisation
+            k          : pool size (default 5 — tuned for 5 enrolled images/person)
+            threshold  : cosine distance cutoff for accepting a match (default 0.68)
+            vote_min   : minimum votes the winner must receive (default 1)
+            margin     : minimum per-person cosine distance gap (default 0.08)
+
+        Returns:
+            (person_dict, distance, confidence)
+            • person_dict — meta dict or None (no match / ambiguous / below threshold)
+            • distance    — winner's best cosine distance (or best overall on reject)
+            • confidence  — float in [0.0, 1.0]; 0.0 on any reject
+
+        Example outputs
+        ───────────────
+        Clear match (enrolled Ali, query = Ali walking):
+            ("Ali", 0.28, 0.82)   ← confident, large margin
+
+        Ambiguous (query between Ali and Ahmed):
+            (None, 0.39, 0.0)     ← margin gate fired; safe reject
+
+        No enrolled person close enough:
+            (None, 0.72, 0.0)     ← best dist > threshold
+        """
+        if self._matrix.ndim < 2 or self._matrix.shape[0] == 0:
+            return None, float('inf'), 0.0
+
+        # ── Step 1: L2-normalize query ────────────────────────────────────────
+        query = np.array(embedding, dtype=np.float32)
+        norm  = np.linalg.norm(query)
+        if norm > 1e-9:
+            query = query / norm
+
+        # ── Step 2: Cosine distances for all stored embeddings ────────────────
+        # Stored matrix is pre-normalised in __init__ so:
+        #   cosine_distance = 1 - dot(query_unit, stored_unit)
+        distances = 1.0 - (self._matrix @ query)   # (N,) float32
+
+        # ── Step 3: Per-person best distance across ALL embeddings ────────────
+        # This is the "ground truth" ranking used for margin check and threshold.
+        best_by_group: dict = {}   # group_key → {'min_dist', 'meta', 'vote_count'}
+        for dist, gk, meta in zip(distances.tolist(), self._group_keys, self._meta):
+            if gk not in best_by_group:
+                best_by_group[gk] = {'min_dist': dist, 'meta': meta, 'vote_count': 0}
+            elif dist < best_by_group[gk]['min_dist']:
+                best_by_group[gk]['min_dist'] = dist
+                best_by_group[gk]['meta']     = meta  # track closest embedding's meta
+
+        if not best_by_group:
+            return None, float('inf'), 0.0
+
+        # ── Step 4: Top-K nearest embeddings (partial sort, O(N)) ─────────────
+        n        = len(distances)
+        k_actual = min(k, n)
+        if k_actual < n:
+            # np.argpartition: O(N) — guarantees the k_actual smallest values are
+            # in the first k_actual positions (unordered within that slice).
+            top_k_idx = np.argpartition(distances, k_actual - 1)[:k_actual]
+        else:
+            top_k_idx = np.arange(n, dtype=np.intp)
+
+        # ── Step 5: Vote counting — per-person, embedding-level pool ─────────
+        # Each unique person whose embedding lands in top-K AND within threshold
+        # gets exactly 1 vote increment.  A person can contribute at most
+        # min(k, enrolled_images) votes — rewarding diverse multi-angle enrolment.
+        vote_counts: dict = {}   # group_key → int
+        for idx in top_k_idx:
+            dist = float(distances[idx])
+            if dist > threshold:
+                continue   # outside threshold — no vote
+            gk = self._group_keys[idx]
+            vote_counts[gk] = vote_counts.get(gk, 0) + 1
+
+        # Merge vote counts back into best_by_group
+        for gk, vc in vote_counts.items():
+            best_by_group[gk]['vote_count'] = vc
+
+        # ── Step 6: Find winner (max votes, tie-break = min distance) ─────────
+        # Build candidate list only for persons that meet vote_min.
+        candidates = [
+            data for data in best_by_group.values()
+            if data['vote_count'] >= vote_min
+        ]
+
+        if not candidates:
+            # Nobody reached vote_min — return best distance for diagnostics.
+            best_dist_global = min(d['min_dist'] for d in best_by_group.values())
+            return None, best_dist_global, 0.0
+
+        winner = max(candidates, key=lambda d: (d['vote_count'], -d['min_dist']))
+        winner_dist = winner['min_dist']
+        winner_meta = winner['meta']
+
+        # ── Step 7: Threshold gate ─────────────────────────────────────────────
+        if winner_dist > threshold:
+            return None, winner_dist, 0.0
+
+        # ── Step 8: Margin gate (person-level best distances) ─────────────────
+        # Sort all enrolled persons by their best distance; if the runner-up is
+        # also within threshold and the gap is too small, reject as ambiguous.
+        #
+        # CRITICAL: winner_gk MUST match the format used in self._group_keys
+        # (built in __init__).  That format is "person_id|role" — NOT the full
+        # "person_id|role|name" person_key.  If we use person_key here, the
+        # winner's own group is never matched in the loop below, the winner
+        # gets compared against itself as the "runner-up" with gap=0, and the
+        # margin gate rejects every match as ambiguous.
+        wp_id   = winner_meta.get('person_id')
+        wp_role = (winner_meta.get('role') or '').upper()
+        winner_gk = (f"{wp_id}|{wp_role}"
+                     if wp_id is not None and wp_role
+                     else (winner_meta.get('person_key') or 'unknown'))
+        runner_up_dist = float('inf')
+        for gk, data in best_by_group.items():
+            if gk != winner_gk and data['min_dist'] <= threshold:
+                if data['min_dist'] < runner_up_dist:
+                    runner_up_dist = data['min_dist']
+
+        if runner_up_dist <= threshold:
+            gap = runner_up_dist - winner_dist
+            if gap < margin:
+                # Query sits between two enrolled identities — reject.
+                return None, winner_dist, 0.0
+
+        # ── Step 9: Confidence score ───────────────────────────────────────────
+        base        = max(0.0, 1.0 - winner_dist / threshold)
+        vote_bonus  = min(0.15, (winner['vote_count'] - 1) * 0.05)
+        confidence  = min(1.0, base + vote_bonus)
+
+        return winner_meta, winner_dist, confidence
 
 
 def find_best_match(embedding, embeddings_data, threshold=DISTANCE_THRESHOLD):

@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiMail, FiUser, FiBook, FiImage } from 'react-icons/fi';
+import { FiArrowLeft, FiMail, FiUser, FiBook, FiImage, FiRefreshCw, FiCheckCircle, FiCamera } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import { studentAPI } from '../api/api';
+import { enrollPerson } from '../api/faceRecognition';
+import AttendanceSummary from '../components/AttendanceSummary';
 
 const StudentDetail = () => {
   const { id } = useParams();
@@ -10,7 +12,44 @@ const StudentDetail = () => {
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollMsg, setEnrollMsg] = useState(null);
+  const [uploadingPic, setUploadingPic] = useState(false);
+  const profileInputRef = useRef(null);
   const isDarkMode = document.documentElement.classList.contains('dark');
+
+  const handleProfilePictureChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
+        setUploadingPic(true);
+        await studentAPI.updateStudent(id, { Profile_Picture: reader.result });
+        await fetchStudentDetails();
+      } catch (err) {
+        console.error('Failed to update profile picture:', err);
+      } finally {
+        setUploadingPic(false);
+        e.target.value = '';
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleEnroll = async () => {
+    try {
+      setEnrolling(true);
+      setEnrollMsg(null);
+      await enrollPerson('Student', student.Student_ID);
+      setEnrollMsg({ type: 'success', text: 'Face enrolled successfully' });
+      await fetchStudentDetails();
+    } catch (err) {
+      setEnrollMsg({ type: 'error', text: err.response?.data?.message || 'Enrollment failed' });
+    } finally {
+      setEnrolling(false);
+    }
+  };
 
   useEffect(() => {
     fetchStudentDetails();
@@ -183,24 +222,48 @@ const StudentDetail = () => {
                   <FiBook style={{ color: isDarkMode ? '#818cf8' : '#6b7280' }} size={18} />
                   <label className="text-xs font-semibold" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#4b5563' }}>Enrollment Status</label>
                 </div>
-                <p className="text-lg font-semibold ml-6">
-                  <span 
+                <div className="ml-6 flex items-center gap-3 flex-wrap">
+                  <span
                     className="px-3 py-1 rounded-full text-sm"
                     style={{
-                      backgroundColor: student.is_enrolled 
+                      backgroundColor: student.is_enrolled
                         ? (isDarkMode ? 'rgba(52, 211, 153, 0.2)' : '#dcfce7')
                         : (isDarkMode ? 'rgba(250, 204, 21, 0.2)' : '#fef9c3'),
-                      color: student.is_enrolled 
+                      color: student.is_enrolled
                         ? (isDarkMode ? '#34d399' : '#15803d')
                         : (isDarkMode ? '#fbbf24' : '#a16207'),
-                      border: isDarkMode 
+                      border: isDarkMode
                         ? `1px solid ${student.is_enrolled ? 'rgba(52, 211, 153, 0.5)' : 'rgba(250, 204, 21, 0.5)'}`
                         : 'none'
                     }}
                   >
                     {student.is_enrolled ? 'Enrolled' : 'Not Enrolled'}
                   </span>
-                </p>
+
+                  {/* Enroll / Re-Enroll button */}
+                  <button
+                    onClick={handleEnroll}
+                    disabled={enrolling || !student.Face_Picture_1}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      backgroundColor: isDarkMode ? 'rgba(129, 140, 248, 0.15)' : '#eef2ff',
+                      color: isDarkMode ? '#818cf8' : '#6365baff',
+                      border: isDarkMode ? '1px solid rgba(129, 140, 248, 0.4)' : '1px solid #a5b4fc'
+                    }}
+                    title={!student.Face_Picture_1 ? 'Add face pictures first' : student.is_enrolled ? 'Re-enroll (replaces existing embeddings)' : 'Enroll face'}
+                  >
+                    <FiRefreshCw size={13} className={enrolling ? 'animate-spin' : ''} />
+                    {enrolling ? 'Enrolling…' : student.is_enrolled ? 'Re-Enroll' : 'Enroll Face'}
+                  </button>
+
+                  {enrollMsg && (
+                    <span className="flex items-center gap-1 text-xs font-medium"
+                      style={{ color: enrollMsg.type === 'success' ? (isDarkMode ? '#34d399' : '#15803d') : '#ef4444' }}>
+                      {enrollMsg.type === 'success' && <FiCheckCircle size={13} />}
+                      {enrollMsg.text}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </motion.div>
@@ -222,18 +285,40 @@ const StudentDetail = () => {
             }}
           >
             <h3 className="text-xl font-bold mb-4" style={{ color: isDarkMode ? '#818cf8' : '#6365baff' }}>Profile Picture</h3>
-            <div className="flex items-center justify-center">
-              <div 
-                className="w-48 h-48 rounded-full flex items-center justify-center text-6xl font-bold"
-                style={{
-                  backgroundColor: isDarkMode ? 'rgba(129, 140, 248, 0.15)' : '#f3f4f6',
-                  border: isDarkMode ? '4px solid rgba(129, 140, 248, 0.7)' : '4px solid #6365baff',
-                  color: isDarkMode ? '#818cf8' : '#305796',
-                  boxShadow: isDarkMode ? '0 0 30px rgba(129, 140, 248, 0.2)' : 'none'
-                }}
-              >
-                {student.Name?.[0] || '?'}
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative group cursor-pointer" onClick={() => profileInputRef.current?.click()}>
+                <div
+                  className="w-48 h-48 rounded-full flex items-center justify-center text-6xl font-bold overflow-hidden"
+                  style={{
+                    backgroundColor: isDarkMode ? 'rgba(129, 140, 248, 0.15)' : '#f3f4f6',
+                    border: isDarkMode ? '4px solid rgba(129, 140, 248, 0.7)' : '4px solid #6365baff',
+                    color: isDarkMode ? '#818cf8' : '#305796',
+                    boxShadow: isDarkMode ? '0 0 30px rgba(129, 140, 248, 0.2)' : 'none'
+                  }}
+                >
+                  {student.Profile_Picture ? (
+                    <img src={student.Profile_Picture} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    student.Name?.[0] || '?'
+                  )}
+                </div>
+                <div className="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ background: 'rgba(0,0,0,0.45)' }}>
+                  {uploadingPic
+                    ? <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-white" />
+                    : <FiCamera size={32} color="white" />}
+                </div>
               </div>
+              <p className="text-xs" style={{ color: isDarkMode ? 'rgba(192,240,240,0.5)' : '#9ca3af' }}>
+                Click to {student.Profile_Picture ? 'change' : 'upload'} profile picture
+              </p>
+              <input
+                ref={profileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleProfilePictureChange}
+              />
             </div>
           </motion.div>
         </div>
@@ -334,6 +419,14 @@ const StudentDetail = () => {
             </div>
           </div>
         </motion.div>
+
+        {/* Attendance Summary */}
+        <AttendanceSummary
+          personId={student.Student_ID}
+          personType="STUDENT"
+          personName={student.Name}
+          isDarkMode={isDarkMode}
+        />
       </div>
     </div>
   );

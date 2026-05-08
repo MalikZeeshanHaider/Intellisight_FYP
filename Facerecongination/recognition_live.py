@@ -294,7 +294,7 @@ class DualCameraRecognizer:
                         face_crop = cv2.cvtColor(face_crop, cv2.COLOR_RGB2BGR)
 
                 face_crop    = preprocess_face_crop(face_crop)
-                face_resized = cv2.resize(face_crop, (160, 160))
+                face_resized = cv2.resize(face_crop, (112, 112))  # ArcFace canonical 112×112
 
                 person_dict = distance = None
                 try:
