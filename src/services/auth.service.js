@@ -361,6 +361,25 @@ export const verifyUserRegistration = async (token, action, rejectionReason = nu
 };
 
 /**
+ * Fetch permission keys for an admin from their assigned Role.
+ * SuperAdmin gets a special marker so the frontend can show everything.
+ * Returns [] for admins with no role assigned.
+ */
+export const getAdminPermissions = async (adminId) => {
+  if (adminId === 'super_admin') return ['*'];   // wildcard — all permissions
+  const admin = await prisma.admin.findUnique({
+    where: { Admin_ID: parseInt(adminId) },
+    include: {
+      role_ref: {
+        include: { RolePermissions: { include: { permission: true } } },
+      },
+    },
+  });
+  if (!admin?.role_ref) return [];
+  return admin.role_ref.RolePermissions.map((rp) => rp.permission.Key);
+};
+
+/**
  * Login admin
  */
 export const loginAdmin = async ({ email, password }) => {
@@ -380,11 +399,12 @@ export const loginAdmin = async ({ email, password }) => {
     });
 
     const superAdmin = {
-      Admin_ID: 'super_admin',
-      Name: superAdminName,
-      Email: superAdminEmail,
-      Role: 'SuperAdmin',
-      isSuperAdmin: true
+      Admin_ID:    'super_admin',
+      Name:        superAdminName,
+      Email:       superAdminEmail,
+      Role:        'SuperAdmin',
+      isSuperAdmin: true,
+      permissions: ['*'],
     };
 
     return { admin: superAdmin, token };
@@ -409,15 +429,18 @@ export const loginAdmin = async ({ email, password }) => {
   // Generate token
   const token = generateToken({
     adminId: admin.Admin_ID,
-    email: admin.Email,
-    role: admin.Role,
-    isSuperAdmin: false
+    email:   admin.Email,
+    role:    admin.Role,
+    isSuperAdmin: false,
   });
+
+  // Fetch permissions from the assigned Role (if any)
+  const permissions = await getAdminPermissions(admin.Admin_ID);
 
   // Return admin without password
   const { Password, ...adminWithoutPassword } = admin;
 
-  return { admin: { ...adminWithoutPassword, isSuperAdmin: false }, token };
+  return { admin: { ...adminWithoutPassword, isSuperAdmin: false, permissions }, token };
 };
 
 /**
@@ -572,16 +595,16 @@ export const getAllAdmins = async () => {
   const admins = await prisma.admin.findMany({
     select: {
       Admin_ID: true,
-      Name: true,
-      Email: true,
-      Role: true,
+      Name:     true,
+      Email:    true,
+      Role:     true,
+      Role_ID:  true,
+      role_ref: { select: { Name: true } },
     },
-    orderBy: {
-      Admin_ID: 'desc'
-    }
+    orderBy: { Admin_ID: 'desc' },
   });
 
-  return admins;
+  return admins.map((a) => ({ ...a, roleName: a.role_ref?.Name ?? null }));
 };
 
 /**

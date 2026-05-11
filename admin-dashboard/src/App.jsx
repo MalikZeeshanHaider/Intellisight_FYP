@@ -34,6 +34,7 @@ import Logs from './pages/Logs';
 import Settings from './pages/Settings';
 import ActivePresence from './pages/ActivePresence';
 import AttendanceAnalytics from './pages/AttendanceAnalytics';
+import RolesPermissions from './pages/RolesPermissions';
 
 console.log('%c📱 App.jsx - Component Loading', 'color: blue; font-size: 14px');
 
@@ -62,6 +63,17 @@ function App() {
                 <ProtectedRoute>
                   <ErrorBoundary>
                     <SuperAdminDashboard />
+                  </ErrorBoundary>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/roles"
+              element={
+                <ProtectedRoute>
+                  <ErrorBoundary>
+                    <RolesPermissions />
                   </ErrorBoundary>
                 </ProtectedRoute>
               }

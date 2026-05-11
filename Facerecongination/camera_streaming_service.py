@@ -169,8 +169,8 @@ TARGET_HEIGHT = 720    # Display / stream height
 # Smaller = faster detection with less CPU.  We scale coordinates back to
 # TARGET resolution after detection, so stream quality is unaffected.
 # 320×180 (16:9) gives ~5-10 ms/frame with YuNet vs ~100-200 ms with RetinaFace.
-PROCESS_WIDTH  = 320   # was 480 — 56 % fewer pixels to scan
-PROCESS_HEIGHT = 180   # was 270 — maintains 16:9 aspect ratio
+PROCESS_WIDTH  = 480   # was 480 — 56 % fewer pixels to scan
+PROCESS_HEIGHT = 270   # was 270 — maintains 16:9 aspect ratio
 
 # Minimum face size in the DETECTION frame (PROCESS_WIDTH × PROCESS_HEIGHT).
 # Kept separate from config.MIN_FACE_SIZE which governs the full-resolution

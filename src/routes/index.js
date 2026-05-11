@@ -1,5 +1,6 @@
 import express from 'express';
 import authRoutes from './auth.routes.js';
+import roleRoutes from './role.routes.js';
 import zoneRoutes from './zone.routes.js';
 import zone1Routes from './zone1.routes.js';
 import cameraRoutes from './camera.routes.js';
@@ -16,6 +17,7 @@ import courseRoutes from './course.routes.js';
 import enrollmentRoutes from './enrollment.routes.js';
 import slotRoutes from './slot.routes.js';
 import classAttendanceRoutes from './classAttendance.routes.js';
+import accessRequestRoutes from './accessRequest.routes.js';
 
 const router = express.Router();
 
@@ -23,7 +25,8 @@ const router = express.Router();
 router.use('/health', healthRoutes);
 
 // Mount all routes
-router.use('/auth', authRoutes); // Changed from /admin to /auth
+router.use('/auth', authRoutes);
+router.use('/roles', roleRoutes); // Changed from /admin to /auth
 router.use('/zones/1', zone1Routes); // Zone 1 live tracking - must be before generic /zones
 router.use('/zones', zoneRoutes);
 router.use('/cameras', cameraRoutes);
@@ -39,5 +42,6 @@ router.use('/courses', courseRoutes);
 router.use('/enrollments', enrollmentRoutes);
 router.use('/slots', slotRoutes);
 router.use('/class-attendance', classAttendanceRoutes);
+router.use('/access-requests', accessRequestRoutes);
 
 export default router;

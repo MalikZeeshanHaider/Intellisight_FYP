@@ -81,6 +81,30 @@ export const requireRole = (...allowedRoles) => {
 };
 
 /**
+ * Middleware to check if the user has a specific permission key.
+ * SuperAdmins (isSuperAdmin=true) pass unconditionally.
+ * For regular admins, permissions are re-fetched from the DB on each call
+ * so that role changes take effect without requiring a new login.
+ */
+export const requirePermission = (permissionKey) => {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) throw new UnauthorizedError(ERROR_MESSAGES.UNAUTHORIZED);
+      if (req.user.isSuperAdmin) return next();
+
+      const { getAdminPermissions } = await import('../services/auth.service.js');
+      const keys = await getAdminPermissions(req.user.adminId);
+      if (!keys.includes(permissionKey)) {
+        throw new UnauthorizedError(`Permission required: ${permissionKey}`);
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+};
+
+/**
  * Optional authentication - doesn't fail if no token.
  * Cookie takes priority over Authorization header.
  */

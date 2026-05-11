@@ -12,7 +12,8 @@ import {
   approvePendingUser,
   rejectPendingUser,
   deleteAdminUser,
-  addUserByAdmin
+  addUserByAdmin,
+  getAdminPermissions,
 } from '../services/auth.service.js';
 import { successResponse } from '../utils/response.js';
 
@@ -264,8 +265,8 @@ export const getPendingUsersHandler = asyncHandler(async (req, res) => {
  * @access  Private
  */
 export const getCurrentUser = asyncHandler(async (req, res) => {
-  // User is added to req by auth middleware
-  return successResponse(res, { user: req.user }, 'User retrieved successfully');
+  const permissions = await getAdminPermissions(req.user.adminId);
+  return successResponse(res, { user: { ...req.user, permissions } }, 'User retrieved successfully');
 });
 
 /**

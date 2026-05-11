@@ -57,8 +57,8 @@ DETECTOR_BACKEND = "yunet"
 # Same person: typically 0.20–0.45 | Different person: typically 0.55–1.00
 # DeepFace's own verified threshold for ArcFace cosine = 0.6717.
 # Using 0.68 to match that boundary and reject borderline matches.
-DISTANCE_THRESHOLD = 0.68  # ArcFace cosine distance (0 = identical, 1 = orthogonal)
-MIN_FACE_SIZE = 40  # Minimum face crop size (pixels) for recognition — NOT for detection frame
+DISTANCE_THRESHOLD = 0.69  # ArcFace cosine distance (0 = identical, 1 = orthogonal)
+MIN_FACE_SIZE = 20  # Minimum face crop size (pixels) for recognition — NOT for detection frame
 CONSECUTIVE_MATCHES = 2  # Matches needed before confirming identity
 FRAME_SKIP = 3  # Legacy — kept for import compatibility; AI sampling now queue-driven
 
@@ -74,7 +74,7 @@ FRAME_SKIP = 3  # Legacy — kept for import compatibility; AI sampling now queu
 #   distance 0.68 →  confidence 0.00  (at search cutoff)
 #
 # 0.30 requires cosine distance ≤ 0.476 — solidly within same-person range.
-RECOGNITION_CONFIDENCE_THRESHOLD = 0.30   # cosine distance ≤ 0.476 passes
+RECOGNITION_CONFIDENCE_THRESHOLD = 0.25   # cosine distance ≤ 0.476 passes
 
 # ── EMA smoothing factor ────────────────────────────────────────────────────────
 # Used in camera_streaming_service.py _handle_recognition.
@@ -129,7 +129,7 @@ SHARPNESS_THRESHOLD = 15.0
 #                Raise to 0.12 for stricter anti-confusion, lower to 0.05 to
 #                allow matches where enrolled images cluster tightly together.
 KNN_K        = 5     # top-K nearest embeddings for voting pool
-KNN_VOTE_MIN = 1     # minimum votes to accept (raise to 2 with ≥3 images each)
+KNN_VOTE_MIN = 2     # minimum votes to accept (raise to 2 with ≥3 images each)
 KNN_MARGIN   = 0.08  # min cosine-distance gap between 1st and 2nd best person
 
 # Folder paths

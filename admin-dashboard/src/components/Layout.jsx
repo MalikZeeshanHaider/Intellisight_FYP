@@ -1,38 +1,20 @@
 /**
- * Main Layout Component
- * Sidebar + sticky top header (page title + mobile toggle).
- * AlertBell is mounted globally in App.jsx — not here.
+ * Main Layout — Sidebar + top navbar.
  */
 
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import { FiMenu, FiX } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useLocation } from 'react-router-dom';
-
-const getPageTitle = (pathname) => {
-  const map = {
-    '/dashboard':            'Dashboard',
-    '/students':             'Students',
-    '/teachers':             'Teachers',
-    '/zones':                'Zones',
-    '/cameras':              'Cameras',
-    '/unknown-faces':        'Unknown Faces',
-    '/logs':                 'Logs',
-    '/settings':             'Settings',
-    '/active-presence':      'Active Presence',
-    '/attendance-analytics': 'Attendance Analytics',
-  };
-  for (const [prefix, title] of Object.entries(map)) {
-    if (pathname.startsWith(prefix)) return title;
-  }
-  return 'IntelliSight';
-};
+import { useTheme } from '../context/ThemeContext';
 
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed]  = useState(false);
-  const location = useLocation();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const { isDarkMode } = useTheme();
+
+  const D = isDarkMode;
 
   return (
     <div className="flex min-h-screen" style={{ background: 'var(--background)' }}>
@@ -41,9 +23,7 @@ const Layout = ({ children }) => {
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={() => setSidebarOpen(false)}
             className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
           />
@@ -51,11 +31,7 @@ const Layout = ({ children }) => {
       </AnimatePresence>
 
       {/* Sidebar */}
-      <div className={`
-        fixed lg:fixed inset-y-0 left-0 z-50
-        transform transition-transform duration-300 ease-in-out
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
+      <div className={`fixed lg:fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <Sidebar onClose={() => setSidebarOpen(false)} onCollapseChange={setIsCollapsed} />
       </div>
 
@@ -65,18 +41,25 @@ const Layout = ({ children }) => {
         transition={{ type: 'spring', stiffness: 100, damping: 20 }}
         className="flex-1 flex flex-col min-h-screen lg:ml-72"
       >
-        {/* Mobile menu toggle — shown only on small screens, no title bar */}
-        <div className="sticky top-0 z-30 lg:hidden flex items-center px-4 h-12 shrink-0"
-          style={{ background: 'rgba(10,14,39,0.88)', backdropFilter: 'blur(16px)' }}
+        {/* Mobile-only top bar */}
+        <div className="lg:hidden sticky top-0 z-30 flex items-center gap-3 px-4 h-14 flex-shrink-0"
+          style={{
+            background:    D ? 'rgba(10,14,39,.92)' : 'rgba(248,250,252,.92)',
+            backdropFilter:'blur(16px)',
+            borderBottom:  D ? '1px solid rgba(255,255,255,.06)' : '1px solid rgba(15,23,42,.1)',
+          }}
         >
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-xl"
-            style={{ background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.3)' }}
+            className="p-2 rounded-xl flex-shrink-0"
+            style={{
+              background: D ? 'rgba(6,182,212,.1)' : 'rgba(59,130,246,.1)',
+              border:     D ? '1px solid rgba(6,182,212,.3)' : '1px solid rgba(59,130,246,.3)',
+            }}
           >
             {sidebarOpen
-              ? <FiX    size={20} className="text-cyan-400" />
-              : <FiMenu size={20} className="text-cyan-400" />}
+              ? <FiX    size={20} style={{ color: D ? '#67e8f9' : '#3b82f6' }} />
+              : <FiMenu size={20} style={{ color: D ? '#67e8f9' : '#3b82f6' }} />}
           </button>
         </div>
 
@@ -85,6 +68,7 @@ const Layout = ({ children }) => {
           {children}
         </main>
       </motion.div>
+
     </div>
   );
 };

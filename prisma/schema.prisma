@@ -8,14 +8,71 @@ datasource db {
 }
 
 model Admin {
-  Admin_ID Int     @id @default(autoincrement())
-  Name     String?
-  Email    String? @unique
-  Password String?
-  Role     String?
-  Logs     Logs[]
+  Admin_ID       Int              @id @default(autoincrement())
+  Name           String?
+  Email          String?          @unique
+  Password       String?
+  Role           String?           // legacy string role — kept for SuperAdmin / backward compat
+  Role_ID        Int?              // FK to structured Role model (nullable — SuperAdmin has no row)
+  Logs           Logs[]
+  role_ref       Role?            @relation(fields: [Role_ID], references: [Role_ID], onDelete: SetNull)
+  accessRequests AccessRequest[]
 
   @@map("Admin")
+}
+
+// ─── Access Requests (non-SuperAdmin requests additional permissions) ──────────
+model AccessRequest {
+  Request_ID     Int       @id @default(autoincrement())
+  Admin_ID       Int
+  Permission_Key String
+  Message        String?
+  Status         String    @default("pending")  // pending | approved | rejected
+  ReviewNote     String?
+  RequestedAt    DateTime  @default(now())
+  ReviewedAt     DateTime?
+  ReviewedBy     Int?
+
+  admin          Admin     @relation(fields: [Admin_ID], references: [Admin_ID], onDelete: Cascade)
+
+  @@map("AccessRequests")
+}
+
+// ─── Roles & Permissions ─────────────────────────────────────────────────────
+
+model Role {
+  Role_ID     Int              @id @default(autoincrement())
+  Name        String           @unique   // "Campus Admin", "Viewer", "Department Head"
+  Description String?
+  IsSystem    Boolean          @default(false) // true = built-in, cannot delete
+  CreatedAt   DateTime         @default(now())
+  UpdatedAt   DateTime         @updatedAt
+  Admins      Admin[]
+  RolePermissions RolePermission[]
+
+  @@map("Role")
+}
+
+model Permission {
+  Permission_ID Int              @id @default(autoincrement())
+  Name          String           @unique   // "Manage Students"
+  Key           String           @unique   // "manage_students"
+  Category      String                     // "People Management", "Monitoring", etc.
+  Description   String?
+  RolePermissions RolePermission[]
+
+  @@map("Permission")
+}
+
+model RolePermission {
+  RolePermission_ID Int        @id @default(autoincrement())
+  Role_ID           Int
+  Permission_ID     Int
+  role              Role       @relation(fields: [Role_ID], references: [Role_ID], onDelete: Cascade)
+  permission        Permission @relation(fields: [Permission_ID], references: [Permission_ID], onDelete: Cascade)
+
+  @@unique([Role_ID, Permission_ID])
+  @@map("RolePermission")
 }
 
 model PendingUsers {

@@ -54,6 +54,43 @@ export const authAPI = {
   },
 };
 
+// ============== ROLES & PERMISSIONS APIs ==============
+
+// ============== ACCESS REQUEST APIs ==============
+
+export const accessRequestAPI = {
+  /** Non-SuperAdmin: submit permission requests */
+  submit: (permissionKeys, message) =>
+    api.post('/access-requests', { permissionKeys, message }).then((r) => r.data),
+
+  /** Non-SuperAdmin: get own requests */
+  getMyRequests: () =>
+    api.get('/access-requests/my').then((r) => r.data),
+
+  /** SuperAdmin: get all requests, optionally filtered by status */
+  getAll: (status) =>
+    api.get('/access-requests', { params: status ? { status } : {} }).then((r) => r.data),
+
+  /** SuperAdmin: count of pending requests (for badge) */
+  getPendingCount: () =>
+    api.get('/access-requests/pending-count').then((r) => r.data),
+
+  /** SuperAdmin: approve or reject a request */
+  review: (id, action, reviewNote) =>
+    api.put(`/access-requests/${id}/review`, { action, reviewNote }).then((r) => r.data),
+};
+
+export const rolesAPI = {
+  listPermissions: () => api.get('/roles/permissions').then((r) => r.data),
+  listRoles:       () => api.get('/roles').then((r) => r.data),
+  createRole:      (data) => api.post('/roles', data).then((r) => r.data),
+  updateRole:      (id, data) => api.put(`/roles/${id}`, data).then((r) => r.data),
+  deleteRole:      (id) => api.delete(`/roles/${id}`).then((r) => r.data),
+  setPermissions:  (id, permissionKeys) => api.put(`/roles/${id}/permissions`, { permissionKeys }).then((r) => r.data),
+  assignRole:      (adminId, roleId) => api.put('/roles/assign', { adminId, roleId }).then((r) => r.data),
+  getRoleAdmins:   (id) => api.get(`/roles/${id}/admins`).then((r) => r.data),
+};
+
 // ============== ZONE APIs ==============
 
 export const zoneAPI = {

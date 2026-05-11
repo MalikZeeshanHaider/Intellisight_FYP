@@ -10,7 +10,7 @@ services:
       - '5000:5432'
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: zeeshan
+      POSTGRES_PASSWORD: ozair
       POSTGRES_DB: FYP_Intellisight
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
