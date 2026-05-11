@@ -714,19 +714,38 @@ class DatabaseHandler:
             raw_embeddings = [e['embedding'] for e in enriched_embeddings
                               if not e.get('is_centroid', False)]
 
+            id_col = '"Student_ID"' if person_type == 'Student' else '"Teacher_ID"'
+
             with self.conn.cursor() as cur:
+                # ── Detect v2 schema ONCE up front ────────────────────────────
+                # The previous code tried the v2 INSERT per row, and on failure
+                # called self.conn.rollback() to fall back to a v1 INSERT.
+                # That rollback was transaction-wide — it undid the DELETE that
+                # was meant to clear this person's old rows, so every re-enroll
+                # accumulated embeddings on top of the existing ones (one user
+                # had 70 rows for 5 photos before this was caught).
+                # Now we check column availability once and pick the right
+                # statement directly — no exception, no rollback.
+                cur.execute("""
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'FaceEmbeddings'
+                      AND column_name = 'QualityScore'
+                    LIMIT 1
+                """)
+                has_v2_columns = cur.fetchone() is not None
+
                 # 1. Legacy pickle blob (only individual embeddings, not centroid)
                 cur.execute(f"""
                     UPDATE {table} SET "Face_Embeddings" = %s WHERE {id_field} = %s
                 """, (pickle.dumps(raw_embeddings), person_id))
 
-                # 2. FaceEmbeddings — clear old rows, insert new ones
-                if person_type == 'Student':
-                    cur.execute('DELETE FROM "FaceEmbeddings" WHERE "Student_ID" = %s',
-                                (person_id,))
-                else:
-                    cur.execute('DELETE FROM "FaceEmbeddings" WHERE "Teacher_ID" = %s',
-                                (person_id,))
+                # 2. FaceEmbeddings — clear old rows for this person.
+                # This must run inside the same transaction as the INSERTs so a
+                # failed re-enroll doesn't leave the person with zero embeddings.
+                cur.execute(
+                    f'DELETE FROM "FaceEmbeddings" WHERE {id_col} = %s',
+                    (person_id,),
+                )
 
                 for item in enriched_embeddings:
                     emb        = item['embedding']
@@ -736,9 +755,7 @@ class DatabaseHandler:
                     emb_json   = json.dumps(emb if isinstance(emb, list) else list(emb))
                     emb_bytes  = emb_json.encode('utf-8')
 
-                    id_col  = '"Student_ID"' if person_type == 'Student' else '"Teacher_ID"'
-                    try:
-                        # v2 INSERT — requires QualityScore, IsCentroid, SourceImageIndex columns
+                    if has_v2_columns:
                         cur.execute(f"""
                             INSERT INTO "FaceEmbeddings"
                                 ("PersonType", {id_col}, "PersonName",
@@ -748,15 +765,15 @@ class DatabaseHandler:
                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                         """, (person_type, person_id, person_name,
                               emb_bytes, emb_json, quality, is_cent, src_idx))
-                    except Exception:
-                        # New columns not yet migrated — fall back to v1 INSERT
-                        self.conn.rollback()
+                    else:
                         cur.execute(f"""
                             INSERT INTO "FaceEmbeddings"
                                 ("PersonType", {id_col}, "PersonName",
-                                 "Embedding", "EmbeddingJson", "CreatedAt", "UpdatedAt")
+                                 "Embedding", "EmbeddingJson",
+                                 "CreatedAt", "UpdatedAt")
                             VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
-                        """, (person_type, person_id, person_name, emb_bytes, emb_json))
+                        """, (person_type, person_id, person_name,
+                              emb_bytes, emb_json))
 
             self.conn.commit()
             n_ind  = sum(1 for e in enriched_embeddings if not e.get('is_centroid'))

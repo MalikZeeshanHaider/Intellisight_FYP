@@ -120,16 +120,23 @@ def generate_embeddings():
             image_path = os.path.join(person_path, image_file)
             
             try:
-                # Read image and apply the same preprocessing used during recognition.
-                # Pipeline must match _recognize_face in camera_streaming_service.py:
-                #   preprocess_face_crop (CLAHE) → resize 160×160 → represent(skip)
+                # Read image and apply the EXACT pipeline used during recognition.
+                # Pipeline must match _get_raw_embedding in camera_streaming_service.py
+                # and _extract_embedding in enrollment.py:
+                #   detect+crop → preprocess_face_crop (CLAHE) → resize 112×112 → represent(skip)
+                #
+                # 112×112 is ArcFace's canonical input size.  Previously this code
+                # resized to 160×160 which forced DeepFace to internally rescale to
+                # 112×112 with a different interpolation, producing embeddings in a
+                # subtly different feature space than the live recognition path —
+                # a direct cause of "known users → Unknown".
                 #
                 # detector_backend='skip' embeds the image as-is without re-running a
                 # face detector. This is critical: the recognition path already has the
                 # face crop extracted by yunet; asking yunet to re-detect inside the crop
                 # often fails (tight crop, low confidence) and produces an unaligned
-                # embedding in a different feature space. Using 'skip' in both training
-                # and recognition ensures they occupy the same embedding space.
+                # embedding. Using 'skip' in both training and recognition ensures they
+                # occupy the same embedding space.
                 image = cv2.imread(image_path)
                 if image is None:
                     print(f"  [FAIL] {image_file} - Cannot read image file")
@@ -140,7 +147,7 @@ def generate_embeddings():
                 from enrollment import _detect_and_crop_face
                 image = _detect_and_crop_face(image)
                 image = preprocess_face_crop(image)
-                image = cv2.resize(image, (160, 160), interpolation=cv2.INTER_LINEAR)
+                image = cv2.resize(image, (112, 112), interpolation=cv2.INTER_LINEAR)
 
                 embedding_objs = DeepFace.represent(
                     img_path=image,

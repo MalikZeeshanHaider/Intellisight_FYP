@@ -56,9 +56,21 @@ DETECTOR_BACKEND = "yunet"
 # ArcFace cosine distance threshold.
 # Same person: typically 0.20–0.45 | Different person: typically 0.55–1.00
 # DeepFace's own verified threshold for ArcFace cosine = 0.6717.
-# Using 0.68 to match that boundary and reject borderline matches.
-DISTANCE_THRESHOLD = 0.69  # ArcFace cosine distance (0 = identical, 1 = orthogonal)
-MIN_FACE_SIZE = 20  # Minimum face crop size (pixels) for recognition — NOT for detection frame
+#
+# We deliberately keep this LOOSE (0.65) so genuine matches with imperfect
+# enrolment photos still pass.  The safety net that prevents wrong labels is
+# elsewhere:
+#   1. KNN_MARGIN (0.08)              — rejects queries between two identities
+#   2. RECOGNITION_CONFIDENCE_THRESHOLD (0.25) — gates BOTH display + DB write
+# Together they catch the bad matches; this threshold only sets "how far to
+# even consider a match", and being too strict here was missing valid users.
+DISTANCE_THRESHOLD = 0.65  # ArcFace cosine distance (0 = identical, 1 = orthogonal)
+
+# Minimum face crop size (pixels) for the full-resolution crop fed to ArcFace.
+# 24 lets typical doorway/corridor detections through; smaller crops still get
+# rejected because their embeddings are too noisy to be useful, but we no longer
+# discard legitimate medium-distance faces.
+MIN_FACE_SIZE = 24
 CONSECUTIVE_MATCHES = 2  # Matches needed before confirming identity
 FRAME_SKIP = 3  # Legacy — kept for import compatibility; AI sampling now queue-driven
 
@@ -130,7 +142,12 @@ SHARPNESS_THRESHOLD = 15.0
 #                allow matches where enrolled images cluster tightly together.
 KNN_K        = 5     # top-K nearest embeddings for voting pool
 KNN_VOTE_MIN = 2     # minimum votes to accept (raise to 2 with ≥3 images each)
-KNN_MARGIN   = 0.08  # min cosine-distance gap between 1st and 2nd best person
+KNN_MARGIN   = 0.08  # min cosine-distance gap between 1st and 2nd best person.
+                     # The RECOGNITION_CONFIDENCE_THRESHOLD display gate already
+                     # suppresses low-conf cross-identity confusion, so this can
+                     # stay at the original 0.08 — tighter values were starting
+                     # to reject genuine matches where two enrolled persons live
+                     # near each other in embedding space.
 
 # Folder paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

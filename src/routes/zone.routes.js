@@ -10,6 +10,7 @@ import {
   getAllUnknownFaces,
   getAllUnknownStats,
   getRecentAlerts,
+  bulkDeleteUnknownFaces,
 } from '../controllers/zone.controller.js';
 import { validateRequest } from '../middlewares/validateRequest.js';
 import {
@@ -28,6 +29,7 @@ router.use(authenticateToken);
 // Static paths must be declared BEFORE the generic /:id route so Express doesn't
 // treat "unknown-faces" or "unknown-stats" as a Zone_id.
 router.get('/unknown-faces', getAllUnknownFaces);
+router.post('/unknown-faces/bulk-delete', bulkDeleteUnknownFaces);
 router.get('/unknown-stats', getAllUnknownStats);
 router.get('/recent-alerts', getRecentAlerts);
 

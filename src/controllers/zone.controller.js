@@ -193,6 +193,50 @@ export const getAllUnknownFaces = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @route   POST /api/zones/unknown-faces/bulk-delete
+ * @desc    Delete multiple unknown face entries in a single request.
+ *          Body shape (one of):
+ *            { ids: number[] }                              — delete these specific rows
+ *            { all: true, status?: string, zone_id?: int }  — delete every row matching filter
+ *          Returns `{ deleted: <count> }`. The explicit `all: true` flag is required
+ *          for a bulk-by-filter delete so an accidental empty body cannot wipe the
+ *          entire UnknownFaces table.
+ * @access  Private
+ */
+export const bulkDeleteUnknownFaces = asyncHandler(async (req, res) => {
+  const { ids, all, status, zone_id } = req.body || {};
+
+  let result;
+  if (Array.isArray(ids) && ids.length > 0) {
+    const parsedIds = [
+      ...new Set(ids.map((x) => parseInt(x, 10)).filter(Number.isFinite)),
+    ];
+    if (parsedIds.length === 0) {
+      return successResponse(res, { deleted: 0 }, 'No valid IDs supplied');
+    }
+    result = await prisma.unknownFaces.deleteMany({
+      where: { Unknown_ID: { in: parsedIds } },
+    });
+  } else if (all === true) {
+    const where = {};
+    if (status)  where.Status  = status;
+    if (zone_id) where.Zone_id = parseInt(zone_id, 10);
+    result = await prisma.unknownFaces.deleteMany({ where });
+  } else {
+    return res.status(400).json({
+      success: false,
+      message: 'Provide either `ids: number[]` or `all: true` in the request body',
+    });
+  }
+
+  successResponse(
+    res,
+    { deleted: result.count },
+    `Deleted ${result.count} unknown face entr${result.count === 1 ? 'y' : 'ies'}`
+  );
+});
+
+/**
  * @route   GET /api/zones/unknown-stats
  * @desc    Aggregate counts across ALL zones for the Unknown Faces page header.
  * @access  Private

@@ -23,7 +23,10 @@ from database_handler import DatabaseHandler
 from config import (
     MODEL_NAME, DISTANCE_THRESHOLD, DISTANCE_METRIC, MIN_FACE_SIZE,
     CONSECUTIVE_MATCHES, EMBEDDINGS_FILE, DETECTOR_BACKEND,
-    UNIDENTIFIED_SAVE_PATH, FRAME_SKIP
+    UNIDENTIFIED_SAVE_PATH, FRAME_SKIP,
+    KNN_K, KNN_VOTE_MIN, KNN_MARGIN,
+    EMBEDDING_EMA_ALPHA, SHARPNESS_THRESHOLD,
+    RECOGNITION_CONFIDENCE_THRESHOLD,
 )
 from utils import (
     setup_logging, get_euclidean_distance, find_best_match,
@@ -243,9 +246,16 @@ class DualCameraRecognizer:
         detections         = []   # fed into tracker.update() at end of frame
 
         # ── Phase 1: detect all faces ─────────────────────────────────────────
+        # CRITICAL: pass the RAW frame, not preprocess_face_crop(frame).
+        # CLAHE belongs on the tight crop just before embedding, run exactly once
+        # to mirror enrollment. Running CLAHE on the full frame here meant the
+        # crop returned by extract_faces was already CLAHE-enhanced, and the
+        # second CLAHE call below produced an over-corrected face whose embedding
+        # did not live in the same feature space as the stored enrolment vectors
+        # — the direct cause of known users being labelled "Unknown".
         try:
             face_list = DeepFace.extract_faces(
-                img_path=preprocess_face_crop(frame),
+                img_path=frame,
                 detector_backend=DETECTOR_BACKEND,
                 enforce_detection=False,
                 align=False   # must match enrollment.py which uses align=False
@@ -274,54 +284,110 @@ class DualCameraRecognizer:
             # Check tracker cache — avoids re-recognition for known faces
             cached_person, cached_dist, _ = tracker.get_person_for_bbox(bbox)
 
+            person_dict = distance = None
+            confidence  = 0.0
+            smooth_emb  = None    # only set on a fresh embedding (cache miss)
+            face_crop   = None    # kept for unknown-face logging below
+
             if cached_person is not None:
                 person_dict = cached_person
                 distance    = cached_dist
             else:
-                # Full recognition: embed the aligned crop, search index
-                face_crop = face_obj.get('face')
-                if face_crop is None or (hasattr(face_crop, 'size') and face_crop.size == 0):
-                    fh, fw = frame.shape[:2]
-                    m = 20
-                    face_crop = frame[max(0, y - m):min(fh, y + h + m),
-                                      max(0, x - m):min(fw, x + w + m)]
+                # Crop directly from the raw frame using the YuNet bbox — no margin.
+                # Matches camera_streaming_service._recognize_face and enrollment
+                # exactly, so cosine distances are comparable to stored vectors.
+                fh, fw = frame.shape[:2]
+                y1, y2 = max(0, y), min(fh, y + h)
+                x1, x2 = max(0, x), min(fw, x + w)
+                face_crop = frame[y1:y2, x1:x2]
+
+                if face_crop.size == 0:
+                    face_crop = None
                 else:
-                    # DeepFace ≥0.0.79 returns float32 [0–1] RGB from extract_faces.
-                    # Convert to uint8 BGR so CLAHE preprocessing works correctly,
-                    # matching the uint8 BGR pipeline used during enrollment.
-                    if face_crop.dtype != np.uint8:
-                        face_crop = (face_crop * 255).clip(0, 255).astype(np.uint8)
-                        face_crop = cv2.cvtColor(face_crop, cv2.COLOR_RGB2BGR)
+                    # ── Sharpness gate ────────────────────────────────────────
+                    # Reject motion-blurred crops — they produce ArcFace
+                    # embeddings that disagree with the same person's enrolled
+                    # vectors and are a major source of identity flicker while
+                    # subjects are walking.  Tracker hysteresis preserves the
+                    # last confirmed identity for ~2 s so a few skipped frames
+                    # do not break recognition.
+                    try:
+                        _gray  = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
+                        _thumb = cv2.resize(_gray, (64, 64),
+                                            interpolation=cv2.INTER_AREA)
+                        _sharp = cv2.Laplacian(_thumb, cv2.CV_64F).var()
+                    except Exception:
+                        _sharp = float('inf')   # don't block on measurement error
 
-                face_crop    = preprocess_face_crop(face_crop)
-                face_resized = cv2.resize(face_crop, (112, 112))  # ArcFace canonical 112×112
+                    if _sharp >= SHARPNESS_THRESHOLD:
+                        # Embed: CLAHE → 112×112 → ArcFace represent (skip detector)
+                        face_preprocessed = preprocess_face_crop(face_crop)
+                        face_resized = cv2.resize(face_preprocessed, (112, 112),
+                                                  interpolation=cv2.INTER_LINEAR)
 
-                person_dict = distance = None
-                try:
-                    results = DeepFace.represent(
-                        img_path=face_resized,
-                        model_name=MODEL_NAME,
-                        detector_backend="skip",
-                        enforce_detection=False,
-                        align=False,
-                    )
-                    if results:
-                        person_dict, distance = self.embedding_index.search(
-                            results[0]["embedding"], DISTANCE_THRESHOLD
-                        )
-                except Exception as e:
-                    logger.debug(f"Recognition error: {e}")
+                        try:
+                            results = DeepFace.represent(
+                                img_path=face_resized,
+                                model_name=MODEL_NAME,
+                                detector_backend="skip",
+                                enforce_detection=False,
+                                align=False,
+                            )
+                            if results:
+                                raw_emb = np.array(results[0]["embedding"],
+                                                   dtype=np.float32)
 
-            # Accumulate detection for tracker update
+                                # EMA smoothing — blend with the track's previous
+                                # smoothed embedding so transient motion noise
+                                # does not flip identity frame-to-frame.
+                                prev_smooth = tracker.get_smooth_embedding(bbox)
+                                if prev_smooth is not None:
+                                    smooth_emb = (EMBEDDING_EMA_ALPHA * prev_smooth
+                                                  + (1.0 - EMBEDDING_EMA_ALPHA) * raw_emb)
+                                else:
+                                    smooth_emb = raw_emb
+
+                                # L2-normalize the blended vector before search.
+                                _n = float(np.linalg.norm(smooth_emb))
+                                query = smooth_emb / _n if _n > 1e-9 else smooth_emb
+
+                                # Top-K voting with margin gate — far more robust
+                                # than raw nearest-neighbour for cross-identity
+                                # discrimination (e.g. siblings, similar faces).
+                                person_dict, distance, confidence = (
+                                    self.embedding_index.search_with_vote(
+                                        query,
+                                        k=KNN_K,
+                                        threshold=DISTANCE_THRESHOLD,
+                                        vote_min=KNN_VOTE_MIN,
+                                        margin=KNN_MARGIN,
+                                    )
+                                )
+                        except Exception as e:
+                            logger.debug(f"Recognition error: {e}")
+
+            # Accumulate detection for tracker update.
+            # smooth_embedding is stored only on cache miss — on a hit the
+            # existing track keeps its prior smoothed vector unchanged.
             detections.append({
-                'bbox':       bbox,
-                'person':     person_dict,
-                'distance':   distance or 0,
-                'confidence': 0,
+                'bbox':             bbox,
+                'person':           person_dict,
+                'distance':         distance if distance is not None else 0,
+                'confidence':       confidence,
+                'smooth_embedding': smooth_emb,
             })
 
-            # Build display label and collect recognized persons
-            if person_dict is not None:
+            # Build display label and collect recognized persons.
+            # Suppress the name on low-confidence matches: when confidence falls
+            # below RECOGNITION_CONFIDENCE_THRESHOLD the index returned a candidate
+            # we don't trust enough to label.  Showing "Basit 17%" on someone who
+            # is actually Abdullah is worse than showing "Unknown" — users believe
+            # the labelled answer.
+            is_confident_match = (
+                person_dict is not None
+                and confidence >= RECOGNITION_CONFIDENCE_THRESHOLD
+            )
+            if is_confident_match:
                 role         = person_dict['role']
                 display_name = person_dict['name']
                 color = (255, 100, 0) if role == 'TEACHER' else (0, 200, 0)
@@ -337,10 +403,12 @@ class DualCameraRecognizer:
             elif distance is not None:
                 color = (0, 0, 255)
                 label = f"Unknown ({distance:.1f})"
-                # face_crop is always available here — unknown faces never hit the
-                # cached-identity branch (cached_person would be None, forcing full
-                # recognition).  Collect for entry-camera unknown-face saving.
-                unknown_crops.append((face_crop.copy(), distance))
+                # Collect for entry-camera unknown-face saving — but only when we
+                # actually have a crop. The sharpness gate above can leave
+                # face_crop = None for motion-blurred detections; we skip those
+                # to avoid logging garbage thumbnails to the UnknownFaces table.
+                if face_crop is not None and face_crop.size > 0:
+                    unknown_crops.append((face_crop.copy(), distance))
             else:
                 color = (0, 255, 255)
                 label = "Detecting..."

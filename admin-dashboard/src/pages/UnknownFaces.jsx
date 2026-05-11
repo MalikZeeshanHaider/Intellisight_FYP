@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { FiAlertCircle, FiTrash2, FiRefreshCw, FiClock, FiUser, FiChevronDown, FiX, FiEdit2, FiCheck } from 'react-icons/fi';
+import { FiAlertCircle, FiTrash2, FiRefreshCw, FiClock, FiUser, FiChevronDown, FiX, FiEdit2, FiCheck, FiCheckSquare, FiSquare } from 'react-icons/fi';
 import { format } from 'date-fns';
 import { unknownFacesAPI } from '../api/unknownFaces';
 import { studentAPI, teacherAPI } from '../api/api';
@@ -21,6 +21,12 @@ const UnknownFaces = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [faceToDelete, setFaceToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Bulk selection + delete state.
+  // selectedIds is a Set of Unknown_ID values; bulkConfirm.mode is 'selected' or 'all'.
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkConfirm, setBulkConfirm] = useState(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   
   // Identify modal state
   const [showIdentifyModal, setShowIdentifyModal] = useState(false);
@@ -131,7 +137,7 @@ const UnknownFaces = () => {
 
   const confirmDelete = async () => {
     if (!faceToDelete) return;
-    
+
     setDeleting(true);
     try {
       await unknownFacesAPI.deleteUnknownFace(faceToDelete.Unknown_ID);
@@ -139,12 +145,79 @@ const UnknownFaces = () => {
       setTimeout(() => setSuccess(null), 3000);
       setShowDeleteConfirm(false);
       setFaceToDelete(null);
+      // Drop this ID from the selection set if it happened to be selected.
+      setSelectedIds((prev) => {
+        if (!prev.has(faceToDelete.Unknown_ID)) return prev;
+        const next = new Set(prev);
+        next.delete(faceToDelete.Unknown_ID);
+        return next;
+      });
       fetchUnknownFaces();
     } catch (err) {
       setError('Failed to delete entry: ' + (err.response?.data?.message || err.message));
       setTimeout(() => setError(null), 5000);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // ── Bulk selection helpers ────────────────────────────────────────────────
+  const toggleSelected = (unknownId) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(unknownId)) next.delete(unknownId);
+      else next.add(unknownId);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const selectAllVisible = () => {
+    setSelectedIds(new Set(unknownFaces.map((f) => f.Unknown_ID)));
+  };
+
+  // Discard selection when the user switches filter — stale IDs would be invisible.
+  useEffect(() => {
+    clearSelection();
+  }, [filter]);
+
+  const openBulkDeleteSelected = () => {
+    if (selectedIds.size === 0) return;
+    setBulkConfirm({ mode: 'selected', count: selectedIds.size });
+  };
+
+  const openBulkDeleteAll = () => {
+    if (unknownFaces.length === 0) return;
+    // "All" deletes every row matching the current filter on the server, not just
+    // what's loaded on screen (the page caps at limit=100). Show the visible count
+    // in the confirmation so the user has a lower bound for what's about to go.
+    setBulkConfirm({ mode: 'all', count: unknownFaces.length });
+  };
+
+  const confirmBulkDelete = async () => {
+    if (!bulkConfirm) return;
+    setBulkDeleting(true);
+    try {
+      let response;
+      if (bulkConfirm.mode === 'selected') {
+        response = await unknownFacesAPI.bulkDelete({ ids: Array.from(selectedIds) });
+      } else {
+        // Respect the current filter — 'all' on the "Pending" view only deletes pending rows.
+        const status = filter === 'all' ? null : filter.toUpperCase();
+        response = await unknownFacesAPI.bulkDelete({ all: true, status });
+      }
+      const deleted = response?.data?.deleted ?? 0;
+      setSuccess(`Deleted ${deleted} unknown face${deleted === 1 ? '' : 's'}`);
+      setTimeout(() => setSuccess(null), 3000);
+      setBulkConfirm(null);
+      clearSelection();
+      fetchUnknownFaces();
+    } catch (err) {
+      setError('Bulk delete failed: ' + (err.response?.data?.message || err.message));
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -252,33 +325,65 @@ const UnknownFaces = () => {
           </h1>
         </div>
 
-        <button
-          onClick={() => fetchUnknownFaces()}
-          disabled={loading}
-          className="flex items-center space-x-2 px-4 py-2 rounded-lg transition disabled:opacity-50"
-          style={{
-            backgroundColor: loading 
-              ? (isDarkMode ? '#374151' : '#e5e7eb') 
-              : (isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#003d82'),
-            color: '#fff',
-            boxShadow: isDarkMode && !loading ? '0 0 20px rgba(6, 182, 212, 0.3)' : 'none'
-          }}
-          onMouseEnter={(e) => {
-            if (!loading) {
-              e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 1)' : '#305796';
-              if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 30px rgba(6, 182, 212, 0.5)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!loading) {
-              e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#003d82';
-              if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 20px rgba(6, 182, 212, 0.3)';
-            }
-          }}
-        >
-          <FiRefreshCw className={loading ? 'animate-spin' : ''} size={16} />
-          <span>Refresh</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          {/* Delete All — wipes every row matching the current filter on the server,
+              not only the rows loaded on screen.  Disabled when there's nothing visible. */}
+          <button
+            onClick={openBulkDeleteAll}
+            disabled={loading || unknownFaces.length === 0}
+            className="flex items-center space-x-2 px-4 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.8)' : '#dc2626',
+              color: '#fff',
+              boxShadow: isDarkMode ? '0 0 15px rgba(239, 68, 68, 0.25)' : 'none',
+              cursor: unknownFaces.length === 0 ? 'not-allowed' : 'pointer'
+            }}
+            onMouseEnter={(e) => {
+              if (unknownFaces.length > 0) {
+                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(239, 68, 68, 1)' : '#b91c1c';
+                if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 22px rgba(239, 68, 68, 0.45)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (unknownFaces.length > 0) {
+                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(239, 68, 68, 0.8)' : '#dc2626';
+                if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.25)';
+              }
+            }}
+            title={filter === 'all' ? 'Delete every unknown face' : `Delete all ${filter} faces`}
+          >
+            <FiTrash2 size={16} />
+            <span>Delete All</span>
+          </button>
+
+          <button
+            onClick={() => fetchUnknownFaces()}
+            disabled={loading}
+            className="flex items-center space-x-2 px-4 py-2 rounded-lg transition disabled:opacity-50"
+            style={{
+              backgroundColor: loading
+                ? (isDarkMode ? '#374151' : '#e5e7eb')
+                : (isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#003d82'),
+              color: '#fff',
+              boxShadow: isDarkMode && !loading ? '0 0 20px rgba(6, 182, 212, 0.3)' : 'none'
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 1)' : '#305796';
+                if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 30px rgba(6, 182, 212, 0.5)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!loading) {
+                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(6, 182, 212, 0.8)' : '#003d82';
+                if (isDarkMode) e.currentTarget.style.boxShadow = '0 0 20px rgba(6, 182, 212, 0.3)';
+              }
+            }}
+          >
+            <FiRefreshCw className={loading ? 'animate-spin' : ''} size={16} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* Alerts */}
@@ -501,7 +606,61 @@ const UnknownFaces = () => {
           border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.2)' : '1px solid #e5e7eb'
         }}
       >
-        <h2 className="text-xl font-bold mb-4" style={{ color: isDarkMode ? '#22d3ee' : '#003d82' }}>Detected Faces</h2>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <h2 className="text-xl font-bold" style={{ color: isDarkMode ? '#22d3ee' : '#003d82' }}>Detected Faces</h2>
+
+          {/* Selection toolbar — only shows once the user has selected at least one card. */}
+          {unknownFaces.length > 0 && (
+            <div className="flex items-center gap-2 text-sm">
+              <span style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
+                {selectedIds.size > 0
+                  ? `${selectedIds.size} selected`
+                  : `${unknownFaces.length} on screen`}
+              </span>
+              <button
+                onClick={selectAllVisible}
+                disabled={selectedIds.size === unknownFaces.length}
+                className="px-3 py-1.5 rounded-md text-xs font-medium transition disabled:opacity-50"
+                style={{
+                  border: isDarkMode ? '1px solid rgba(6, 182, 212, 0.3)' : '1px solid #d1d5db',
+                  color: isDarkMode ? '#c0f0f0' : '#374151',
+                  backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.6)' : 'white',
+                  cursor: selectedIds.size === unknownFaces.length ? 'not-allowed' : 'pointer'
+                }}
+                title="Select every face shown on this page"
+              >
+                Select All
+              </button>
+              <button
+                onClick={clearSelection}
+                disabled={selectedIds.size === 0}
+                className="px-3 py-1.5 rounded-md text-xs font-medium transition disabled:opacity-50"
+                style={{
+                  border: isDarkMode ? '1px solid rgba(107, 114, 128, 0.3)' : '1px solid #d1d5db',
+                  color: isDarkMode ? '#c0f0f0' : '#374151',
+                  backgroundColor: 'transparent',
+                  cursor: selectedIds.size === 0 ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Clear
+              </button>
+              <button
+                onClick={openBulkDeleteSelected}
+                disabled={selectedIds.size === 0}
+                className="px-3 py-1.5 rounded-md text-xs font-semibold text-white transition disabled:opacity-50 flex items-center gap-1.5"
+                style={{
+                  backgroundColor: selectedIds.size === 0
+                    ? (isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#fca5a5')
+                    : (isDarkMode ? 'rgba(239, 68, 68, 0.85)' : '#dc2626'),
+                  cursor: selectedIds.size === 0 ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <FiTrash2 size={12} />
+                Delete Selected
+              </button>
+            </div>
+          )}
+        </div>
 
         {loading && unknownFaces.length === 0 ? (
           <div className="flex items-center justify-center py-12">
@@ -523,25 +682,32 @@ const UnknownFaces = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {unknownFaces.map((face) => (
+            {unknownFaces.map((face) => {
+              const isSelected = selectedIds.has(face.Unknown_ID);
+              return (
               <div
                 key={face.Unknown_ID}
                 className="rounded-lg p-4 shadow-sm hover:shadow-md transition"
                 style={{
-                  background: isDarkMode 
+                  background: isDarkMode
                     ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9))'
                     : 'linear-gradient(135deg, #fef2f2, #fff7ed)',
-                  border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid #fecaca'
+                  border: isSelected
+                    ? (isDarkMode ? '2px solid #22d3ee' : '2px solid #003d82')
+                    : (isDarkMode ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid #fecaca'),
+                  boxShadow: isSelected
+                    ? (isDarkMode ? '0 0 18px rgba(34, 211, 238, 0.35)' : '0 0 0 2px rgba(0, 61, 130, 0.15)')
+                    : undefined
                 }}
               >
-                {/* Face Image */}
-                <div className="mb-3">
+                {/* Face Image + selection checkbox overlay */}
+                <div className="mb-3 relative">
                   {face.CapturedImage ? (
                     <img
                       src={face.CapturedImage}
                       alt="Unknown Person"
                       className="w-full h-48 object-cover rounded-lg shadow"
-                      style={{ 
+                      style={{
                         border: isDarkMode ? '2px solid rgba(239, 68, 68, 0.4)' : '2px solid #fca5a5'
                       }}
                     />
@@ -550,6 +716,29 @@ const UnknownFaces = () => {
                       <FiUser size={64} className="text-white opacity-50" />
                     </div>
                   )}
+
+                  {/* Checkbox — top-left of image. Click anywhere on it to toggle. */}
+                  <button
+                    onClick={() => toggleSelected(face.Unknown_ID)}
+                    className="absolute top-2 left-2 rounded-md flex items-center justify-center transition cursor-pointer"
+                    style={{
+                      width: 28,
+                      height: 28,
+                      backgroundColor: isSelected
+                        ? (isDarkMode ? 'rgba(34, 211, 238, 0.95)' : '#003d82')
+                        : 'rgba(255, 255, 255, 0.92)',
+                      border: isSelected
+                        ? 'none'
+                        : '1px solid rgba(0, 0, 0, 0.2)',
+                      color: isSelected ? '#fff' : '#374151',
+                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.25)'
+                    }}
+                    title={isSelected ? 'Unselect' : 'Select'}
+                    aria-label={isSelected ? 'Unselect this face' : 'Select this face'}
+                    aria-pressed={isSelected}
+                  >
+                    {isSelected ? <FiCheckSquare size={16} /> : <FiSquare size={16} />}
+                  </button>
                 </div>
 
                 {/* Info */}
@@ -568,9 +757,12 @@ const UnknownFaces = () => {
                     <span>{format(new Date(face.DetectedTime), 'MMM dd, yyyy HH:mm:ss')}</span>
                   </div>
 
-                  {/* Zone */}
+                  {/* Zone — uses the Zone_Name returned by /zones/unknown-faces.
+                      Was hardcoded to "Zone 1" before, which mis-attributed every
+                      capture once Zone 2+ cameras came online. */}
                   <div className="text-sm" style={{ color: isDarkMode ? '#c0f0f0' : '#374151' }}>
-                    <span className="font-semibold">Zone:</span> Zone 1
+                    <span className="font-semibold">Zone:</span>{' '}
+                    {face.Zone_Name || (face.Zone_id != null ? `Zone ${face.Zone_id}` : 'Unknown')}
                   </div>
 
                   {/* Confidence */}
@@ -735,7 +927,8 @@ const UnknownFaces = () => {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -1220,6 +1413,112 @@ const UnknownFaces = () => {
                   </>
                 )}
               </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {bulkConfirm && (
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50 p-4"
+          style={{
+            background: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(8px)'
+          }}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="rounded-2xl p-8 max-w-md w-full shadow-2xl relative"
+            style={{
+              background: isDarkMode
+                ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95))'
+                : 'rgba(255, 255, 255, 0.98)',
+              backdropFilter: 'blur(20px)',
+              border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(239, 68, 68, 0.3)',
+              boxShadow: isDarkMode
+                ? '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(239, 68, 68, 0.1)'
+                : '0 20px 60px rgba(0, 0, 0, 0.3)'
+            }}
+          >
+            <button
+              onClick={() => !bulkDeleting && setBulkConfirm(null)}
+              className="absolute top-4 right-4 p-2 rounded-full transition-colors"
+              style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}
+            >
+              <FiX size={20} />
+            </button>
+
+            <div className="text-center">
+              <div
+                className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4"
+                style={{
+                  background: isDarkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)',
+                  border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(239, 68, 68, 0.3)'
+                }}
+              >
+                <FiTrash2 className="text-3xl" style={{ color: isDarkMode ? '#f87171' : '#dc2626' }} />
+              </div>
+
+              <h2 className="text-2xl font-bold mb-2" style={{ color: isDarkMode ? '#c0f0f0' : '#1f2937' }}>
+                {bulkConfirm.mode === 'selected' ? 'Delete Selected Faces' : 'Delete All Faces'}
+              </h2>
+
+              <p className="mb-2" style={{ color: isDarkMode ? 'rgba(192, 240, 240, 0.7)' : '#6b7280' }}>
+                {bulkConfirm.mode === 'selected'
+                  ? `Permanently delete ${bulkConfirm.count} selected unknown face${bulkConfirm.count === 1 ? '' : 's'}?`
+                  : (filter === 'all'
+                      ? `Permanently delete every unknown face? (${bulkConfirm.count} currently visible)`
+                      : `Permanently delete every ${filter} face? (${bulkConfirm.count} currently visible)`)}
+              </p>
+
+              <p
+                className="text-sm mb-6 px-4 py-2 rounded-lg"
+                style={{
+                  backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)',
+                  color: isDarkMode ? '#f87171' : '#dc2626'
+                }}
+              >
+                This action cannot be undone.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setBulkConfirm(null)}
+                  disabled={bulkDeleting}
+                  className="flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-200 cursor-pointer"
+                  style={{
+                    background: isDarkMode ? 'rgba(107, 114, 128, 0.2)' : 'rgba(107, 114, 128, 0.1)',
+                    border: isDarkMode ? '1px solid rgba(107, 114, 128, 0.4)' : '1px solid rgba(107, 114, 128, 0.3)',
+                    color: isDarkMode ? '#c0f0f0' : '#4b5563'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmBulkDelete}
+                  disabled={bulkDeleting}
+                  className="flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
+                  style={{
+                    background: isDarkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)',
+                    border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid rgba(239, 68, 68, 0.4)',
+                    color: isDarkMode ? '#f87171' : '#dc2626'
+                  }}
+                >
+                  {bulkDeleting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: isDarkMode ? '#f87171' : '#dc2626', borderTopColor: 'transparent' }}></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <FiTrash2 size={16} />
+                      Delete {bulkConfirm.mode === 'selected' ? bulkConfirm.count : 'All'}
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </motion.div>
         </div>

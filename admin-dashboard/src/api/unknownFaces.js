@@ -49,4 +49,22 @@ export const unknownFacesAPI = {
     const response = await zone1Api.delete(`/unknown/${unknownId}`);
     return response.data;
   },
+
+  /**
+   * Delete many rows at once.
+   *   bulkDelete({ ids: [1, 2, 3] })           → delete those IDs
+   *   bulkDelete({ all: true })                → delete every unknown face
+   *   bulkDelete({ all: true, status: 'PENDING' })  → delete all PENDING faces
+   */
+  bulkDelete: async ({ ids, all, status, zoneId } = {}) => {
+    const body = {};
+    if (Array.isArray(ids) && ids.length > 0) body.ids = ids;
+    if (all) {
+      body.all = true;
+      if (status) body.status = status;
+      if (zoneId) body.zone_id = zoneId;
+    }
+    const response = await api.post('/zones/unknown-faces/bulk-delete', body);
+    return response.data;
+  },
 };

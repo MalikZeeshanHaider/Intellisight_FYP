@@ -111,40 +111,49 @@ def find_new_images(trained_set):
 
 def extract_face_embedding(image_path):
     """
-    Extract face embedding from an image using DeepFace FaceNet
-    This matches the embedding format used in recognition_live.py
+    Extract face embedding from an image, using the SAME pipeline as
+    camera_streaming_service._get_raw_embedding and enrollment._extract_embedding.
+
+    Canonical pipeline (do not diverge):
+      1. Read raw BGR image from disk
+      2. Run face detector on the RAW frame to get a tight crop
+      3. CLAHE the crop (preprocess_face_crop) — NOT the full frame
+      4. Resize the crop to 112×112 (ArcFace canonical input)
+      5. DeepFace.represent(detector_backend='skip', align=False)
+
+    Earlier this function applied CLAHE to the WHOLE frame first and then asked
+    DeepFace to detect a face inside the CLAHE-enhanced image. That produced
+    embeddings from a different image than the live recognition path (which
+    detects on raw frames and CLAHEs only the crop), so enrolled embeddings
+    drifted from query embeddings — the direct cause of "known users → Unknown".
+
+    We now delegate to enrollment.py's helpers so all training paths
+    (full enroll, incremental, folder-based train.py) share one implementation.
     """
     try:
         if not DEEPFACE_AVAILABLE:
             print("  [ERROR] DeepFace not available")
             return None
 
-        # Apply the same preprocessing used during recognition so that
-        # incremental embeddings are consistent with the full training run.
         image = cv2.imread(image_path)
         if image is None:
             print("  [ERROR] Cannot read image file")
             return None
-        image = preprocess_face_crop(image)
 
-        # Use DeepFace to generate embedding
-        results = DeepFace.represent(
-            img_path=image,
-            model_name=MODEL_NAME,
-            detector_backend=DETECTOR_BACKEND,
-            enforce_detection=True,
-            align=False   # must match enrollment.py (align=False) to keep embedding space consistent
-        )
-        
-        if results and len(results) > 0:
-            embedding = results[0]["embedding"]
-            return embedding
-        else:
-            print("  [WARNING] No face detected in image")
+        # Reuse the enrollment quality gate + crop extractor.  Returns the tight
+        # BGR uint8 face crop and a rejection reason string ('' on success).
+        from enrollment import score_enrollment_image, _extract_embedding
+
+        score, face_crop, _conf, reject_reason, _metrics = score_enrollment_image(image)
+        if reject_reason or face_crop is None:
+            print(f"  [WARNING] image rejected: {reject_reason or 'no_crop'}")
             return None
-        
+
+        # Canonical embedding pipeline — CLAHE + resize 112×112 + ArcFace(skip)
+        return _extract_embedding(face_crop)
+
     except Exception as e:
-        print(f"  [ERROR] {str(e)[:50]}")
+        print(f"  [ERROR] {str(e)[:80]}")
         return None
 
 
@@ -156,60 +165,95 @@ def save_embeddings(embeddings):
         json.dump(embeddings, f, indent=2)
 
 
+def _person_key_for(item):
+    """Return the canonical person folder name for a JSON item, regardless of
+    whether it was written by train_incremental ('person') or enrollment ('name')."""
+    return item.get('person') or item.get('name') or ''
+
+
 def main():
     print("\n" + "="*50)
-    print("INCREMENTAL FACE TRAINING")
+    print("INCREMENTAL FACE TRAINING (per-person regeneration)")
     print("="*50)
-    
-    # Load existing embeddings
+
+    # Load existing embeddings from JSON
     existing_embeddings = load_existing_embeddings()
-    trained_set = get_trained_images(existing_embeddings)
-    
+    trained_set         = get_trained_images(existing_embeddings)
+
     print(f"[INFO] Existing embeddings: {len(existing_embeddings)}")
-    
-    # Find new images
+
+    # Find images that aren't in the trained set
     new_images = find_new_images(trained_set)
-    
+
     if len(new_images) == 0:
         print("[OK] No new images to train")
         print("="*50 + "\n")
         return
-    
-    print(f"[INFO] New images to train: {len(new_images)}")
+
+    # ── Per-person regeneration ────────────────────────────────────────────────
+    # Earlier this script appended new embeddings to the JSON and re-synced the
+    # whole list to FaceEmbeddings, so any person who had new images re-uploaded
+    # (or renamed files, or re-trained multiple times) ended up with duplicate
+    # rows.  One user accumulated 46 embeddings for 5 photos.
+    #
+    # New behaviour: if a person has ANY new image, we treat their entire image
+    # folder as the source of truth and regenerate embeddings for ALL of their
+    # on-disk images in one go.  The JSON entries for that person are dropped
+    # first, so the result is exactly N embeddings per person where N = number
+    # of valid images in their folder.
+    persons_to_retrain = {img['person'] for img in new_images}
+    print(f"[INFO] Persons needing re-training: {sorted(persons_to_retrain)}")
+
+    # Keep JSON entries for persons NOT affected by this run
+    kept_existing = [
+        item for item in existing_embeddings
+        if _person_key_for(item) not in persons_to_retrain
+    ]
+    dropped = len(existing_embeddings) - len(kept_existing)
+    if dropped:
+        print(f"[INFO] Dropped {dropped} stale entries for retrained persons")
     print("-"*50)
-    
-    # Train new images
+
+    # Re-train every on-disk image for each affected person
     new_embeddings = []
-    for img_info in new_images:
-        print(f"Training: {img_info['person']}/{img_info['image']}", end=" ")
-        
-        embedding = extract_face_embedding(img_info['path'])
-        
-        if embedding is not None:
-            new_embeddings.append({
-                'person': img_info['person'],
-                'image': img_info['image'],
-                'image_path': img_info['path'],
-                'embedding': embedding
-            })
-            print("[OK]")
-        else:
-            print("[SKIP]")
-    
-    # Merge with existing embeddings
-    if len(new_embeddings) > 0:
-        all_embeddings = existing_embeddings + new_embeddings
-        save_embeddings(all_embeddings)
-        
-        print("-"*50)
-        print(f"[OK] Added {len(new_embeddings)} new embeddings")
-        print(f"[OK] Total embeddings: {len(all_embeddings)}")
-        
-        # Sync to database
-        sync_embeddings_to_database(all_embeddings)
-    else:
-        print("[WARN] No new embeddings generated")
-    
+    for person in sorted(persons_to_retrain):
+        person_dir = os.path.join(IMAGES_FOLDER, person)
+        if not os.path.isdir(person_dir):
+            continue
+
+        image_files = [
+            f for f in sorted(os.listdir(person_dir))
+            if f.lower().endswith(('.jpg', '.jpeg', '.png'))
+        ]
+        for image_file in image_files:
+            image_path = os.path.join(person_dir, image_file)
+            print(f"Training: {person}/{image_file}", end=" ")
+            embedding = extract_face_embedding(image_path)
+            if embedding is not None:
+                new_embeddings.append({
+                    'person':     person,
+                    'image':      image_file,
+                    'image_path': image_path,
+                    'embedding':  embedding,
+                })
+                print("[OK]")
+            else:
+                print("[SKIP]")
+
+    if len(new_embeddings) == 0:
+        print("[WARN] No embeddings generated (all images failed quality gates)")
+        print("="*50 + "\n")
+        return
+
+    all_embeddings = kept_existing + new_embeddings
+    save_embeddings(all_embeddings)
+
+    print("-"*50)
+    print(f"[OK] Regenerated {len(new_embeddings)} embedding(s) "
+          f"for {len(persons_to_retrain)} person(s)")
+    print(f"[OK] Total embeddings in JSON: {len(all_embeddings)}")
+
+    sync_embeddings_to_database(all_embeddings)
     print("="*50 + "\n")
 
 

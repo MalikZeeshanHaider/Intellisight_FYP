@@ -187,11 +187,19 @@ MOTION_THRESHOLD   = 5.0   # below this → scene is static, skip detector
 STATIC_SKIP_AFTER  = 15    # only engage gate after N consecutive empty frames
 
 # ── Detector quality gates ────────────────────────────────────────────────────
-# YuNet returns a per-detection confidence in [0.0, 1.0]. Real human faces
-# usually score > 0.85; texture / corner / shadow false positives sit in
-# 0.50–0.80. A 0.85 threshold near-eliminates ceiling-and-wall false hits
-# without rejecting real (even side-on) faces.
-FACE_DETECT_CONFIDENCE = 0.85
+# YuNet returns a per-detection confidence in [0.0, 1.0]. The earlier 0.85
+# floor was rejecting many real faces (angled, partial, slightly blurred,
+# backlit), producing the "no box at all" complaint from operators. Real-world
+# YuNet hits on legitimate faces sit anywhere from 0.45 (side profile, motion
+# blur) up to 0.98 (frontal, well-lit). Lower to 0.55: false positives still
+# get filtered downstream by:
+#   • aspect-ratio gate (0.4–2.5)
+#   • brightness gate (CROP_MIN_MEAN_BRIGHTNESS)
+#   • contrast gate (CROP_MIN_STD_DEV)
+#   • sharpness gate (SHARPNESS_THRESHOLD)
+#   • RECOGNITION_CONFIDENCE_THRESHOLD display gate
+# so a permissive detector is safe here.
+FACE_DETECT_CONFIDENCE = 0.55
 
 # Crops that are nearly black (IR night frame with no subject) or nearly
 # uniform (blank wall) cannot be real faces. Use mean-brightness and
@@ -652,8 +660,15 @@ class CameraStream:
 
         tracker_updates = []
 
+        # ── Phase 1: gather a "match record" for every detected face ──────────
+        # Each record holds bbox + crop + person/distance/confidence + smooth_emb.
+        # Quality-rejected faces still get a record (with person=None) so they
+        # appear in the tracker update and the detections list with their bbox,
+        # just labelled "Unknown".  No DB writes happen yet — those are deferred
+        # to phase 3 after the uniqueness pass.
+        face_records = []
+
         for face in small_faces:
-            # Scale bbox from detection frame (320×180) back to full resolution.
             x  = int(face['x'] * scale)
             y  = int(face['y'] * scale)
             fw = int(face['w'] * scale)
@@ -665,22 +680,20 @@ class CameraStream:
                 'confidence': face['confidence'],
             })
 
-            detection = {
-                'bbox':       {'x': x, 'y': y, 'w': fw, 'h': fh},
-                'person':     {'recognized': False},
+            rec = {
+                'bbox':       bbox,
+                'face_crop':  None,
+                'person':     None,
+                'distance':   float('inf'),
                 'confidence': 0.0,
+                'smooth_emb': None,
+                'rejected':   False,    # set True by any quality gate
             }
 
-            # ── Step 3: Quality gates ──────────────────────────────────────────
-            # Gate A: minimum size — crop must be large enough for ArcFace.
-            #
+            # ── Quality gates ──────────────────────────────────────────────────
             # CRITICAL: enrollment uses the TIGHT bbox crop returned by
-            # DeepFace.extract_faces (essentially frame[y:y+h, x:x+w] with no
-            # padding).  If we add a margin here, the face occupies a different
-            # fraction of the 112×112 ArcFace input than during enrollment, and
-            # cosine distances systematically exceed the threshold for the
-            # SAME person.  Match enrollment exactly: use the YuNet bbox
-            # directly with no margin.
+            # DeepFace.extract_faces.  Match enrollment exactly: use the YuNet
+            # bbox directly with no margin, so cosine distances are comparable.
             y1 = max(0, y);   y2 = min(h, y + fh)
             x1 = max(0, x);   x2 = min(w, x + fw)
             face_crop = frame[y1:y2, x1:x2]
@@ -690,47 +703,39 @@ class CameraStream:
                     or face_crop.shape[1] < MIN_FACE_SIZE):
                 self._quality_rejects['too_small'] = (
                     self._quality_rejects.get('too_small', 0) + 1)
-                tracker_updates.append({'bbox': bbox, 'person': None,
-                                        'distance': float('inf'), 'confidence': 0.0})
-                detections.append(detection)
+                rec['rejected'] = True
+                face_records.append(rec)
                 continue
 
-            # Gate B: aspect ratio — real faces are roughly square (0.4–2.5).
-            # Horizontal "faces" detected on ceiling rails or shelves are rejected.
             aspect = fw / fh if fh > 0 else 0
             if not (0.4 <= aspect <= 2.5):
                 self._quality_rejects['bad_aspect'] = (
                     self._quality_rejects.get('bad_aspect', 0) + 1)
-                tracker_updates.append({'bbox': bbox, 'person': None,
-                                        'distance': float('inf'), 'confidence': 0.0})
-                detections.append(detection)
+                rec['rejected'] = True
+                face_records.append(rec)
                 continue
 
-            # Gates C–E: brightness, contrast, sharpness (Laplacian variance).
-            # _assess_face_quality runs all three in ~0.3 ms on a 64×64 thumbnail.
             _q_ok, _q_reason, _q_metrics = _assess_face_quality(face_crop)
             if not _q_ok:
-                _q_cat = _q_reason.split('(')[0]   # e.g. 'blurry', 'too_dark'
+                _q_cat = _q_reason.split('(')[0]
                 self._quality_rejects[_q_cat] = (
                     self._quality_rejects.get(_q_cat, 0) + 1)
-                tracker_updates.append({'bbox': bbox, 'person': None,
-                                        'distance': float('inf'), 'confidence': 0.0})
-                detections.append(detection)
+                rec['rejected'] = True
+                face_records.append(rec)
                 continue
 
-            # ── Step 4: FaceTracker cache — skip ArcFace on known tracks ──────
-            # get_person_for_bbox returns the cached identity when IoU >= 0.5 and
-            # the cache has been refreshed within TRACKER_RERECOG_INTERVAL seconds.
-            # Returns (None, None, None) on miss, forcing a fresh ArcFace call.
+            rec['face_crop'] = face_crop
+
+            # ── Tracker cache ──────────────────────────────────────────────────
             person_dict, distance, confidence = self._face_tracker.get_person_for_bbox(
                 bbox, rerecog_interval=TRACKER_RERECOG_INTERVAL
             )
-            smooth_emb = None   # populated only when ArcFace runs (cache miss)
+            smooth_emb = None
 
             if person_dict is not None:
-                self._tracker_hits += 1   # ArcFace skipped — identity reused
+                self._tracker_hits += 1
             else:
-                # ── Step 5: ArcFace embedding + EMA smoothing + search ────────
+                # ── ArcFace embedding + EMA + Top-K vote search ────────────────
                 self._tracker_misses += 1
                 _t_emb  = time.perf_counter()
                 raw_emb = self._get_raw_embedding(face_crop)
@@ -738,13 +743,11 @@ class CameraStream:
                 self._ai_timing['embed_n']  += 1
 
                 if raw_emb is not None:
-                    # Blend with the track's previous smooth embedding (if any)
                     prev_smooth = self._face_tracker.get_smooth_embedding(bbox)
                     smooth_emb  = _ema_smooth_embedding(raw_emb, prev_smooth,
                                                         EMBEDDING_EMA_ALPHA)
 
-                    # Search the index with Top-K voting
-                    _idx = embedding_index   # local snapshot (reload-safe)
+                    _idx = embedding_index
                     if _idx is not None and len(_idx) > 0:
                         confidence = 0.0
                         person_dict, distance, confidence = _idx.search_with_vote(
@@ -763,17 +766,77 @@ class CameraStream:
                             print(f"[Camera {self.camera_id}] ✗ NO MATCH: "
                                   f"best dist {dist_str} > {DISTANCE_THRESHOLD}")
 
-            # Register this detection in the tracker (smooth_emb stored when set)
+            rec['person']     = person_dict
+            rec['distance']   = distance if distance is not None else float('inf')
+            rec['confidence'] = confidence or 0.0
+            rec['smooth_emb'] = smooth_emb
+            face_records.append(rec)
+
+        # ── Phase 2: per-frame uniqueness ─────────────────────────────────────
+        # No enrolled person can legitimately be on two faces at once.  Earlier
+        # this code labelled both faces in the frame "Zeeshan 60%" + "Zeeshan 49%"
+        # because each face was matched independently.  Now: group all matches by
+        # person_id and keep only the highest-confidence face per person — the
+        # rest are demoted to Unknown so they fall through to the unknown-face
+        # path below.  The demoted faces will get their own embedding searched
+        # again on subsequent frames, so the correct identity can still emerge
+        # later if the tracker cache expires.
+        person_to_records = {}
+        for rec in face_records:
+            if rec['person'] is None:
+                continue
+            if rec['confidence'] < RECOGNITION_CONFIDENCE_THRESHOLD:
+                continue   # below-floor matches will be dropped in phase 3 anyway
+            pid = rec['person']['person_id']
+            person_to_records.setdefault(pid, []).append(rec)
+
+        for pid, recs in person_to_records.items():
+            if len(recs) <= 1:
+                continue
+            recs.sort(key=lambda r: r['confidence'], reverse=True)
+            winner = recs[0]
+            for loser in recs[1:]:
+                print(f"[Camera {self.camera_id}] ⚠ DUPLICATE-PERSON suppressed: "
+                      f"{loser['person']['name']} matched {len(recs)} faces — "
+                      f"kept conf {winner['confidence']:.0%}, "
+                      f"demoted conf {loser['confidence']:.0%}")
+                loser['person']     = None
+                loser['confidence'] = 0.0
+                # Keep loser['distance'] for unknown-face confidence reporting.
+
+        # ── Phase 3: finalize tracker updates, detections, DB writes ──────────
+        for rec in face_records:
+            bbox        = rec['bbox']
+            person_dict = rec['person']
+            distance    = rec['distance']
+            confidence  = rec['confidence']
+            smooth_emb  = rec['smooth_emb']
+
+            detection = {
+                'bbox':       {'x': bbox[0], 'y': bbox[1], 'w': bbox[2], 'h': bbox[3]},
+                'person':     {'recognized': False},
+                'confidence': 0.0,
+            }
+
             tracker_updates.append({
                 'bbox':             bbox,
                 'person':           person_dict,
-                'distance':         distance if distance is not None else float('inf'),
-                'confidence':       confidence or 0.0,
-                'smooth_embedding': smooth_emb,  # None on cache hit or embed failure
+                'distance':         distance,
+                'confidence':       confidence,
+                'smooth_embedding': smooth_emb,
             })
 
-            # ── Step 6: Build detection result + DB write ─────────────────────
-            if person_dict is not None:
+            if rec['rejected']:
+                # Quality-rejected: no DB write at all (no crop to save either).
+                detections.append(detection)
+                continue
+
+            is_confident_match = (
+                person_dict is not None
+                and confidence >= RECOGNITION_CONFIDENCE_THRESHOLD
+            )
+
+            if is_confident_match:
                 detection['person'] = {
                     'recognized': True,
                     'id':   person_dict['person_id'],
@@ -793,10 +856,14 @@ class CameraStream:
                     'camera_type': self.camera_type,
                 })
 
-                if confidence >= RECOGNITION_CONFIDENCE_THRESHOLD:
-                    self._handle_recognition(person_dict, confidence)
+                self._handle_recognition(person_dict, confidence)
             else:
-                self._handle_unknown_face(face_crop, distance)
+                if person_dict is not None:
+                    print(f"[Camera {self.camera_id}] ⚠ LOW-CONF MATCH suppressed: "
+                          f"{person_dict['name']} "
+                          f"({confidence:.0%} < {RECOGNITION_CONFIDENCE_THRESHOLD:.0%}) "
+                          f"— shown as Unknown")
+                self._handle_unknown_face(rec['face_crop'], distance)
 
             detections.append(detection)
 
