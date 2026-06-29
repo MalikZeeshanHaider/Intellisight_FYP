@@ -70,7 +70,7 @@ export const env = {
   // Database
   DATABASE_URL:         process.env.DATABASE_URL,
   DB_HOST:              process.env.DB_HOST                   || 'localhost',
-  DB_PORT:              parseInt(process.env.DB_PORT)         || 5432,
+  DB_PORT:              parseInt(process.env.DB_PORT)         || 5000,
   DB_NAME:              process.env.DB_NAME                   || 'FYP_Intellisight',
   DB_USER:              process.env.DB_USER                   || 'postgres',
   DB_PASSWORD:          process.env.DB_PASSWORD,

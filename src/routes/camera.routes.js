@@ -1,11 +1,5 @@
 import express from 'express';
-import {
-  getAllCameras,
-  getCameraById,
-  createCamera,
-  updateCamera,
-  deleteCamera,
-} from '../controllers/camera.controller.js';
+import {getAllCameras,getCameraById,createCamera,updateCamera,deleteCamera,} from '../controllers/camera.controller.js';
 import { validateRequest } from '../middlewares/validateRequest.js';
 import {
   createCameraSchema,
